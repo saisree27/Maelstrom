@@ -5,8 +5,8 @@ import "fmt"
 type u64 uint64
 
 type board struct {
-	pieces    [15]u64   // Stores bitboards of all white and black pieces along with EMPTY
-	squares   [64]Piece // Stores all 64 squares and which pieces are on them
+	pieces    [14]u64   // Stores bitboards of all white and black pieces
+	squares   [64]Piece // Stores all 64 squares (not used for move generation)
 	colors    [2]u64    // Stores bitboards of both colors
 	occupied  u64       // Bits are set when pieces are there
 	empty     u64       // Bits are clear when pieces are there
@@ -45,12 +45,14 @@ func (b *board) initStartPos() {
 			b.putPiece(b.squares[i], Square(i), WHITE)
 		} else if i >= 48 {
 			b.putPiece(b.squares[i], Square(i), BLACK)
+		} else {
+			b.empty ^= u64(1 << i)
 		}
 	}
 }
 
 func (b *board) initFEN(fen string) {
-
+	// TODO: Initialize position based on FEN string
 }
 
 func (b *board) getPieceSet(p Piece) u64 {
@@ -74,34 +76,92 @@ func (b *board) putPiece(p Piece, s Square, c Color) {
 	b.occupied |= square
 }
 
+func (b *board) movePiece(p Piece, mvfrom Square, mvto Square, c Color) {
+	var from u64 = 1 << mvfrom
+	var to u64 = 1 << mvto
+	var fromTo u64 = from ^ to
+
+	b.pieces[p] ^= fromTo
+	b.colors[c] ^= fromTo
+	b.occupied ^= fromTo
+	b.empty ^= fromTo
+
+	// update mailbox representation
+	b.squares[mvfrom] = EMPTY
+	b.squares[mvto] = p
+}
+
+func (b *board) capturePiece(p Piece, q Piece, mvfrom Square, mvto Square, c Color) {
+	var from u64 = 1 << mvfrom
+	var to u64 = 1 << mvto
+	var fromTo u64 = from ^ to
+	b.pieces[p] ^= fromTo
+	b.colors[c] ^= fromTo
+	b.pieces[q] ^= to
+	b.colors[reverseColor(c)] ^= to
+	b.occupied ^= from
+	b.empty ^= from
+
+	// update mailbox representation
+	b.squares[mvfrom] = EMPTY
+	b.squares[mvto] = p
+}
+
+func (b *board) replacePiece(p Piece, q Piece, sq Square) {
+	var square u64 = 1 << sq
+	b.pieces[p] ^= square
+	b.pieces[q] ^= square
+
+	// update mailbox representation
+	b.squares[sq] = q
+}
+
+func (b *board) removePiece(p Piece, sq Square) {
+	var square u64 = 1 << sq
+	b.pieces[p] ^= square
+	b.occupied ^= square
+	b.empty ^= square
+	b.squares[sq] = EMPTY
+}
+
 func (b *board) makeMove(mv Move) {
-	if mv.movetype == QUIET {
-		var from u64 = 1 << mv.from
-		var to u64 = 1 << mv.to
-		var fromTo u64 = from ^ to
-		b.pieces[mv.piece] ^= fromTo
-		b.colors[mv.colorMoved] ^= fromTo
-		b.occupied ^= fromTo
-		b.empty ^= fromTo
-
-		// update mailbox representation
-		b.squares[mv.from] = EMPTY
-		b.squares[mv.to] = mv.piece
-	} else if mv.movetype == CAPTURE {
-		var from u64 = 1 << mv.from
-		var to u64 = 1 << mv.to
-		var fromTo u64 = from ^ to
-		b.pieces[mv.piece] ^= fromTo
-		b.colors[mv.colorMoved] ^= fromTo
-		b.pieces[mv.captured] ^= to
-		b.pieces[ReverseColor(mv.colorMoved)] ^= to
-		b.occupied ^= from
-		b.empty ^= from
-
-		// update mailbox representation
-		b.squares[mv.from] = EMPTY
-		b.squares[mv.to] = mv.piece
+	b.history = append(b.history, mv)
+	switch mv.movetype {
+	case QUIET:
+		b.movePiece(mv.piece, mv.from, mv.to, mv.colorMoved)
+	case CAPTURE:
+		b.capturePiece(mv.piece, mv.captured, mv.from, mv.to, mv.colorMoved)
+	case PROMOTION:
+		b.movePiece(mv.piece, mv.from, mv.to, mv.colorMoved)
+		b.replacePiece(mv.piece, mv.promote, mv.to)
+	case CAPTUREANDPROMOTION:
+		b.capturePiece(mv.piece, mv.captured, mv.from, mv.to, mv.colorMoved)
+		b.replacePiece(mv.piece, mv.promote, mv.to)
+	case KCASTLE:
+		if mv.colorMoved == WHITE {
+			b.movePiece(wK, e1, g1, WHITE)
+			b.movePiece(wR, h1, f1, WHITE)
+		} else {
+			b.movePiece(bK, e8, g8, BLACK)
+			b.movePiece(bR, h8, f8, BLACK)
+		}
+	case QCASTLE:
+		if mv.colorMoved == WHITE {
+			b.movePiece(wK, e1, c1, WHITE)
+			b.movePiece(wR, a1, d1, WHITE)
+		} else {
+			b.movePiece(bK, e8, c8, BLACK)
+			b.movePiece(bR, a8, d8, BLACK)
+		}
+	case ENPASSANT:
+		b.movePiece(mv.piece, mv.from, mv.to, mv.colorMoved)
+		if mv.colorMoved == WHITE {
+			b.removePiece(bP, mv.to.goDirection(SOUTH))
+		} else {
+			b.removePiece(wP, mv.to.goDirection(NORTH))
+		}
 	}
+	b.turn = reverseColor(b.turn)
 }
 
 func (b *board) print() {
@@ -109,6 +169,36 @@ func (b *board) print() {
 	for i := 56; i >= 0; i -= 8 {
 		for j := 0; j < 8; j++ {
 			s += b.squares[i+j].toString() + " "
+		}
+		s += "\n"
+	}
+	fmt.Print(s)
+}
+
+func (b *board) printFromBitBoards() {
+	s := "\n"
+	for i := 56; i >= 0; i -= 8 {
+		for j := 0; j < 8; j++ {
+			if b.occupied&u64(1<<(i+j)) != 0 {
+				var found = false
+				for k := 0; k < 14; k++ {
+					if b.pieces[k]&u64(1<<(i+j)) != 0 {
+						if found {
+							fmt.Println("Duplicate pieces...")
+						} else {
+							found = true
+							s += Piece(k).toString() + " "
+						}
+					}
+				}
+				if !found {
+					fmt.Println("Piece is in occupied bitboard not not present in any of the pieces bitboard...")
+				}
+			} else if b.empty&u64(1<<(i+j)) != 0 {
+				s += EMPTY.toString() + " "
+			} else {
+				fmt.Println("Square is not represented in either occupied or empty...")
+			}
 		}
 		s += "\n"
 	}

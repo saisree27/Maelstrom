@@ -26,7 +26,7 @@ const (
 	BLACK
 )
 
-func ReverseColor(c Color) Color {
+func reverseColor(c Color) Color {
 	return Color(c ^ 1)
 }
 
@@ -88,10 +88,11 @@ type MoveType int
 const (
 	QUIET MoveType = iota
 	CAPTURE
-	CHECK
-	CASTLE
+	KCASTLE
+	QCASTLE
 	PROMOTION
 	ENPASSANT
+	CAPTUREANDPROMOTION
 )
 
 type Direction int
@@ -188,4 +189,9 @@ const (
 	f8
 	g8
 	h8
+	EMPTYSQ
 )
+
+func (sq Square) goDirection(d Direction) Square {
+	return Square(int(sq) + int(d))
+}
