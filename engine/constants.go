@@ -2,9 +2,13 @@ package engine
 
 // Bitboard constants
 // Using Little-Endian Rank-File Mapping
-var files = [8]u64{
-	0x101010101010101, 0x202020202020202, 0x404040404040404, 0x808080808080808, 0x1010101010101010, 0x2020202020202020, 0x4040404040404040, 0x8080808080808080}
 
+// Bitboard mask of a-h files
+var files = [8]u64{
+	0x101010101010101, 0x202020202020202, 0x404040404040404, 0x808080808080808,
+	0x1010101010101010, 0x2020202020202020, 0x4040404040404040, 0x8080808080808080}
+
+// Bitboard mask of ranks 1-8
 var ranks = [8]u64{
 	0xff, 0xff00, 0xff0000, 0xff000000,
 	0xff00000000, 0xff0000000000, 0xff000000000000, 0xff00000000000000}
@@ -18,13 +22,77 @@ const darkSquares = 0xAA55AA55AA55AA55
 type Color int
 
 const (
-	white Color = iota
-	black
+	WHITE Color = iota
+	BLACK
 )
 
 func ReverseColor(c Color) Color {
 	return Color(c ^ 1)
 }
+
+type Piece int
+
+const (
+	wP Piece = iota
+	wB
+	wN
+	wR
+	wQ
+	wK
+	bP
+	bB
+	bN
+	bR
+	bQ
+	bK
+	EMPTY
+)
+
+func (p Piece) toString() string {
+	switch p {
+	case wP:
+		return "P"
+	case wB:
+		return "B"
+	case wN:
+		return "N"
+	case wR:
+		return "R"
+	case wQ:
+		return "Q"
+	case wK:
+		return "K"
+	case bP:
+		return "p"
+	case bB:
+		return "b"
+	case bN:
+		return "n"
+	case bR:
+		return "r"
+	case bQ:
+		return "q"
+	case bK:
+		return "k"
+	case EMPTY:
+		return "."
+	}
+	return "."
+}
+
+// access bitboard of correct color (e.g. pieces[wP + colorIndexOffset * color])
+const colorIndexOffset = 6
+
+type MoveType int
+
+const (
+	QUIET MoveType = iota
+	CAPTURE
+	CHECK
+	CASTLE
+	PROMOTION
+	ENPASSANT
+)
 
 type Direction int
 
@@ -42,18 +110,19 @@ const (
 type File int
 
 const (
-	a File = iota
-	b
-	c
-	d
-	e
-	f
-	g
-	h
+	A File = iota
+	B
+	C
+	D
+	E
+	F
+	G
+	H
 )
 
 type Square int
 
+// LERM ordering
 const (
 	a1 Square = iota
 	b1
