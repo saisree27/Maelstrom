@@ -35,6 +35,27 @@ func (b *board) getAllAttacks(o Color, occupied u64) u64 {
 		opponentBishops &= ^(1 << lsb)
 		attackedSquares |= getBishopAttacks(Square(lsb), occupied)
 	}
+
+	var opponentRooks u64 = b.getColorPieces(rook, o)
+	for {
+		if opponentRooks == 0 {
+			break
+		}
+		lsb = bitScanForward(opponentRooks)
+		opponentRooks &= ^(1 << lsb)
+		attackedSquares |= getRookAttacks(Square(lsb), occupied)
+	}
+
+	var opponentQueens u64 = b.getColorPieces(queen, o)
+	for {
+		if opponentQueens == 0 {
+			break
+		}
+		lsb = bitScanForward(opponentQueens)
+		opponentQueens &= ^(1 << lsb)
+		attackedSquares |= (getRookAttacks(Square(lsb), occupied) | getBishopAttacks(Square(lsb), occupied))
+	}
+
 	return attackedSquares
 }
 
@@ -57,6 +78,11 @@ func knightAttacks(sq Square) u64 {
 func getBishopAttacks(sq Square, bb u64) u64 {
 	magicIndex := (bb & bishopMasks[sq]) * bishopMagics[sq]
 	return bishopAttacks[sq][magicIndex>>bishopShifts[sq]]
+}
+
+func getRookAttacks(sq Square, bb u64) u64 {
+	magicIndex := (bb & rookMasks[sq]) * rookMagics[sq]
+	return rookAttacks[sq][magicIndex>>rookShifts[sq]]
 }
 
 func (b *board) generateMovesFromLocs(m *[]Move, sq Square, locs u64, c Color) {
@@ -135,6 +161,61 @@ func (b *board) getPawnMoves(m *[]Move, pawns u64, pinned u64, occupied u64, opp
 	}
 }
 
+func (b *board) getBishopMoves(m *[]Move, bishops u64, pinned u64, occupied u64, opponents u64, c Color) {
+	var pinnedBishops u64 = bishops & pinned
+	UNUSED(pinnedBishops)
+
+	var unpinnedBishops u64 = bishops & ^pinned
+	var sq Square
+	for {
+		if unpinnedBishops == 0 {
+			break
+		}
+		sq = Square(popLSB(&unpinnedBishops))
+
+		var bishopMoves u64 = getBishopAttacks(sq, occupied|opponents) & ^occupied
+
+		b.generateMovesFromLocs(m, sq, bishopMoves, c)
+	}
+}
+
+func (b *board) getRookMoves(m *[]Move, rooks u64, pinned u64, occupied u64, opponents u64, c Color) {
+	var pinnedRooks u64 = rooks & pinned
+	UNUSED(pinnedRooks)
+
+	var unpinnedRooks u64 = rooks & ^pinned
+	var sq Square
+	for {
+		if unpinnedRooks == 0 {
+			break
+		}
+		sq = Square(popLSB(&unpinnedRooks))
+
+		var rookMoves u64 = getRookAttacks(sq, occupied|opponents) & ^occupied
+
+		b.generateMovesFromLocs(m, sq, rookMoves, c)
+	}
+}
+
+func (b *board) getQueenMoves(m *[]Move, queens u64, pinned u64, occupied u64, opponents u64, c Color) {
+	var pinnedQueens u64 = queens & pinned
+	UNUSED(pinnedQueens)
+
+	var unpinnedQueens u64 = queens & ^pinned
+	var sq Square
+	for {
+		if unpinnedQueens == 0 {
+			break
+		}
+		sq = Square(popLSB(&unpinnedQueens))
+
+		var rookMoves u64 = getRookAttacks(sq, occupied|opponents) & ^occupied
+		var bishopMoves u64 = getBishopAttacks(sq, occupied|opponents) & ^occupied
+
+		b.generateMovesFromLocs(m, sq, rookMoves|bishopMoves, c)
+	}
+}
+
 func (b *board) generateLegalMoves() []Move {
 	// Setup move list. Will be appending moves to this
 	var m []Move = []Move{}
@@ -168,6 +249,18 @@ func (b *board) generateLegalMoves() []Move {
 	// STEP 3: Calculate pawn moves
 	var playerPawns u64 = b.getColorPieces(pawn, player)
 	b.getPawnMoves(&m, playerPawns, pinned, playerPieces, opponentPieces, player)
+
+	// STEP 4: Calculate bishop moves
+	var playerBishops u64 = b.getColorPieces(bishop, player)
+	b.getBishopMoves(&m, playerBishops, pinned, playerPieces, opponentPieces, player)
+
+	// STEP 5: Calculate rook moves
+	var playerRooks u64 = b.getColorPieces(rook, player)
+	b.getRookMoves(&m, playerRooks, pinned, playerPieces, opponentPieces, player)
+
+	// STEP 5: Calculate rook moves
+	var playerQueens u64 = b.getColorPieces(queen, player)
+	b.getQueenMoves(&m, playerQueens, pinned, playerPieces, opponentPieces, player)
 
 	return m
 }

@@ -416,7 +416,7 @@ var rookShifts = [64]int{}
 // bishop occupancy bits
 var bishopShifts = [64]int{}
 
-func slidingBishopAttacks(s Square, b u64) u64 {
+func slidingBishopAttacksForInitialization(s Square, b u64) u64 {
 	var attacks u64 = 0
 	attacks |= slidingAttacks(s, b, sqToAntiDiag(s))
 	attacks |= slidingAttacks(s, b, sqToDiag(s))
@@ -440,8 +440,40 @@ func initBishopAttacks() {
 			j := i
 			j *= bishopMagics[s]
 			j >>= bishopShifts[s]
-			bishopAttacks[s][j] = slidingBishopAttacks(s, i)
+			bishopAttacks[s][j] = slidingBishopAttacksForInitialization(s, i)
 			i = (i - bishopMasks[s]) & bishopMasks[s]
+			if i == 0 {
+				break
+			}
+		}
+	}
+}
+
+func slidingRookAttacksForInitialization(s Square, b u64) u64 {
+	var attacks u64 = 0
+	attacks |= slidingAttacks(s, b, files[sqToFile(s)])
+	attacks |= slidingAttacks(s, b, ranks[sqToRank(s)])
+	return attacks
+}
+
+func initRookAttacks() {
+	for s := a1; s <= h8; s++ {
+		var edgeMask u64 = (files[A] | files[H]) & ^files[sqToFile(s)]
+		edgeMask |= (ranks[R1] | ranks[R8]) & ^ranks[sqToRank(s)]
+
+		// remove board edges from attack squares
+		rookMasks[s] = (files[sqToFile(s)] ^ ranks[sqToRank(s)]) & ^edgeMask
+
+		// number of movement possibilities from square s
+		rookShifts[s] = 64 - popCount(rookMasks[s])
+
+		var i u64 = 0
+		for {
+			j := i
+			j *= rookMagics[s]
+			j >>= rookShifts[s]
+			rookAttacks[s][j] = slidingRookAttacksForInitialization(s, i)
+			i = (i - rookMasks[s]) & rookMasks[s]
 			if i == 0 {
 				break
 			}

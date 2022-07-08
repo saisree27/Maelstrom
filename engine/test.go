@@ -13,6 +13,7 @@ func Test() {
 	initializeKnightAttacks()
 	initializePawnAttacks()
 	initBishopAttacks()
+	initRookAttacks()
 
 	// // printBitBoard(knightAttacksSquareLookup[int(b1)])
 
