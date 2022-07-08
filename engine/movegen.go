@@ -1,6 +1,6 @@
 package engine
 
-func (b *board) getAllAttacks(o Color) u64 {
+func (b *board) getAllAttacks(o Color, occupied u64) u64 {
 	// Generate all squares attacked/defended by opponent
 	var attackedSquares u64 = 0
 
@@ -26,7 +26,15 @@ func (b *board) getAllAttacks(o Color) u64 {
 	}
 
 	// TODO: Slider pieces (bishop, rook, queen)
-
+	var opponentBishops u64 = b.getColorPieces(bishop, o)
+	for {
+		if opponentBishops == 0 {
+			break
+		}
+		lsb = bitScanForward(opponentBishops)
+		opponentBishops &= ^(1 << lsb)
+		attackedSquares |= getBishopAttacks(Square(lsb), occupied)
+	}
 	return attackedSquares
 }
 
@@ -44,6 +52,11 @@ func kingAttacks(sq Square) u64 {
 
 func knightAttacks(sq Square) u64 {
 	return knightAttacksSquareLookup[sq]
+}
+
+func getBishopAttacks(sq Square, bb u64) u64 {
+	magicIndex := (bb & bishopMasks[sq]) * bishopMagics[sq]
+	return bishopAttacks[sq][magicIndex>>bishopShifts[sq]]
 }
 
 func (b *board) generateMovesFromLocs(m *[]Move, sq Square, locs u64, c Color) {
@@ -135,7 +148,8 @@ func (b *board) generateLegalMoves() []Move {
 	var opponentPieces u64 = b.colors[opponent]
 
 	// Find all squares controlled by opponent
-	var attacks u64 = b.getAllAttacks(opponent)
+	var attacks u64 = b.getAllAttacks(opponent, b.occupied)
+	printBitBoard(attacks)
 
 	// STEP 1: Generate king moves, since we can look for checks after
 	// Get player king square

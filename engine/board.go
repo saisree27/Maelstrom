@@ -55,16 +55,8 @@ func (b *board) initFEN(fen string) {
 	// TODO: Initialize position based on FEN string
 }
 
-func (b *board) getPieceSet(p Piece) u64 {
-	return b.pieces[p]
-}
-
 func (b *board) getColorPieces(p PieceType, c Color) u64 {
 	return b.pieces[int(p)+int(c)*colorIndexOffset]
-}
-
-func (b *board) getBothPieces(p1 Piece, p2 Piece) u64 {
-	return b.pieces[p1] | b.pieces[p2]
 }
 
 func (b *board) putPiece(p Piece, s Square, c Color) {
