@@ -42,6 +42,12 @@ func bitScanForward(bb u64) int {
 	return index64[((bb^(bb-1))*debruijn64)>>58]
 }
 
+func popLSB(bb *u64) int {
+	lsb := bitScanForward(*bb)
+	*bb &= *bb - 1
+	return lsb
+}
+
 func flipVertical(x u64) u64 {
 	const k1 = u64(0x00FF00FF00FF00FF)
 	const k2 = u64(0x0000FFFF0000FFFF)
@@ -109,4 +115,33 @@ func rotateLeft(x u64, n int) u64 {
 
 func rotateRight(x u64, n int) u64 {
 	return (x >> n) | (x << (64 - n))
+}
+
+func shiftBitboard(x u64, d Direction) u64 {
+	switch d {
+	case NORTH:
+		return x << NORTH
+	case SOUTH:
+		return x >> NORTH
+	case 2 * NORTH:
+		// for two-square pawn pushes
+		return x << int(2*NORTH)
+	case 2 * SOUTH:
+		return x >> int(2*NORTH)
+	case EAST:
+		// remove pieces on H file which will still remain after shift
+		return (x & ^files[H]) << EAST
+	case WEST:
+		// remove pieces on A file which will still remain after shift
+		return (x & ^files[A]) >> EAST
+	case NE:
+		return (x & ^files[H]) << NE
+	case SE:
+		return (x & ^files[H]) >> -SE
+	case NW:
+		return (x & ^files[A]) << NW
+	case SW:
+		return (x & ^files[A]) >> -SW
+	}
+	return 0
 }

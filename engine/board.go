@@ -59,7 +59,7 @@ func (b *board) getPieceSet(p Piece) u64 {
 	return b.pieces[p]
 }
 
-func (b *board) getColorPieces(p Piece, c Color) u64 {
+func (b *board) getColorPieces(p PieceType, c Color) u64 {
 	return b.pieces[int(p)+int(c)*colorIndexOffset]
 }
 

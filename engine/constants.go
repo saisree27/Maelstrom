@@ -1,5 +1,10 @@
 package engine
 
+/**
+* Contains constants for pieces, squares, ranks, files, masks, etc.
+* Also contains initialization methods for lookup tables for piece attacks
+**/
+
 // Bitboard constants
 // Using Little-Endian Rank-File Mapping
 
@@ -88,6 +93,21 @@ func (p Piece) getColor() Color {
 	}
 }
 
+type PieceType int
+
+const (
+	pawn PieceType = iota
+	bishop
+	knight
+	rook
+	queen
+	king
+)
+
+func getCP(c Color, pt PieceType) Piece {
+	return Piece(int(pt) + colorIndexOffset*int(c))
+}
+
 // access bitboard of correct color (e.g. pieces[wP + colorIndexOffset * color])
 const colorIndexOffset = 6
 
@@ -128,6 +148,23 @@ const (
 	G
 	H
 )
+
+type Rank int
+
+const (
+	R1 Rank = iota
+	R2
+	R3
+	R4
+	R5
+	R6
+	R7
+	R8
+)
+
+var almostPromotion = map[Color]Rank{WHITE: R7, BLACK: R2}
+var startingRank = map[Color]Rank{WHITE: R2, BLACK: R7}
+var pawnPushDirection = map[Color]Direction{WHITE: NORTH, BLACK: SOUTH}
 
 type Square int
 
@@ -222,4 +259,58 @@ func reversedMap(m map[string]Square) map[Square]string {
 
 func (sq Square) goDirection(d Direction) Square {
 	return Square(int(sq) + int(d))
+}
+
+var kingAttacksSquareLookup [64]u64
+
+func initializeKingAttacks() {
+	var bb u64 = 1
+	for i := 0; i < 64; i++ {
+		copy := bb
+		attacks := shiftBitboard(copy, EAST) | shiftBitboard(copy, WEST)
+		copy |= attacks
+		attacks |= shiftBitboard(copy, NORTH) | shiftBitboard(copy, SOUTH)
+
+		kingAttacksSquareLookup[i] = attacks
+		bb = bb << 1
+	}
+}
+
+var knightAttacksSquareLookup [64]u64
+
+func initializeKnightAttacks() {
+	var bb u64 = 1
+	for i := 0; i < 64; i++ {
+		var attacks u64 = 0
+		attacks |= (bb << 17) & ^files[A]
+		attacks |= (bb << 10) & ^files[A] & ^files[B]
+		attacks |= (bb >> 6) & ^files[A] & ^files[B]
+		attacks |= (bb >> 15) & ^files[A]
+		attacks |= (bb << 15) & ^files[H]
+		attacks |= (bb << 6) & ^files[G] & ^files[H]
+		attacks |= (bb >> 10) & ^files[G] & ^files[H]
+		attacks |= (bb >> 17) & ^files[H]
+
+		knightAttacksSquareLookup[i] = attacks
+		bb = bb << 1
+	}
+}
+
+var whitePawnAttacksSquareLookup [64]u64
+var blackPawnAttacksSquareLookup [64]u64
+
+func initializePawnAttacks() {
+	var bb u64 = 1
+	for i := 0; i < 64; i++ {
+		var attacks u64 = shiftBitboard(bb, NE) | shiftBitboard(bb, NW)
+		whitePawnAttacksSquareLookup[i] = attacks
+		attacks = shiftBitboard(bb, SE) | shiftBitboard(bb, SW)
+		blackPawnAttacksSquareLookup[i] = attacks
+		bb = bb << 1
+	}
+}
+
+// get rid of variable unused error while developing, don't really like that lol
+func UNUSED(x interface{}) {
+	_ = x
 }
