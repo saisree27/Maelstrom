@@ -16,15 +16,16 @@ func Test() {
 	initRookAttacks()
 	initSquaresBetween()
 	initLine()
+	initializeSQLookup()
 
 	// // printBitBoard(knightAttacksSquareLookup[int(b1)])
 
 	b := board{}
-	b.initFEN("4r2k/6p1/7p/1p1N2nP/1P2P3/b3BP2/2R3K1/8 b - - 18 58")
+	b.initFEN("r3k2r/pppbqppp/3p1n2/2b1p1B1/2BnP3/2NP1N2/PPPQ1PPP/1K1R3R b kq - 7 9")
 
 	b.print()
 	b.printFromBitBoards()
-
+	fmt.Println(b.kW)
 	printBitBoard(b.occupied)
 	// for {
 	// 	var move string

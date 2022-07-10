@@ -364,6 +364,14 @@ var colorToKingLookup = map[Color]Piece{
 	WHITE: wK, BLACK: bK,
 }
 
+var sToBB [64]u64
+
+func initializeSQLookup() {
+	for i := 0; i < 64; i++ {
+		sToBB[i] = 1 << i
+	}
+}
+
 // Magic bitboard initialization for bishop and rook moves:
 //
 // Don't really quite understand how magics work yet so a lot of the

@@ -61,12 +61,9 @@ func (b *board) initFEN(fen string) {
 	for s := a1; s <= h8; s++ {
 		b.putPiece(EMPTY, s, WHITE)
 	}
-	// FEN example:
-	// rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
-	// sections: board turn castling enpassant halfMoves currMove
+
 	attrs := strings.Split(fen, " ")
 
-	// add all pieces to board
 	pieces := attrs[0]
 	ranksPieces := strings.Split(pieces, "/")
 
@@ -229,7 +226,34 @@ func (b *board) makeMove(mv Move) {
 			b.removePiece(wP, mv.to.goDirection(NORTH))
 		}
 	}
+
 	b.turn = reverseColor(b.turn)
+
+	// update castling rights
+	if mv.piece == wK {
+		b.kW = false
+		b.qW = false
+	}
+	if mv.piece == bK {
+		b.kB = false
+		b.qB = false
+	}
+	if mv.piece == wR {
+		if mv.from == a1 {
+			b.qW = false
+		}
+		if mv.from == h1 {
+			b.kW = false
+		}
+	}
+	if mv.piece == bR {
+		if mv.from == a8 {
+			b.qB = false
+		}
+		if mv.from == h8 {
+			b.kB = false
+		}
+	}
 }
 
 func (b *board) print() {

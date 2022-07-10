@@ -26,7 +26,7 @@ func (b *board) getAllAttacks(o Color, occupied u64) u64 {
 			break
 		}
 		lsb = bitScanForward(opponentKnights)
-		opponentKnights &= ^(1 << lsb)
+		opponentKnights &= ^(sToBB[lsb])
 		attackedSquares |= knightAttacks(Square(lsb))
 	}
 
@@ -37,7 +37,7 @@ func (b *board) getAllAttacks(o Color, occupied u64) u64 {
 			break
 		}
 		lsb = bitScanForward(opponentBishops)
-		opponentBishops &= ^(1 << lsb)
+		opponentBishops &= ^(sToBB[lsb])
 		attackedSquares |= getBishopAttacks(Square(lsb), occupied^playerKing)
 	}
 
@@ -47,7 +47,7 @@ func (b *board) getAllAttacks(o Color, occupied u64) u64 {
 			break
 		}
 		lsb = bitScanForward(opponentRooks)
-		opponentRooks &= ^(1 << lsb)
+		opponentRooks &= ^(sToBB[lsb])
 		attackedSquares |= getRookAttacks(Square(lsb), occupied^playerKing)
 	}
 
@@ -57,7 +57,7 @@ func (b *board) getAllAttacks(o Color, occupied u64) u64 {
 			break
 		}
 		lsb = bitScanForward(opponentQueens)
-		opponentQueens &= ^(1 << lsb)
+		opponentQueens &= ^(sToBB[lsb])
 		attackedSquares |= (getRookAttacks(Square(lsb), occupied^playerKing) | getBishopAttacks(Square(lsb), occupied^playerKing))
 	}
 
@@ -100,7 +100,7 @@ func (b *board) generateMovesFromLocs(m *[]Move, sq Square, locs u64, c Color) {
 		}
 
 		lsb = Square(popLSB(&locs))
-		bbLSB = 1 << lsb
+		bbLSB = sToBB[lsb]
 		piece = b.squares[sq]
 
 		if piece == wP && (bbLSB&ranks[R8] != 0) {
@@ -127,18 +127,19 @@ func (b *board) generateMovesFromLocs(m *[]Move, sq Square, locs u64, c Color) {
 				Move{from: sq, to: Square(lsb), piece: wP, colorMoved: c, captured: b.squares[lsb], movetype: movet, promote: bB},
 			}
 			*m = append(*m, moves...)
-		}
-
-		var newMove Move = Move{
-			from: sq, to: Square(lsb), piece: piece,
-			colorMoved: c, captured: b.squares[lsb]}
-		if b.squares[lsb] == EMPTY {
-			newMove.movetype = QUIET
 		} else {
-			newMove.movetype = CAPTURE
-		}
 
-		*m = append(*m, newMove)
+			var newMove Move = Move{
+				from: sq, to: Square(lsb), piece: piece,
+				colorMoved: c, captured: b.squares[lsb]}
+			if b.squares[lsb] == EMPTY {
+				newMove.movetype = QUIET
+			} else {
+				newMove.movetype = CAPTURE
+			}
+
+			*m = append(*m, newMove)
+		}
 	}
 }
 
@@ -177,7 +178,7 @@ func (b *board) getPawnMoves(m *[]Move, pawns u64, pinned u64, occupied u64, opp
 				break
 			}
 			lsb = Square(popLSB(&pinnedPawns))
-			bbSQ = 1 << lsb
+			bbSQ = sToBB[lsb]
 
 			var pawnMoves u64 = (shiftBitboard(bbSQ, pawnPushDirection[c]) & ^occupied) & allowed & line[colorToKingLookup[c]][lsb]
 			if pawnMoves != 0 {
@@ -199,7 +200,7 @@ func (b *board) getPawnMoves(m *[]Move, pawns u64, pinned u64, occupied u64, opp
 			break
 		}
 		sq = Square(popLSB(&unpinnedPawns))
-		bbSQ = 1 << sq
+		bbSQ = sToBB[sq]
 		var pawnMoves u64 = (shiftBitboard(bbSQ, pawnPushDirection[c]) & ^occupied) & allowed
 		if pawnMoves != 0 {
 			if bbSQ&ranks[startingRank[c]] != 0 {
@@ -321,6 +322,34 @@ func (b *board) getQueenMoves(m *[]Move, queens u64, pinned u64, player u64, opp
 	}
 }
 
+func (b *board) getCastlingMoves(m *[]Move, pKing Square, attacks u64, c Color) {
+	var castlingKingsidePossible bool = false
+	var castlingQueensidePossible bool = false
+
+	var allowed u64 = ^attacks & b.empty
+
+	if c == WHITE {
+		castlingKingsidePossible = (sToBB[f1]&allowed != 0) && (sToBB[g1]&allowed != 0)
+		castlingQueensidePossible = (sToBB[b1]&allowed != 0) && (sToBB[c1]&allowed != 0) && (sToBB[d1]&allowed != 0)
+		if b.kW && castlingKingsidePossible {
+			*m = append(*m, Move{from: e1, to: g1, piece: wK, movetype: KCASTLE, colorMoved: WHITE})
+		}
+		if b.qW && castlingQueensidePossible {
+			*m = append(*m, Move{from: e1, to: c1, piece: wK, movetype: QCASTLE, colorMoved: WHITE})
+		}
+	} else {
+		castlingKingsidePossible = (sToBB[f8]&allowed != 0) && (sToBB[g8]&allowed != 0)
+		castlingQueensidePossible = (sToBB[b8]&allowed != 0) && (sToBB[c8]&allowed != 0) && (sToBB[d8]&allowed != 0)
+		if b.kB && castlingKingsidePossible {
+			*m = append(*m, Move{from: e8, to: g8, piece: bK, movetype: KCASTLE, colorMoved: BLACK})
+		}
+
+		if b.qB && castlingQueensidePossible {
+			*m = append(*m, Move{from: e8, to: c8, piece: bK, movetype: QCASTLE, colorMoved: BLACK})
+		}
+	}
+}
+
 func (b *board) generateLegalMoves() []Move {
 	// Setup move list. Will be appending moves to this
 	var m []Move = []Move{}
@@ -375,7 +404,7 @@ func (b *board) generateLegalMoves() []Move {
 		printBitBoard(piecesBetween)
 
 		if piecesBetween == 0 {
-			checkers ^= 1 << lsb
+			checkers ^= sToBB[lsb]
 		} else if piecesBetween != 0 && (piecesBetween&(piecesBetween-1)) == 0 {
 			// only one piece between player and king, since otherwise there is no pin
 			pinned ^= piecesBetween
@@ -460,6 +489,9 @@ func (b *board) generateLegalMoves() []Move {
 	// STEP 5: Calculate rook moves
 	var playerQueens u64 = b.getColorPieces(queen, player)
 	b.getQueenMoves(&m, playerQueens, pinned, playerPieces, opponentPieces, player, allowed)
+
+	// STEP 6: Castling
+	b.getCastlingMoves(&m, playerKing, attacks, player)
 
 	return m
 }
