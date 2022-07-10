@@ -6,6 +6,9 @@ func (b *board) getAllAttacks(o Color, occupied u64) u64 {
 	// Generate all squares attacked/defended by opponent
 	var attackedSquares u64 = 0
 
+	// Used to remove king from xray attacks
+	var playerKing = b.getColorPieces(king, reverseColor(o))
+
 	// Begin first with king
 	var opponentKing Square = Square(bitScanForward(b.getColorPieces(king, o)))
 	attackedSquares |= kingAttacks(opponentKing)
@@ -35,7 +38,7 @@ func (b *board) getAllAttacks(o Color, occupied u64) u64 {
 		}
 		lsb = bitScanForward(opponentBishops)
 		opponentBishops &= ^(1 << lsb)
-		attackedSquares |= getBishopAttacks(Square(lsb), occupied)
+		attackedSquares |= getBishopAttacks(Square(lsb), occupied^playerKing)
 	}
 
 	var opponentRooks u64 = b.getColorPieces(rook, o)
@@ -45,7 +48,7 @@ func (b *board) getAllAttacks(o Color, occupied u64) u64 {
 		}
 		lsb = bitScanForward(opponentRooks)
 		opponentRooks &= ^(1 << lsb)
-		attackedSquares |= getRookAttacks(Square(lsb), occupied)
+		attackedSquares |= getRookAttacks(Square(lsb), occupied^playerKing)
 	}
 
 	var opponentQueens u64 = b.getColorPieces(queen, o)
@@ -55,7 +58,7 @@ func (b *board) getAllAttacks(o Color, occupied u64) u64 {
 		}
 		lsb = bitScanForward(opponentQueens)
 		opponentQueens &= ^(1 << lsb)
-		attackedSquares |= (getRookAttacks(Square(lsb), occupied) | getBishopAttacks(Square(lsb), occupied))
+		attackedSquares |= (getRookAttacks(Square(lsb), occupied^playerKing) | getBishopAttacks(Square(lsb), occupied^playerKing))
 	}
 
 	return attackedSquares
