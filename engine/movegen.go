@@ -146,9 +146,11 @@ func (b *board) getPawnMoves(m *[]Move, pawns u64, pinned u64, occupied u64, opp
 		sq = Square(popLSB(&unpinnedPawns))
 		bbSQ = 1 << sq
 		var pawnMoves u64 = (shiftBitboard(bbSQ, pawnPushDirection[c]) & ^occupied)
-		if bbSQ&ranks[startingRank[c]] != 0 {
-			// two move pushes allowed
-			pawnMoves |= (shiftBitboard(bbSQ, pawnPushDirection[c]*2) & ^occupied)
+		if pawnMoves != 0 {
+			if bbSQ&ranks[startingRank[c]] != 0 {
+				// two move pushes allowed
+				pawnMoves |= (shiftBitboard(bbSQ, pawnPushDirection[c]*2) & ^occupied)
+			}
 		}
 		// add captures
 		if c == WHITE {
