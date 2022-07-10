@@ -486,6 +486,41 @@ func initRookAttacks() {
 	}
 }
 
+// helpful tables found in nkarve/surge
+var squaresBetween [64][64]u64
+
+func initSquaresBetween() {
+	var squares u64
+	for i := a1; i <= h8; i++ {
+		for j := a1; j <= h8; j++ {
+			squares = 1<<i | 1<<j
+			if (sqToFile(i) == sqToFile(j)) || (sqToRank(i) == sqToRank(j)) {
+				squaresBetween[i][j] =
+					slidingRookAttacksForInitialization(i, squares) & slidingRookAttacksForInitialization(j, squares)
+			} else if (sqToDiag(i) == sqToDiag(j)) || (sqToAntiDiag(i) == sqToAntiDiag(j)) {
+				squaresBetween[i][j] =
+					slidingBishopAttacksForInitialization(i, squares) & slidingBishopAttacksForInitialization(j, squares)
+			}
+		}
+	}
+}
+
+var line [64][64]u64
+
+func initLine() {
+	for i := a1; i <= h8; i++ {
+		for j := a1; j <= h8; j++ {
+			if (sqToFile(i) == sqToFile(j)) || (sqToRank(i) == sqToRank(j)) {
+				line[i][j] =
+					(slidingRookAttacksForInitialization(i, 0) & slidingRookAttacksForInitialization(j, 0)) | 1<<i | 1<<j
+			} else if (sqToDiag(i) == sqToDiag(j)) || (sqToAntiDiag(i) == sqToAntiDiag(j)) {
+				line[i][j] =
+					(slidingBishopAttacksForInitialization(i, 0) & slidingBishopAttacksForInitialization(j, 0)) | 1<<i | 1<<j
+			}
+		}
+	}
+}
+
 // get rid of variable unused error while developing, don't really like that lol
 func UNUSED(x interface{}) {
 	_ = x
