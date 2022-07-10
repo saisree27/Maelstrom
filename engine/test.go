@@ -20,7 +20,7 @@ func Test() {
 	// // printBitBoard(knightAttacksSquareLookup[int(b1)])
 
 	b := board{}
-	b.initFEN("r7/6p1/1bp5/p4k2/R7/1NP1K2P/8/8 w - - 5 51")
+	b.initFEN("4r2k/6p1/7p/1p1N2nP/1P2P3/b3BP2/2R3K1/8 b - - 18 58")
 
 	b.print()
 	b.printFromBitBoards()

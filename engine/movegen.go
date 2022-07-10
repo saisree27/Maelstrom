@@ -92,15 +92,45 @@ func getRookAttacks(sq Square, bb u64) u64 {
 
 func (b *board) generateMovesFromLocs(m *[]Move, sq Square, locs u64, c Color) {
 	var lsb Square
+	var bbLSB u64
+	var piece Piece
 	for {
 		if locs == 0 {
 			break
 		}
 
 		lsb = Square(popLSB(&locs))
+		bbLSB = 1 << lsb
+		piece = b.squares[sq]
+
+		if piece == wP && (bbLSB&ranks[R8] != 0) {
+			movet := PROMOTION
+			if b.squares[lsb] == EMPTY {
+				movet = CAPTUREANDPROMOTION
+			}
+			moves := []Move{
+				Move{from: sq, to: Square(lsb), piece: wP, colorMoved: c, captured: b.squares[lsb], movetype: movet, promote: wN},
+				Move{from: sq, to: Square(lsb), piece: wP, colorMoved: c, captured: b.squares[lsb], movetype: movet, promote: wR},
+				Move{from: sq, to: Square(lsb), piece: wP, colorMoved: c, captured: b.squares[lsb], movetype: movet, promote: wQ},
+				Move{from: sq, to: Square(lsb), piece: wP, colorMoved: c, captured: b.squares[lsb], movetype: movet, promote: wB},
+			}
+			*m = append(*m, moves...)
+		} else if piece == bP && (bbLSB&ranks[R8] != 0) {
+			movet := PROMOTION
+			if b.squares[lsb] == EMPTY {
+				movet = CAPTUREANDPROMOTION
+			}
+			moves := []Move{
+				Move{from: sq, to: Square(lsb), piece: wP, colorMoved: c, captured: b.squares[lsb], movetype: movet, promote: bN},
+				Move{from: sq, to: Square(lsb), piece: wP, colorMoved: c, captured: b.squares[lsb], movetype: movet, promote: bR},
+				Move{from: sq, to: Square(lsb), piece: wP, colorMoved: c, captured: b.squares[lsb], movetype: movet, promote: bQ},
+				Move{from: sq, to: Square(lsb), piece: wP, colorMoved: c, captured: b.squares[lsb], movetype: movet, promote: bB},
+			}
+			*m = append(*m, moves...)
+		}
 
 		var newMove Move = Move{
-			from: sq, to: Square(lsb), piece: b.squares[sq],
+			from: sq, to: Square(lsb), piece: piece,
 			colorMoved: c, captured: b.squares[lsb]}
 		if b.squares[lsb] == EMPTY {
 			newMove.movetype = QUIET
@@ -139,11 +169,31 @@ func (b *board) getPawnMoves(m *[]Move, pawns u64, pinned u64, occupied u64, opp
 	// have to handle pinned pawns (TODO)
 	// promotion & enpassant will be handled in generateMovesFromLocs
 	var pinnedPawns u64 = pawns & pinned
-	UNUSED(pinnedPawns)
+	var bbSQ u64
+	if pinnedPawns != 0 {
+		var lsb Square
+		for {
+			if pinnedPawns == 0 {
+				break
+			}
+			lsb = Square(popLSB(&pinnedPawns))
+			bbSQ = 1 << lsb
+
+			var pawnMoves u64 = (shiftBitboard(bbSQ, pawnPushDirection[c]) & ^occupied) & allowed & line[colorToKingLookup[c]][lsb]
+			if pawnMoves != 0 {
+				if bbSQ&ranks[startingRank[c]] != 0 {
+					// two move pushes allowed
+					pawnMoves |= (shiftBitboard(bbSQ, pawnPushDirection[c]*2) & ^occupied) & allowed & line[colorToKingLookup[c]][lsb]
+				}
+			}
+
+			pawnMoves |= colorToPawnLookup[c][lsb] & opponents & allowed & line[colorToKingLookup[c]][lsb]
+			b.generateMovesFromLocs(m, lsb, pawnMoves, c)
+		}
+	}
 
 	var unpinnedPawns u64 = pawns & ^pinned
 	var sq Square
-	var bbSQ u64
 	for {
 		if unpinnedPawns == 0 {
 			break
@@ -170,7 +220,23 @@ func (b *board) getPawnMoves(m *[]Move, pawns u64, pinned u64, occupied u64, opp
 
 func (b *board) getBishopMoves(m *[]Move, bishops u64, pinned u64, player u64, opponents u64, c Color, allowed u64) {
 	var pinnedBishops u64 = bishops & pinned
-	UNUSED(pinnedBishops)
+	if pinnedBishops != 0 {
+		var lsb Square
+		for {
+			if pinnedBishops == 0 {
+				break
+			}
+			lsb = Square(popLSB(&pinnedBishops))
+
+			var possible u64
+			if c == WHITE {
+				possible = getBishopAttacks(lsb, b.occupied) & line[b.pieces[wK]][lsb] & allowed
+			} else {
+				possible = getBishopAttacks(lsb, b.occupied) & line[b.pieces[bK]][lsb] & allowed
+			}
+			b.generateMovesFromLocs(m, lsb, possible, c)
+		}
+	}
 
 	var unpinnedBishops u64 = bishops & ^pinned
 	var sq Square
@@ -188,7 +254,23 @@ func (b *board) getBishopMoves(m *[]Move, bishops u64, pinned u64, player u64, o
 
 func (b *board) getRookMoves(m *[]Move, rooks u64, pinned u64, player u64, opponents u64, c Color, allowed u64) {
 	var pinnedRooks u64 = rooks & pinned
-	UNUSED(pinnedRooks)
+	if pinnedRooks != 0 {
+		var lsb Square
+		for {
+			if pinnedRooks == 0 {
+				break
+			}
+			lsb = Square(popLSB(&pinnedRooks))
+
+			var possible u64
+			if c == WHITE {
+				possible = getRookAttacks(lsb, b.occupied) & line[b.pieces[wK]][lsb] & allowed
+			} else {
+				possible = getRookAttacks(lsb, b.occupied) & line[b.pieces[bK]][lsb] & allowed
+			}
+			b.generateMovesFromLocs(m, lsb, possible, c)
+		}
+	}
 
 	var unpinnedRooks u64 = rooks & ^pinned
 	var sq Square
@@ -206,7 +288,23 @@ func (b *board) getRookMoves(m *[]Move, rooks u64, pinned u64, player u64, oppon
 
 func (b *board) getQueenMoves(m *[]Move, queens u64, pinned u64, player u64, opponents u64, c Color, allowed u64) {
 	var pinnedQueens u64 = queens & pinned
-	UNUSED(pinnedQueens)
+	if pinnedQueens != 0 {
+		var lsb Square
+		for {
+			if pinnedQueens == 0 {
+				break
+			}
+			lsb = Square(popLSB(&pinnedQueens))
+
+			var possible u64
+			if c == WHITE {
+				possible = (getRookAttacks(lsb, b.occupied) | getBishopAttacks(lsb, b.occupied)) & line[b.pieces[wK]][lsb] & allowed
+			} else {
+				possible = (getRookAttacks(lsb, b.occupied) | getBishopAttacks(lsb, b.occupied)) & line[b.pieces[bK]][lsb] & allowed
+			}
+			b.generateMovesFromLocs(m, lsb, possible, c)
+		}
+	}
 
 	var unpinnedQueens u64 = queens & ^pinned
 	var sq Square

@@ -352,6 +352,18 @@ func initializePawnAttacks() {
 	}
 }
 
+var colorToPawnLookup = map[Color][64]u64{
+	WHITE: whitePawnAttacksSquareLookup, BLACK: blackPawnAttacksSquareLookup,
+}
+
+var colorToPawnLookupReverse = map[Color][64]u64{
+	WHITE: blackPawnAttacksSquareLookup, BLACK: whitePawnAttacksSquareLookup,
+}
+
+var colorToKingLookup = map[Color]Piece{
+	WHITE: wK, BLACK: bK,
+}
+
 // Magic bitboard initialization for bishop and rook moves:
 //
 // Don't really quite understand how magics work yet so a lot of the
