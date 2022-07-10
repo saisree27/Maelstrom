@@ -17,9 +17,13 @@ func Test() {
 
 	// // printBitBoard(knightAttacksSquareLookup[int(b1)])
 
-	b := newBoard()
+	b := board{}
+	b.initFEN("r3k2r/2qn1p1p/3bpn2/1Ppp4/P3P1p1/8/1B1N1PPP/RN1QK2R w KQkq - 2 15")
+
 	b.print()
 	b.printFromBitBoards()
+
+	printBitBoard(b.occupied)
 	// for {
 	// 	var move string
 	// 	fmt.Println("Enter move: ")

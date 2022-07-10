@@ -1,6 +1,10 @@
 package engine
 
-import "fmt"
+import (
+	"fmt"
+	"strconv"
+	"strings"
+)
 
 type u64 uint64
 
@@ -11,19 +15,21 @@ type board struct {
 	occupied  u64       // Bits are set when pieces are there
 	empty     u64       // Bits are clear when pieces are there
 	turn      Color     // Side to move
-	enpassant bool      // If en passant is possible at current turn
+	enpassant Square    // En passant square. If not possible, stores EMPTY
 	kW        bool      // If kingside castling available for White
 	qW        bool      // If queenside castling is available for White
 	kB        bool      // If kingside castling is available for Black
 	qB        bool      // If queenside castling is available for Black
 	history   []Move    // Stores move history for board
 	zobrist   u64       // Zobrist hash (TODO)
+	plyCnt    int       // Stores number of half moves played
+	moveCount int       // Stores which move currently we are at
 }
 
 func newBoard() *board {
 	b := board{}
 	b.turn = WHITE
-	b.enpassant = false
+	b.enpassant = EMPTYSQ
 	b.kW, b.qW, b.kB, b.qB = true, true, true, true
 	b.initStartPos()
 	return &b
@@ -52,7 +58,70 @@ func (b *board) initStartPos() {
 }
 
 func (b *board) initFEN(fen string) {
-	// TODO: Initialize position based on FEN string
+	for s := a1; s <= h8; s++ {
+		b.putPiece(EMPTY, s, WHITE)
+	}
+	// FEN example:
+	// rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
+	// sections: board turn castling enpassant halfMoves currMove
+	attrs := strings.Split(fen, " ")
+
+	// add all pieces to board
+	pieces := attrs[0]
+	ranksPieces := strings.Split(pieces, "/")
+
+	for i, stRank := range ranksPieces {
+		rank := 8 * (7 - i)
+		sq := Square(rank)
+		for _, piece := range stRank {
+			if strings.Contains("PBNRQKpbnrqk", string(piece)) {
+				piece := stringToPieceMap[string(piece)]
+				b.putPiece(piece, sq, piece.getColor())
+				sq++
+			} else {
+				num, _ := strconv.Atoi(string(piece))
+				for k := 0; k < num; k++ {
+					newSq := Square(int(sq) + int(k))
+					b.putPiece(EMPTY, newSq, WHITE)
+				}
+				sq += Square(num)
+			}
+		}
+	}
+
+	turn := attrs[1]
+	if turn == "w" {
+		b.turn = WHITE
+	} else {
+		b.turn = BLACK
+	}
+
+	castling := attrs[2]
+	if strings.Contains(castling, "K") {
+		b.kW = true
+	}
+	if strings.Contains(castling, "Q") {
+		b.qW = true
+	}
+	if strings.Contains(castling, "k") {
+		b.kB = true
+	}
+	if strings.Contains(castling, "q") {
+		b.qB = true
+	}
+
+	enpassant := attrs[3]
+	if enpassant == "-" {
+		b.enpassant = EMPTYSQ
+	} else {
+		b.enpassant = stringToSquareMap[enpassant]
+	}
+
+	halfMoveClock := attrs[4]
+	b.plyCnt, _ = strconv.Atoi(halfMoveClock)
+
+	moveCount := attrs[5]
+	b.moveCount, _ = strconv.Atoi(moveCount)
 }
 
 func (b *board) getColorPieces(p PieceType, c Color) u64 {
@@ -62,10 +131,17 @@ func (b *board) getColorPieces(p PieceType, c Color) u64 {
 func (b *board) putPiece(p Piece, s Square, c Color) {
 	b.squares[s] = p
 
-	var square u64 = (1 << s)
-	b.colors[c] |= square
-	b.pieces[p] |= square
-	b.occupied |= square
+	if p != EMPTY {
+		var square u64 = (1 << s)
+		b.colors[c] |= square
+		b.pieces[p] |= square
+		b.occupied |= square
+		b.empty &= ^square
+	} else {
+		var square u64 = (1 << s)
+		b.empty |= square
+		b.occupied &= ^square
+	}
 }
 
 func (b *board) movePiece(p Piece, mvfrom Square, mvto Square, c Color) {

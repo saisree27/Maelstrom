@@ -105,6 +105,11 @@ func (p Piece) toString() string {
 	return "."
 }
 
+var stringToPieceMap = map[string]Piece{
+	"P": wP, "B": wB, "N": wN, "R": wR, "Q": wQ, "K": wK,
+	"p": bP, "b": bB, "n": bN, "r": bR, "q": bQ, "k": bK,
+}
+
 func (p Piece) getColor() Color {
 	if p == wP || p == wN || p == wB || p == wR || p == wQ || p == wK {
 		return WHITE

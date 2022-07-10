@@ -107,13 +107,13 @@ func (b *board) generateMovesFromLocs(m *[]Move, sq Square, locs u64, c Color) {
 	}
 }
 
-func (b *board) getKingMoves(m *[]Move, sq Square, attacks u64, occupied u64, c Color) {
-	var kingMoves u64 = kingAttacks(sq) & ^attacks & ^occupied
+func (b *board) getKingMoves(m *[]Move, sq Square, attacks u64, player u64, c Color) {
+	var kingMoves u64 = kingAttacks(sq) & ^attacks & ^player
 	b.generateMovesFromLocs(m, sq, kingMoves, c)
 
 }
 
-func (b *board) getKnightMoves(m *[]Move, knights u64, pinned u64, occupied u64, c Color) {
+func (b *board) getKnightMoves(m *[]Move, knights u64, pinned u64, player u64, c Color) {
 	// since a pinned knight means no possible moves, can just mask by non-pinned
 	knights &= ^pinned
 
@@ -125,7 +125,7 @@ func (b *board) getKnightMoves(m *[]Move, knights u64, pinned u64, occupied u64,
 
 		sq = Square(popLSB(&knights))
 
-		var knightMoves u64 = knightAttacks(Square(sq)) & ^occupied
+		var knightMoves u64 = knightAttacks(Square(sq)) & ^player
 		b.generateMovesFromLocs(m, sq, knightMoves, c)
 	}
 }
@@ -145,10 +145,10 @@ func (b *board) getPawnMoves(m *[]Move, pawns u64, pinned u64, occupied u64, opp
 		}
 		sq = Square(popLSB(&unpinnedPawns))
 		bbSQ = 1 << sq
-		var pawnMoves u64 = shiftBitboard(bbSQ, pawnPushDirection[c]) & ^occupied
+		var pawnMoves u64 = (shiftBitboard(bbSQ, pawnPushDirection[c]) & ^occupied)
 		if bbSQ&ranks[startingRank[c]] != 0 {
 			// two move pushes allowed
-			pawnMoves |= shiftBitboard(bbSQ, pawnPushDirection[c]*2) & ^occupied
+			pawnMoves |= (shiftBitboard(bbSQ, pawnPushDirection[c]*2) & ^occupied)
 		}
 		// add captures
 		if c == WHITE {
@@ -161,7 +161,7 @@ func (b *board) getPawnMoves(m *[]Move, pawns u64, pinned u64, occupied u64, opp
 	}
 }
 
-func (b *board) getBishopMoves(m *[]Move, bishops u64, pinned u64, occupied u64, opponents u64, c Color) {
+func (b *board) getBishopMoves(m *[]Move, bishops u64, pinned u64, player u64, opponents u64, c Color) {
 	var pinnedBishops u64 = bishops & pinned
 	UNUSED(pinnedBishops)
 
@@ -173,13 +173,13 @@ func (b *board) getBishopMoves(m *[]Move, bishops u64, pinned u64, occupied u64,
 		}
 		sq = Square(popLSB(&unpinnedBishops))
 
-		var bishopMoves u64 = getBishopAttacks(sq, occupied|opponents) & ^occupied
+		var bishopMoves u64 = getBishopAttacks(sq, player|opponents) & ^player
 
 		b.generateMovesFromLocs(m, sq, bishopMoves, c)
 	}
 }
 
-func (b *board) getRookMoves(m *[]Move, rooks u64, pinned u64, occupied u64, opponents u64, c Color) {
+func (b *board) getRookMoves(m *[]Move, rooks u64, pinned u64, player u64, opponents u64, c Color) {
 	var pinnedRooks u64 = rooks & pinned
 	UNUSED(pinnedRooks)
 
@@ -191,13 +191,13 @@ func (b *board) getRookMoves(m *[]Move, rooks u64, pinned u64, occupied u64, opp
 		}
 		sq = Square(popLSB(&unpinnedRooks))
 
-		var rookMoves u64 = getRookAttacks(sq, occupied|opponents) & ^occupied
+		var rookMoves u64 = getRookAttacks(sq, player|opponents) & ^player
 
 		b.generateMovesFromLocs(m, sq, rookMoves, c)
 	}
 }
 
-func (b *board) getQueenMoves(m *[]Move, queens u64, pinned u64, occupied u64, opponents u64, c Color) {
+func (b *board) getQueenMoves(m *[]Move, queens u64, pinned u64, player u64, opponents u64, c Color) {
 	var pinnedQueens u64 = queens & pinned
 	UNUSED(pinnedQueens)
 
@@ -209,8 +209,8 @@ func (b *board) getQueenMoves(m *[]Move, queens u64, pinned u64, occupied u64, o
 		}
 		sq = Square(popLSB(&unpinnedQueens))
 
-		var rookMoves u64 = getRookAttacks(sq, occupied|opponents) & ^occupied
-		var bishopMoves u64 = getBishopAttacks(sq, occupied|opponents) & ^occupied
+		var rookMoves u64 = getRookAttacks(sq, player|opponents) & ^player
+		var bishopMoves u64 = getBishopAttacks(sq, player|opponents) & ^player
 
 		b.generateMovesFromLocs(m, sq, rookMoves|bishopMoves, c)
 	}
@@ -248,7 +248,7 @@ func (b *board) generateLegalMoves() []Move {
 
 	// STEP 3: Calculate pawn moves
 	var playerPawns u64 = b.getColorPieces(pawn, player)
-	b.getPawnMoves(&m, playerPawns, pinned, playerPieces, opponentPieces, player)
+	b.getPawnMoves(&m, playerPawns, pinned, b.occupied, opponentPieces, player)
 
 	// STEP 4: Calculate bishop moves
 	var playerBishops u64 = b.getColorPieces(bishop, player)
