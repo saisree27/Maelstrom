@@ -23,8 +23,7 @@ func (b *board) getAllAttacks(o Color, occupied u64) u64 {
 		if opponentKnights == 0 {
 			break
 		}
-		lsb = bitScanForward(opponentKnights)
-		opponentKnights &= ^(sToBB[lsb])
+		lsb = popLSB(&opponentKnights)
 		attackedSquares |= knightAttacks(Square(lsb))
 	}
 
@@ -34,8 +33,7 @@ func (b *board) getAllAttacks(o Color, occupied u64) u64 {
 		if opponentBishops == 0 {
 			break
 		}
-		lsb = bitScanForward(opponentBishops)
-		opponentBishops &= ^(sToBB[lsb])
+		lsb = popLSB(&opponentBishops)
 		attackedSquares |= getBishopAttacks(Square(lsb), occupied^playerKing)
 	}
 
@@ -44,8 +42,7 @@ func (b *board) getAllAttacks(o Color, occupied u64) u64 {
 		if opponentRooks == 0 {
 			break
 		}
-		lsb = bitScanForward(opponentRooks)
-		opponentRooks &= ^(sToBB[lsb])
+		lsb = popLSB(&opponentRooks)
 		attackedSquares |= getRookAttacks(Square(lsb), occupied^playerKing)
 	}
 
@@ -54,8 +51,7 @@ func (b *board) getAllAttacks(o Color, occupied u64) u64 {
 		if opponentQueens == 0 {
 			break
 		}
-		lsb = bitScanForward(opponentQueens)
-		opponentQueens &= ^(sToBB[lsb])
+		lsb = popLSB(&opponentQueens)
 		attackedSquares |= (getRookAttacks(Square(lsb), occupied^playerKing) | getBishopAttacks(Square(lsb), occupied^playerKing))
 	}
 
@@ -327,7 +323,7 @@ func (b *board) getCastlingMoves(m *[]Move, pKing Square, attacks u64, c Color) 
 
 	if c == WHITE {
 		castlingKingsidePossible = (sToBB[f1]&allowed != 0) && (sToBB[g1]&allowed != 0)
-		castlingQueensidePossible = (sToBB[b1]&allowed != 0) && (sToBB[c1]&allowed != 0) && (sToBB[d1]&allowed != 0)
+		castlingQueensidePossible = (sToBB[c1]&allowed != 0) && (sToBB[d1]&allowed != 0)
 		if b.kW && castlingKingsidePossible {
 			*m = append(*m, Move{from: e1, to: g1, piece: wK, movetype: KCASTLE, colorMoved: WHITE})
 		}
@@ -336,7 +332,7 @@ func (b *board) getCastlingMoves(m *[]Move, pKing Square, attacks u64, c Color) 
 		}
 	} else {
 		castlingKingsidePossible = (sToBB[f8]&allowed != 0) && (sToBB[g8]&allowed != 0)
-		castlingQueensidePossible = (sToBB[b8]&allowed != 0) && (sToBB[c8]&allowed != 0) && (sToBB[d8]&allowed != 0)
+		castlingQueensidePossible = (sToBB[c8]&allowed != 0) && (sToBB[d8]&allowed != 0)
 		if b.kB && castlingKingsidePossible {
 			*m = append(*m, Move{from: e8, to: g8, piece: bK, movetype: KCASTLE, colorMoved: BLACK})
 		}

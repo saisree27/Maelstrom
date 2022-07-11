@@ -20,10 +20,19 @@ type board struct {
 	qW        bool      // If queenside castling is available for White
 	kB        bool      // If kingside castling is available for Black
 	qB        bool      // If queenside castling is available for Black
-	history   []Move    // Stores move history for board
+	history   []prev    // Stores history for board
 	zobrist   u64       // Zobrist hash (TODO)
 	plyCnt    int       // Stores number of half moves played
 	moveCount int       // Stores which move currently we are at
+}
+
+type prev struct {
+	move      Move   // Stores previous move made
+	kW        bool   // White Kingside castling history
+	qW        bool   // White Queenside castling history
+	kB        bool   // Black Kingside castling history
+	qB        bool   // Black Queenside castling history
+	enpassant Square // En passant square history
 }
 
 func newBoard() *board {
@@ -55,6 +64,12 @@ func (b *board) initStartPos() {
 			b.empty ^= u64(1 << i)
 		}
 	}
+	b.turn = WHITE
+	b.enpassant = EMPTYSQ
+	b.kW = true
+	b.qW = true
+	b.kB = true
+	b.qB = true
 }
 
 func (b *board) initFEN(fen string) {
@@ -181,16 +196,22 @@ func (b *board) replacePiece(p Piece, q Piece, sq Square) {
 	b.squares[sq] = q
 }
 
-func (b *board) removePiece(p Piece, sq Square) {
+func (b *board) removePiece(p Piece, sq Square, c Color) {
 	var square u64 = 1 << sq
 	b.pieces[p] ^= square
 	b.occupied ^= square
 	b.empty ^= square
+	b.colors[c] ^= square
 	b.squares[sq] = EMPTY
 }
 
+func (b *board) makeMoveFromUCI(uci string) {
+	b.makeMove(fromUCI(uci, *b))
+}
+
 func (b *board) makeMove(mv Move) {
-	b.history = append(b.history, mv)
+	var entry prev = prev{move: mv, kW: b.kW, qW: b.qW, kB: b.kB, qB: b.qB, enpassant: b.enpassant}
+	b.history = append(b.history, entry)
 
 	switch mv.movetype {
 	case QUIET:
@@ -222,9 +243,9 @@ func (b *board) makeMove(mv Move) {
 	case ENPASSANT:
 		b.movePiece(mv.piece, mv.from, mv.to, mv.colorMoved)
 		if mv.colorMoved == WHITE {
-			b.removePiece(bP, mv.to.goDirection(SOUTH))
+			b.removePiece(bP, mv.to.goDirection(SOUTH), mv.colorMoved)
 		} else {
-			b.removePiece(wP, mv.to.goDirection(NORTH))
+			b.removePiece(wP, mv.to.goDirection(NORTH), mv.colorMoved)
 		}
 	}
 
@@ -267,6 +288,56 @@ func (b *board) makeMove(mv Move) {
 	}
 }
 
+func (b *board) undo() {
+	prevEntry := b.history[len(b.history)-1]
+	prevMove := prevEntry.move
+	switch prevMove.movetype {
+	case QUIET:
+		b.movePiece(prevMove.piece, prevMove.to, prevMove.from, prevMove.colorMoved)
+	case CAPTURE:
+		b.movePiece(prevMove.piece, prevMove.to, prevMove.from, prevMove.colorMoved)
+		b.putPiece(prevMove.captured, prevMove.to, reverseColor(prevMove.colorMoved))
+	case PROMOTION:
+		b.removePiece(prevMove.promote, prevMove.to, prevMove.colorMoved)
+		b.putPiece(prevMove.piece, prevMove.from, prevMove.colorMoved)
+	case CAPTUREANDPROMOTION:
+		b.removePiece(prevMove.promote, prevMove.to, prevMove.colorMoved)
+		b.putPiece(prevMove.piece, prevMove.from, prevMove.colorMoved)
+		b.putPiece(prevMove.captured, prevMove.to, reverseColor(prevMove.colorMoved))
+	case KCASTLE:
+		if prevMove.colorMoved == WHITE {
+			b.movePiece(wK, g1, e1, WHITE)
+			b.movePiece(wR, f1, h1, WHITE)
+		} else {
+			b.movePiece(bK, g8, e8, BLACK)
+			b.movePiece(bR, f8, h8, BLACK)
+		}
+	case QCASTLE:
+		if prevMove.colorMoved == WHITE {
+			b.movePiece(wK, c1, e1, WHITE)
+			b.movePiece(wR, d1, a1, WHITE)
+		} else {
+			b.movePiece(bK, c8, e8, BLACK)
+			b.movePiece(bR, d8, a8, BLACK)
+		}
+	case ENPASSANT:
+		b.movePiece(prevMove.piece, prevMove.to, prevMove.from, prevMove.colorMoved)
+		if prevMove.colorMoved == WHITE {
+			b.putPiece(bP, prevMove.to.goDirection(SOUTH), prevMove.colorMoved)
+		} else {
+			b.putPiece(wP, prevMove.to.goDirection(NORTH), prevMove.colorMoved)
+		}
+	}
+	b.kW = prevEntry.kW
+	b.qW = prevEntry.qW
+	b.kB = prevEntry.kB
+	b.qB = prevEntry.qB
+	b.enpassant = prevEntry.enpassant
+	b.turn = reverseColor(b.turn)
+
+	b.history = b.history[:len(b.history)-1]
+}
+
 func (b *board) print() {
 	s := "\n"
 	for i := 56; i >= 0; i -= 8 {
@@ -306,4 +377,35 @@ func (b *board) printFromBitBoards() {
 		s += "\n"
 	}
 	fmt.Print(s)
+}
+
+// For testing purposes only
+func (b *board) getStringFromBitBoards() string {
+	s := "\n"
+	for i := 56; i >= 0; i -= 8 {
+		for j := 0; j < 8; j++ {
+			if b.occupied&u64(1<<(i+j)) != 0 {
+				var found = false
+				for k := 0; k < 14; k++ {
+					if b.pieces[k]&u64(1<<(i+j)) != 0 {
+						if found {
+							fmt.Println("Duplicate pieces...")
+						} else {
+							found = true
+							s += Piece(k).toString() + " "
+						}
+					}
+				}
+				if !found {
+					fmt.Println("Piece is in occupied bitboard not not present in any of the pieces bitboard...")
+				}
+			} else if b.empty&u64(1<<(i+j)) != 0 {
+				s += EMPTY.toString() + " "
+			} else {
+				fmt.Println("Square is not represented in either occupied or empty...")
+			}
+		}
+		s += "\n"
+	}
+	return s
 }

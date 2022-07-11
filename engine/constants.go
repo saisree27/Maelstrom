@@ -1,6 +1,10 @@
 package engine
 
-import "math/bits"
+import (
+	"math/bits"
+	"reflect"
+	"sort"
+)
 
 /**
 * Contains constants for pieces, squares, ranks, files, masks, etc.
@@ -539,6 +543,33 @@ func initLine() {
 			}
 		}
 	}
+}
+
+// Some slice functions for unit testing and possibly other things in the engine
+func contains(s []interface{}, e interface{}) bool {
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
+}
+
+func checkSameElements(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	a_copy := make([]string, len(a))
+	b_copy := make([]string, len(b))
+
+	copy(a_copy, a)
+	copy(b_copy, b)
+
+	sort.Strings(a_copy)
+	sort.Strings(b_copy)
+
+	return reflect.DeepEqual(a_copy, b_copy)
 }
 
 // get rid of variable unused error while developing, don't really like that lol
