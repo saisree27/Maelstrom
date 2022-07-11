@@ -16,10 +16,10 @@ type Board struct {
 	empty     u64       // Bits are clear when pieces are there
 	turn      Color     // Side to move
 	enpassant Square    // En passant square. If not possible, stores EMPTY
-	kW        bool      // If kingside castling available for White
-	qW        bool      // If queenside castling is available for White
-	kB        bool      // If kingside castling is available for Black
-	qB        bool      // If queenside castling is available for Black
+	OO        bool      // If kingside castling available for White
+	OOO       bool      // If queenside castling is available for White
+	oo        bool      // If kingside castling is available for Black
+	ooo       bool      // If queenside castling is available for Black
 	history   []prev    // Stores history for board
 	zobrist   u64       // Zobrist hash (TODO)
 	plyCnt    int       // Stores number of half moves played
@@ -28,10 +28,10 @@ type Board struct {
 
 type prev struct {
 	move      Move   // Stores previous move made
-	kW        bool   // White Kingside castling history
-	qW        bool   // White Queenside castling history
-	kB        bool   // Black Kingside castling history
-	qB        bool   // Black Queenside castling history
+	OO        bool   // White Kingside castling history
+	OOO       bool   // White Queenside castling history
+	oo        bool   // Black Kingside castling history
+	ooo       bool   // Black Queenside castling history
 	enpassant Square // En passant square history
 }
 
@@ -39,7 +39,7 @@ func newBoard() *Board {
 	b := Board{}
 	b.turn = WHITE
 	b.enpassant = EMPTYSQ
-	b.kW, b.qW, b.kB, b.qB = true, true, true, true
+	b.OO, b.OOO, b.oo, b.ooo = true, true, true, true
 	b.InitStartPos()
 	return &b
 }
@@ -66,10 +66,10 @@ func (b *Board) InitStartPos() {
 	}
 	b.turn = WHITE
 	b.enpassant = EMPTYSQ
-	b.kW = true
-	b.qW = true
-	b.kB = true
-	b.qB = true
+	b.OO = true
+	b.OOO = true
+	b.oo = true
+	b.ooo = true
 }
 
 func (b *Board) InitFEN(fen string) {
@@ -110,16 +110,16 @@ func (b *Board) InitFEN(fen string) {
 
 	castling := attrs[2]
 	if strings.Contains(castling, "K") {
-		b.kW = true
+		b.OO = true
 	}
 	if strings.Contains(castling, "Q") {
-		b.qW = true
+		b.OOO = true
 	}
 	if strings.Contains(castling, "k") {
-		b.kB = true
+		b.oo = true
 	}
 	if strings.Contains(castling, "q") {
-		b.qB = true
+		b.ooo = true
 	}
 
 	enpassant := attrs[3]
@@ -210,7 +210,7 @@ func (b *Board) makeMoveFromUCI(uci string) {
 }
 
 func (b *Board) makeMove(mv Move) {
-	var entry prev = prev{move: mv, kW: b.kW, qW: b.qW, kB: b.kB, qB: b.qB, enpassant: b.enpassant}
+	var entry prev = prev{move: mv, OO: b.OO, OOO: b.OOO, oo: b.oo, ooo: b.ooo, enpassant: b.enpassant}
 	b.history = append(b.history, entry)
 
 	switch mv.movetype {
@@ -243,9 +243,9 @@ func (b *Board) makeMove(mv Move) {
 	case ENPASSANT:
 		b.movePiece(mv.piece, mv.from, mv.to, mv.colorMoved)
 		if mv.colorMoved == WHITE {
-			b.removePiece(bP, mv.to.goDirection(SOUTH), mv.colorMoved)
+			b.removePiece(bP, mv.to.goDirection(SOUTH), BLACK)
 		} else {
-			b.removePiece(wP, mv.to.goDirection(NORTH), mv.colorMoved)
+			b.removePiece(wP, mv.to.goDirection(NORTH), WHITE)
 		}
 	}
 
@@ -253,27 +253,27 @@ func (b *Board) makeMove(mv Move) {
 
 	// update castling rights
 	if mv.piece == wK {
-		b.kW = false
-		b.qW = false
+		b.OO = false
+		b.OOO = false
 	}
 	if mv.piece == bK {
-		b.kB = false
-		b.qB = false
+		b.oo = false
+		b.ooo = false
 	}
 	if mv.piece == wR {
 		if mv.from == a1 {
-			b.qW = false
+			b.OOO = false
 		}
 		if mv.from == h1 {
-			b.kW = false
+			b.OO = false
 		}
 	}
 	if mv.piece == bR {
 		if mv.from == a8 {
-			b.qB = false
+			b.ooo = false
 		}
 		if mv.from == h8 {
-			b.kB = false
+			b.oo = false
 		}
 	}
 
@@ -291,6 +291,7 @@ func (b *Board) makeMove(mv Move) {
 func (b *Board) undo() {
 	prevEntry := b.history[len(b.history)-1]
 	prevMove := prevEntry.move
+
 	switch prevMove.movetype {
 	case QUIET:
 		b.movePiece(prevMove.piece, prevMove.to, prevMove.from, prevMove.colorMoved)
@@ -323,15 +324,15 @@ func (b *Board) undo() {
 	case ENPASSANT:
 		b.movePiece(prevMove.piece, prevMove.to, prevMove.from, prevMove.colorMoved)
 		if prevMove.colorMoved == WHITE {
-			b.putPiece(bP, prevMove.to.goDirection(SOUTH), prevMove.colorMoved)
+			b.putPiece(bP, prevMove.to.goDirection(SOUTH), BLACK)
 		} else {
-			b.putPiece(wP, prevMove.to.goDirection(NORTH), prevMove.colorMoved)
+			b.putPiece(wP, prevMove.to.goDirection(NORTH), WHITE)
 		}
 	}
-	b.kW = prevEntry.kW
-	b.qW = prevEntry.qW
-	b.kB = prevEntry.kB
-	b.qB = prevEntry.qB
+	b.OO = prevEntry.OO
+	b.OOO = prevEntry.OOO
+	b.oo = prevEntry.oo
+	b.ooo = prevEntry.ooo
 	b.enpassant = prevEntry.enpassant
 	b.turn = reverseColor(b.turn)
 

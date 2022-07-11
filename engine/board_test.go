@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"fmt"
 	"math/rand"
 	"testing"
 	"time"
@@ -29,7 +30,7 @@ func TestStartPos(t *testing.T) {
 
 	name := "castlingRights"
 	want := true
-	got := b.kB && b.qB && b.kW && b.qW
+	got := b.oo && b.ooo && b.OO && b.OOO
 
 	if got != want {
 		t.Errorf("TestStartPos (%q): got %t, wanted %t", name, got, want)
@@ -275,6 +276,7 @@ func TestMakeAndUndoEnPassant(t *testing.T) {
 	b.InitFEN(fen)
 
 	orig := b.getStringFromBitBoards()
+	stats := fmt.Sprintf("Castling: %t %t %t %t, En passant: %q, Turn: %d, History: %d, Occupied: %d, Empty: %d, White: %d, Black: %d \n", b.oo, b.ooo, b.OO, b.OOO, squareToStringMap[b.enpassant], b.turn, len(b.history), b.occupied, b.empty, b.colors[WHITE], b.colors[BLACK])
 
 	b.makeMoveFromUCI("a4b3")
 
@@ -301,9 +303,14 @@ func TestMakeAndUndoEnPassant(t *testing.T) {
 	}
 
 	new := b.getStringFromBitBoards()
+	newStats := fmt.Sprintf("Castling: %t %t %t %t, En passant: %q, Turn: %d, History: %d, Occupied: %d, Empty: %d, White: %d, Black: %d \n", b.oo, b.ooo, b.OO, b.OOO, squareToStringMap[b.enpassant], b.turn, len(b.history), b.occupied, b.empty, b.colors[WHITE], b.colors[BLACK])
 
 	if orig != new {
 		t.Errorf("TestMakeAndUndoEnpassant (bitboard): got %q, wanted %q", new, orig)
+	}
+
+	if stats != newStats {
+		t.Errorf("TestMakeAndUndoEnPassant (stats): got %s, wanted %s", newStats, stats)
 	}
 }
 
@@ -330,5 +337,36 @@ func TestUndoMoveCapture(t *testing.T) {
 
 	if orig != new {
 		t.Errorf("TestUndoMoveCapture (bitboard): got %q, wanted %q", new, orig)
+	}
+}
+
+// In a given position, check that all moves can be made and unmade correctly (includes some perft calls)
+func TestAllMovesMakeUnmake(t *testing.T) {
+	fen := "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1"
+	b := Board{}
+	b.InitFEN(fen)
+
+	orig := b.getStringFromBitBoards()
+
+	stats := fmt.Sprintf("Castling: %t %t %t %t, En passant: %q, Turn: %d, History: %d, Occupied: %d, Empty: %d, White: %d, Black: %d \n", b.oo, b.ooo, b.OO, b.OOO, squareToStringMap[b.enpassant], b.turn, len(b.history), b.occupied, b.empty, b.colors[WHITE], b.colors[BLACK])
+
+	moves := b.generateLegalMoves()
+	for _, m := range moves {
+		b.makeMove(m)
+		_ = Perft(&b, 3)
+
+		b.undo()
+
+		newStats := fmt.Sprintf("Castling: %t %t %t %t, En passant: %q, Turn: %d, History: %d, Occupied: %d, Empty: %d, White: %d, Black: %d \n", b.oo, b.ooo, b.OO, b.OOO, squareToStringMap[b.enpassant], b.turn, len(b.history), b.occupied, b.empty, b.colors[WHITE], b.colors[BLACK])
+
+		new := b.getStringFromBitBoards()
+
+		if orig != new {
+			t.Errorf("TestAllMovesMakeUnMake (%q): got %s, wanted %s", m.toUCI(), new, orig)
+		}
+
+		if stats != newStats {
+			t.Errorf("TestAllMovesMakeUnMake (stats): got %s, wanted %s", newStats, stats)
+		}
 	}
 }

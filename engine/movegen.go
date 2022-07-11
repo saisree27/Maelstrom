@@ -323,21 +323,21 @@ func (b *Board) getCastlingMoves(m *[]Move, pKing Square, attacks u64, c Color) 
 
 	if c == WHITE {
 		castlingKingsidePossible = (sToBB[f1]&allowed != 0) && (sToBB[g1]&allowed != 0)
-		castlingQueensidePossible = (sToBB[c1]&allowed != 0) && (sToBB[d1]&allowed != 0)
-		if b.kW && castlingKingsidePossible {
+		castlingQueensidePossible = (sToBB[b1]&b.empty != 0) && (sToBB[c1]&allowed != 0) && (sToBB[d1]&allowed != 0)
+		if b.OO && castlingKingsidePossible {
 			*m = append(*m, Move{from: e1, to: g1, piece: wK, movetype: KCASTLE, colorMoved: WHITE})
 		}
-		if b.qW && castlingQueensidePossible {
+		if b.OOO && castlingQueensidePossible {
 			*m = append(*m, Move{from: e1, to: c1, piece: wK, movetype: QCASTLE, colorMoved: WHITE})
 		}
 	} else {
 		castlingKingsidePossible = (sToBB[f8]&allowed != 0) && (sToBB[g8]&allowed != 0)
-		castlingQueensidePossible = (sToBB[c8]&allowed != 0) && (sToBB[d8]&allowed != 0)
-		if b.kB && castlingKingsidePossible {
+		castlingQueensidePossible = (sToBB[b8]&b.empty != 0) && (sToBB[c8]&allowed != 0) && (sToBB[d8]&allowed != 0)
+		if b.oo && castlingKingsidePossible {
 			*m = append(*m, Move{from: e8, to: g8, piece: bK, movetype: KCASTLE, colorMoved: BLACK})
 		}
 
-		if b.qB && castlingQueensidePossible {
+		if b.ooo && castlingQueensidePossible {
 			*m = append(*m, Move{from: e8, to: c8, piece: bK, movetype: QCASTLE, colorMoved: BLACK})
 		}
 	}
@@ -425,14 +425,14 @@ func (b *Board) generateLegalMoves() []Move {
 				if slidingAttacks(playerKing,
 					b.occupied^sToBB[lsb]^shiftBitboard(sToBB[checker], pawnPushDirection[opponent]),
 					ranks[sqToRank(playerKing)]&(b.getColorPieces(rook, opponent)|b.getColorPieces(queen, opponent))) == 0 {
-					m = append(m, Move{from: lsb, to: checker, movetype: ENPASSANT, captured: checkerPiece})
+					m = append(m, Move{from: lsb, to: checker, movetype: ENPASSANT, captured: checkerPiece, colorMoved: player, piece: b.squares[lsb]})
 				}
 			}
 
 			pinnedPawns := pawns & pinned & line[checker][playerKing]
 			if pinnedPawns != 0 {
 				sq := Square(bitScanForward(pinnedPawns))
-				m = append(m, Move{from: sq, to: checker, movetype: ENPASSANT, captured: checkerPiece})
+				m = append(m, Move{from: sq, to: checker, movetype: ENPASSANT, captured: checkerPiece, colorMoved: player, piece: b.squares[lsb]})
 			}
 
 		}
@@ -518,14 +518,14 @@ func (b *Board) generateLegalMoves() []Move {
 			if slidingAttacks(playerKing,
 				b.occupied^sToBB[lsb]^shiftBitboard(sToBB[b.enpassant], pawnPushDirection[opponent]),
 				ranks[sqToRank(playerKing)]&(b.getColorPieces(rook, opponent)|b.getColorPieces(queen, opponent))) == 0 {
-				m = append(m, Move{from: lsb, to: b.enpassant, movetype: ENPASSANT, captured: b.squares[b.enpassant]})
+				m = append(m, Move{from: lsb, to: b.enpassant, movetype: ENPASSANT, captured: b.squares[b.enpassant], colorMoved: player, piece: b.squares[lsb]})
 			}
 		}
 
 		pinnedPawns := pawns & pinned & line[b.enpassant][playerKing]
 		if pinnedPawns != 0 {
 			sq := Square(bitScanForward(pinnedPawns))
-			m = append(m, Move{from: sq, to: b.enpassant, movetype: ENPASSANT, captured: b.squares[b.enpassant]})
+			m = append(m, Move{from: sq, to: b.enpassant, movetype: ENPASSANT, captured: b.squares[b.enpassant], colorMoved: player, piece: b.squares[lsb]})
 		}
 	}
 	return m
