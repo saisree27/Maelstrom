@@ -185,8 +185,7 @@ func (b *Board) getPawnMoves(m *[]Move, pawns u64, pinned u64, occupied u64, opp
 					pawnMoves |= (shiftBitboard(bbSQ, pawnPushDirection[c]*2) & ^occupied) & allowed & line[kingLoc][lsb]
 				}
 			}
-
-			pawnMoves |= colorToPawnLookup[c][lsb] & opponents & allowed & line[colorToKingLookup[c]][lsb]
+			pawnMoves |= colorToPawnLookup[c][lsb] & opponents & allowed & line[kingLoc][lsb]
 			b.generateMovesFromLocs(m, lsb, pawnMoves, c)
 		}
 	}
@@ -200,7 +199,7 @@ func (b *Board) getPawnMoves(m *[]Move, pawns u64, pinned u64, occupied u64, opp
 		sq = Square(popLSB(&unpinnedPawns))
 		bbSQ = sToBB[sq]
 		var pawnMoves u64 = (shiftBitboard(bbSQ, pawnPushDirection[c]) & ^occupied) & allowed
-		if pawnMoves != 0 {
+		if b.squares[sq+Square(pawnPushDirection[c])] == EMPTY {
 			if bbSQ&ranks[startingRank[c]] != 0 {
 				// two move pushes allowed
 				pawnMoves |= (shiftBitboard(bbSQ, pawnPushDirection[c]*2) & ^occupied) & allowed
@@ -324,20 +323,20 @@ func (b *Board) getCastlingMoves(m *[]Move, pKing Square, attacks u64, c Color) 
 	if c == WHITE {
 		castlingKingsidePossible = (sToBB[f1]&allowed != 0) && (sToBB[g1]&allowed != 0)
 		castlingQueensidePossible = (sToBB[b1]&b.empty != 0) && (sToBB[c1]&allowed != 0) && (sToBB[d1]&allowed != 0)
-		if b.OO && castlingKingsidePossible {
+		if b.OO && castlingKingsidePossible && b.squares[h1] == wR {
 			*m = append(*m, Move{from: e1, to: g1, piece: wK, movetype: KCASTLE, colorMoved: WHITE})
 		}
-		if b.OOO && castlingQueensidePossible {
+		if b.OOO && castlingQueensidePossible && b.squares[a1] == wR {
 			*m = append(*m, Move{from: e1, to: c1, piece: wK, movetype: QCASTLE, colorMoved: WHITE})
 		}
 	} else {
 		castlingKingsidePossible = (sToBB[f8]&allowed != 0) && (sToBB[g8]&allowed != 0)
 		castlingQueensidePossible = (sToBB[b8]&b.empty != 0) && (sToBB[c8]&allowed != 0) && (sToBB[d8]&allowed != 0)
-		if b.oo && castlingKingsidePossible {
+		if b.oo && castlingKingsidePossible && b.squares[h8] == bR {
 			*m = append(*m, Move{from: e8, to: g8, piece: bK, movetype: KCASTLE, colorMoved: BLACK})
 		}
 
-		if b.ooo && castlingQueensidePossible {
+		if b.ooo && castlingQueensidePossible && b.squares[a8] == bR {
 			*m = append(*m, Move{from: e8, to: c8, piece: bK, movetype: QCASTLE, colorMoved: BLACK})
 		}
 	}

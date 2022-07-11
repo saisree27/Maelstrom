@@ -1,6 +1,9 @@
 package engine
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 func init() {
 	initializeKingAttacks()
@@ -65,7 +68,11 @@ func RunPerfTests(position string) {
 	fmt.Println()
 
 	for depth := 0; depth <= 6; depth++ {
-		fmt.Printf("Depth %d finished, Nodes: %d\n", depth, Perft(&b, depth))
+		start := time.Now()
+		nodes := Perft(&b, depth)
+		duration := time.Since(start)
+		fmt.Printf("Depth %d, Nodes: %d, Time: %d µs, NPS: %d\n", depth, nodes, duration.Microseconds(), int(nodes*1000000000/(int(duration.Nanoseconds()))))
+
 	}
 }
 
