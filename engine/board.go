@@ -191,6 +191,7 @@ func (b *board) removePiece(p Piece, sq Square) {
 
 func (b *board) makeMove(mv Move) {
 	b.history = append(b.history, mv)
+
 	switch mv.movetype {
 	case QUIET:
 		b.movePiece(mv.piece, mv.from, mv.to, mv.colorMoved)

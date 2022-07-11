@@ -1,7 +1,5 @@
 package engine
 
-import "fmt"
-
 func (b *board) getAllAttacks(o Color, occupied u64) u64 {
 	// Generate all squares attacked/defended by opponent
 	var attackedSquares u64 = 0
@@ -105,7 +103,7 @@ func (b *board) generateMovesFromLocs(m *[]Move, sq Square, locs u64, c Color) {
 
 		if piece == wP && (bbLSB&ranks[R8] != 0) {
 			movet := PROMOTION
-			if b.squares[lsb] == EMPTY {
+			if b.squares[lsb] != EMPTY {
 				movet = CAPTUREANDPROMOTION
 			}
 			moves := []Move{
@@ -115,16 +113,16 @@ func (b *board) generateMovesFromLocs(m *[]Move, sq Square, locs u64, c Color) {
 				Move{from: sq, to: Square(lsb), piece: wP, colorMoved: c, captured: b.squares[lsb], movetype: movet, promote: wB},
 			}
 			*m = append(*m, moves...)
-		} else if piece == bP && (bbLSB&ranks[R8] != 0) {
+		} else if piece == bP && (bbLSB&ranks[R1] != 0) {
 			movet := PROMOTION
-			if b.squares[lsb] == EMPTY {
+			if b.squares[lsb] != EMPTY {
 				movet = CAPTUREANDPROMOTION
 			}
 			moves := []Move{
-				Move{from: sq, to: Square(lsb), piece: wP, colorMoved: c, captured: b.squares[lsb], movetype: movet, promote: bN},
-				Move{from: sq, to: Square(lsb), piece: wP, colorMoved: c, captured: b.squares[lsb], movetype: movet, promote: bR},
-				Move{from: sq, to: Square(lsb), piece: wP, colorMoved: c, captured: b.squares[lsb], movetype: movet, promote: bQ},
-				Move{from: sq, to: Square(lsb), piece: wP, colorMoved: c, captured: b.squares[lsb], movetype: movet, promote: bB},
+				Move{from: sq, to: Square(lsb), piece: bP, colorMoved: c, captured: b.squares[lsb], movetype: movet, promote: bN},
+				Move{from: sq, to: Square(lsb), piece: bP, colorMoved: c, captured: b.squares[lsb], movetype: movet, promote: bR},
+				Move{from: sq, to: Square(lsb), piece: bP, colorMoved: c, captured: b.squares[lsb], movetype: movet, promote: bQ},
+				Move{from: sq, to: Square(lsb), piece: bP, colorMoved: c, captured: b.squares[lsb], movetype: movet, promote: bB},
 			}
 			*m = append(*m, moves...)
 		} else {
@@ -171,6 +169,8 @@ func (b *board) getPawnMoves(m *[]Move, pawns u64, pinned u64, occupied u64, opp
 	// promotion & enpassant will be handled in generateMovesFromLocs
 	var pinnedPawns u64 = pawns & pinned
 	var bbSQ u64
+	var kingLoc Square
+
 	if pinnedPawns != 0 {
 		var lsb Square
 		for {
@@ -180,11 +180,13 @@ func (b *board) getPawnMoves(m *[]Move, pawns u64, pinned u64, occupied u64, opp
 			lsb = Square(popLSB(&pinnedPawns))
 			bbSQ = sToBB[lsb]
 
-			var pawnMoves u64 = (shiftBitboard(bbSQ, pawnPushDirection[c]) & ^occupied) & allowed & line[colorToKingLookup[c]][lsb]
+			kingLoc = Square(bitScanForward(b.getColorPieces(king, c)))
+
+			var pawnMoves u64 = (shiftBitboard(bbSQ, pawnPushDirection[c]) & ^occupied) & allowed & line[kingLoc][lsb]
 			if pawnMoves != 0 {
 				if bbSQ&ranks[startingRank[c]] != 0 {
 					// two move pushes allowed
-					pawnMoves |= (shiftBitboard(bbSQ, pawnPushDirection[c]*2) & ^occupied) & allowed & line[colorToKingLookup[c]][lsb]
+					pawnMoves |= (shiftBitboard(bbSQ, pawnPushDirection[c]*2) & ^occupied) & allowed & line[kingLoc][lsb]
 				}
 			}
 
@@ -221,6 +223,8 @@ func (b *board) getPawnMoves(m *[]Move, pawns u64, pinned u64, occupied u64, opp
 
 func (b *board) getBishopMoves(m *[]Move, bishops u64, pinned u64, player u64, opponents u64, c Color, allowed u64) {
 	var pinnedBishops u64 = bishops & pinned
+	var kingLoc Square
+
 	if pinnedBishops != 0 {
 		var lsb Square
 		for {
@@ -229,12 +233,9 @@ func (b *board) getBishopMoves(m *[]Move, bishops u64, pinned u64, player u64, o
 			}
 			lsb = Square(popLSB(&pinnedBishops))
 
-			var possible u64
-			if c == WHITE {
-				possible = getBishopAttacks(lsb, b.occupied) & line[b.pieces[wK]][lsb] & allowed
-			} else {
-				possible = getBishopAttacks(lsb, b.occupied) & line[b.pieces[bK]][lsb] & allowed
-			}
+			kingLoc = Square(bitScanForward(b.getColorPieces(king, c)))
+
+			var possible u64 = getBishopAttacks(lsb, b.occupied) & line[kingLoc][lsb] & allowed & ^player
 			b.generateMovesFromLocs(m, lsb, possible, c)
 		}
 	}
@@ -255,6 +256,7 @@ func (b *board) getBishopMoves(m *[]Move, bishops u64, pinned u64, player u64, o
 
 func (b *board) getRookMoves(m *[]Move, rooks u64, pinned u64, player u64, opponents u64, c Color, allowed u64) {
 	var pinnedRooks u64 = rooks & pinned
+	var kingLoc Square
 	if pinnedRooks != 0 {
 		var lsb Square
 		for {
@@ -263,12 +265,9 @@ func (b *board) getRookMoves(m *[]Move, rooks u64, pinned u64, player u64, oppon
 			}
 			lsb = Square(popLSB(&pinnedRooks))
 
-			var possible u64
-			if c == WHITE {
-				possible = getRookAttacks(lsb, b.occupied) & line[b.pieces[wK]][lsb] & allowed
-			} else {
-				possible = getRookAttacks(lsb, b.occupied) & line[b.pieces[bK]][lsb] & allowed
-			}
+			kingLoc = Square(bitScanForward(b.getColorPieces(king, c)))
+
+			var possible u64 = getRookAttacks(lsb, b.occupied) & line[kingLoc][lsb] & allowed & ^player
 			b.generateMovesFromLocs(m, lsb, possible, c)
 		}
 	}
@@ -289,6 +288,7 @@ func (b *board) getRookMoves(m *[]Move, rooks u64, pinned u64, player u64, oppon
 
 func (b *board) getQueenMoves(m *[]Move, queens u64, pinned u64, player u64, opponents u64, c Color, allowed u64) {
 	var pinnedQueens u64 = queens & pinned
+	var kingLoc Square
 	if pinnedQueens != 0 {
 		var lsb Square
 		for {
@@ -296,13 +296,10 @@ func (b *board) getQueenMoves(m *[]Move, queens u64, pinned u64, player u64, opp
 				break
 			}
 			lsb = Square(popLSB(&pinnedQueens))
+			kingLoc = Square(bitScanForward(b.getColorPieces(king, c)))
 
-			var possible u64
-			if c == WHITE {
-				possible = (getRookAttacks(lsb, b.occupied) | getBishopAttacks(lsb, b.occupied)) & line[b.pieces[wK]][lsb] & allowed
-			} else {
-				possible = (getRookAttacks(lsb, b.occupied) | getBishopAttacks(lsb, b.occupied)) & line[b.pieces[bK]][lsb] & allowed
-			}
+			var possible u64 = (getBishopAttacks(lsb, b.occupied) | getRookAttacks(lsb, b.occupied)) & line[kingLoc][lsb] & allowed & ^player
+
 			b.generateMovesFromLocs(m, lsb, possible, c)
 		}
 	}
@@ -400,9 +397,6 @@ func (b *board) generateLegalMoves() []Move {
 		lsb = popLSB(&pinPoss)
 		piecesBetween = squaresBetween[playerKing][lsb] & playerPieces
 
-		fmt.Println("SQUARES BETWEEN: ")
-		printBitBoard(piecesBetween)
-
 		if piecesBetween == 0 {
 			checkers ^= sToBB[lsb]
 		} else if piecesBetween != 0 && (piecesBetween&(piecesBetween-1)) == 0 {
@@ -410,11 +404,6 @@ func (b *board) generateLegalMoves() []Move {
 			pinned ^= piecesBetween
 		}
 	}
-
-	fmt.Println("\nCheckers: ")
-	printBitBoard(checkers)
-	fmt.Println("\nPinned: ")
-	printBitBoard(pinned)
 
 	var numCheckers int = popCount(checkers)
 	if numCheckers == 2 {
