@@ -352,12 +352,12 @@ func initializePawnAttacks() {
 	}
 }
 
-var colorToPawnLookup = map[Color][64]u64{
-	WHITE: whitePawnAttacksSquareLookup, BLACK: blackPawnAttacksSquareLookup,
+var colorToPawnLookup = map[Color]*[64]u64{
+	WHITE: &whitePawnAttacksSquareLookup, BLACK: &blackPawnAttacksSquareLookup,
 }
 
-var colorToPawnLookupReverse = map[Color][64]u64{
-	WHITE: blackPawnAttacksSquareLookup, BLACK: whitePawnAttacksSquareLookup,
+var colorToPawnLookupReverse = map[Color]*[64]u64{
+	WHITE: &blackPawnAttacksSquareLookup, BLACK: &whitePawnAttacksSquareLookup,
 }
 
 var colorToKingLookup = map[Color]Piece{

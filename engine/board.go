@@ -255,6 +255,16 @@ func (b *board) makeMove(mv Move) {
 			b.kB = false
 		}
 	}
+
+	// update en passant square
+	dist := Direction(int(mv.to - mv.from))
+	if dist == 2*NORTH && mv.piece == wP {
+		b.enpassant = mv.from + Square(NORTH)
+	} else if dist == 2*SOUTH && mv.piece == bP {
+		b.enpassant = mv.from + Square(SOUTH)
+	} else {
+		b.enpassant = EMPTYSQ
+	}
 }
 
 func (b *board) print() {

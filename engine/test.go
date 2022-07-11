@@ -21,7 +21,9 @@ func Test() {
 	// // printBitBoard(knightAttacksSquareLookup[int(b1)])
 
 	b := board{}
-	b.initStartPos()
+	// b.initStartPos()
+	b.initFEN("rnbq1bnr/ppp1pppp/8/8/k2p3R/8/PPPPPPPP/RNBQKBN1 w - - 0 1")
+	// b.initFEN("rnbqkbnr/pppppppp/8/4P2K/8/8/PPPP1PPP/RNBQ1BNR b k - 0 1")
 	// b.initFEN("r1bqkbnr/pPppp3/2n2ppp/8/8/8/1PPPPPPP/RNBQKBNR w KQkq - 0 5")
 	// b.makeMove(fromUCI("b7c8r", b))
 	// b.initFEN("rnb1kbnr/pp2pppp/2ppq3/4P3/8/8/PPPP1PPP/RNBQKBNR w kq - 0 6")
@@ -35,6 +37,28 @@ func Test() {
 	fmt.Println(b.qB)
 	fmt.Println(b.kW)
 	fmt.Println(b.qW)
+
+	b.makeMove(fromUCI("e2e4", b))
+
+	// b.makeMove(fromUCI("d7d5", b))
+	// b.makeMove(fromUCI("e2e4", b))
+	// b.printFromBitBoards()
+
+	// fmt.Println(squareToStringMap[b.enpassant])
+
+	// b.makeMove(fromUCI("e7e5", b))
+	// b.printFromBitBoards()
+
+	// fmt.Println(squareToStringMap[b.enpassant])
+
+	// b.makeMove(fromUCI("d2d4", b))
+	// b.makeMove(fromUCI("f7f5", b))
+	// b.makeMove(fromUCI("d4d5", b))
+	// b.makeMove(fromUCI("c7c5", b))
+
+	b.printFromBitBoards()
+	fmt.Println(squareToStringMap[b.enpassant])
+
 	// for {
 	// 	var move string
 	// 	fmt.Println("Enter move: ")
@@ -45,36 +69,36 @@ func Test() {
 	// 	b.printFromBitBoards()
 	// }
 
-	// p := b.generateLegalMoves()
-	// for _, move := range p {
-	// 	fmt.Print(move.toUCI() + " ")
-	// }
-	// fmt.Println("done")
-	completedMoves := []Move{}
-
-	var i u64
-	for i = 0; i < 1500; i++ {
-		m := b.generateLegalMoves()
-		// for _, move := range m {
-		// fmt.Println(move.toUCI())
-		// }
-		fmt.Println(i)
-		if len(m) == 0 {
-			break
-		}
-		randomMove := m[rand.Intn(len(m))]
-		fmt.Printf("Choosing random move: %s\n", randomMove.toUCI())
-		b.makeMove(randomMove)
-		completedMoves = append(completedMoves, randomMove)
-
-		b.print()
-		b.printFromBitBoards()
+	p := b.generateLegalMoves()
+	for _, move := range p {
+		fmt.Print(move.toUCI() + " ")
 	}
+	fmt.Println("done")
+	// completedMoves := []Move{}
+
+	// var i u64
+	// for i = 0; i < 1500; i++ {
+	// 	m := b.generateLegalMoves()
+	// 	// for _, move := range m {
+	// 	// fmt.Println(move.toUCI())
+	// 	// }
+	// 	fmt.Println(i)
+	// 	if len(m) == 0 {
+	// 		break
+	// 	}
+	// 	randomMove := m[rand.Intn(len(m))]
+	// 	fmt.Printf("Choosing random move: %s\n", randomMove.toUCI())
+	// 	b.makeMove(randomMove)
+	// 	completedMoves = append(completedMoves, randomMove)
+
+	// 	b.print()
+	// 	b.printFromBitBoards()
+	// }
 
 	// for _, move := range completedMoves {
-	// fmt.Print(move.toUCI() + " ")
+	// 	fmt.Print(move.toUCI() + " ")
 	// }
 
-	b.printFromBitBoards()
-	fmt.Print("\n")
+	// b.printFromBitBoards()
+	// fmt.Print("\n")
 }

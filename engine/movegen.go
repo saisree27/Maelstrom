@@ -359,6 +359,9 @@ func (b *board) generateLegalMoves() []Move {
 	var playerPieces u64 = b.colors[player]
 	var opponentPieces u64 = b.colors[opponent]
 
+	// get player pawns
+	var playerPawns u64 = b.getColorPieces(pawn, player)
+
 	// Mask that specifies which squares are pieces allowed to move
 	// Set to all bits by default
 	var allowed u64 = 0xFFFFFFFFFFFFFFFF
@@ -413,6 +416,31 @@ func (b *board) generateLegalMoves() []Move {
 		var checker Square = Square(bitScanForward(checkers))
 		var checkerPiece = b.squares[checker]
 
+		if checker == b.enpassant {
+			// en passant check capture
+			pawns := colorToPawnLookup[opponent][checker] & playerPawns
+
+			unpinnedPawns := pawns & ^pinned
+			for {
+				if unpinnedPawns == 0 {
+					break
+				}
+				lsb := Square(popLSB(&unpinnedPawns))
+				if slidingAttacks(playerKing,
+					b.occupied^sToBB[lsb]^shiftBitboard(sToBB[checker], pawnPushDirection[opponent]),
+					ranks[sqToRank(playerKing)]&(b.getColorPieces(rook, opponent)|b.getColorPieces(queen, opponent))) == 0 {
+					m = append(m, Move{from: lsb, to: checker, movetype: ENPASSANT, captured: checkerPiece})
+				}
+			}
+
+			pinnedPawns := pawns & pinned & line[checker][playerKing]
+			if pinnedPawns != 0 {
+				sq := Square(bitScanForward(pinnedPawns))
+				m = append(m, Move{from: sq, to: checker, movetype: ENPASSANT, captured: checkerPiece})
+			}
+
+		}
+
 		// get possible captures of the checker
 		var possibleCaptures u64 = 0
 		if player == WHITE {
@@ -464,7 +492,6 @@ func (b *board) generateLegalMoves() []Move {
 	b.getKnightMoves(&m, playerKnights, pinned, playerPieces, player, allowed)
 
 	// STEP 3: Calculate pawn moves
-	var playerPawns u64 = b.getColorPieces(pawn, player)
 	b.getPawnMoves(&m, playerPawns, pinned, b.occupied, opponentPieces, player, allowed)
 
 	// STEP 4: Calculate bishop moves
@@ -482,5 +509,28 @@ func (b *board) generateLegalMoves() []Move {
 	// STEP 6: Castling
 	b.getCastlingMoves(&m, playerKing, attacks, player)
 
+	// STEP 7: En passant
+	if b.enpassant != EMPTYSQ {
+		pawns := colorToPawnLookup[opponent][b.enpassant] & playerPawns
+
+		unpinnedPawns := pawns & ^pinned
+		for {
+			if unpinnedPawns == 0 {
+				break
+			}
+			lsb := Square(popLSB(&unpinnedPawns))
+			if slidingAttacks(playerKing,
+				b.occupied^sToBB[lsb]^shiftBitboard(sToBB[b.enpassant], pawnPushDirection[opponent]),
+				ranks[sqToRank(playerKing)]&(b.getColorPieces(rook, opponent)|b.getColorPieces(queen, opponent))) == 0 {
+				m = append(m, Move{from: lsb, to: b.enpassant, movetype: ENPASSANT, captured: b.squares[b.enpassant]})
+			}
+		}
+
+		pinnedPawns := pawns & pinned & line[b.enpassant][playerKing]
+		if pinnedPawns != 0 {
+			sq := Square(bitScanForward(pinnedPawns))
+			m = append(m, Move{from: sq, to: b.enpassant, movetype: ENPASSANT, captured: b.squares[b.enpassant]})
+		}
+	}
 	return m
 }
