@@ -8,7 +8,7 @@ import (
 
 type u64 uint64
 
-type board struct {
+type Board struct {
 	pieces    [14]u64   // Stores bitboards of all white and black pieces
 	squares   [64]Piece // Stores all 64 squares (not used for move generation)
 	colors    [2]u64    // Stores bitboards of both colors
@@ -35,16 +35,16 @@ type prev struct {
 	enpassant Square // En passant square history
 }
 
-func newBoard() *board {
-	b := board{}
+func newBoard() *Board {
+	b := Board{}
 	b.turn = WHITE
 	b.enpassant = EMPTYSQ
 	b.kW, b.qW, b.kB, b.qB = true, true, true, true
-	b.initStartPos()
+	b.InitStartPos()
 	return &b
 }
 
-func (b *board) initStartPos() {
+func (b *Board) InitStartPos() {
 	b.squares = [64]Piece{
 		wR, wN, wB, wQ, wK, wB, wN, wR,
 		wP, wP, wP, wP, wP, wP, wP, wP,
@@ -72,7 +72,7 @@ func (b *board) initStartPos() {
 	b.qB = true
 }
 
-func (b *board) initFEN(fen string) {
+func (b *Board) InitFEN(fen string) {
 	for s := a1; s <= h8; s++ {
 		b.putPiece(EMPTY, s, WHITE)
 	}
@@ -136,11 +136,11 @@ func (b *board) initFEN(fen string) {
 	b.moveCount, _ = strconv.Atoi(moveCount)
 }
 
-func (b *board) getColorPieces(p PieceType, c Color) u64 {
+func (b *Board) getColorPieces(p PieceType, c Color) u64 {
 	return b.pieces[int(p)+int(c)*colorIndexOffset]
 }
 
-func (b *board) putPiece(p Piece, s Square, c Color) {
+func (b *Board) putPiece(p Piece, s Square, c Color) {
 	b.squares[s] = p
 
 	if p != EMPTY {
@@ -156,7 +156,7 @@ func (b *board) putPiece(p Piece, s Square, c Color) {
 	}
 }
 
-func (b *board) movePiece(p Piece, mvfrom Square, mvto Square, c Color) {
+func (b *Board) movePiece(p Piece, mvfrom Square, mvto Square, c Color) {
 	var from u64 = 1 << mvfrom
 	var to u64 = 1 << mvto
 	var fromTo u64 = from ^ to
@@ -171,7 +171,7 @@ func (b *board) movePiece(p Piece, mvfrom Square, mvto Square, c Color) {
 	b.squares[mvto] = p
 }
 
-func (b *board) capturePiece(p Piece, q Piece, mvfrom Square, mvto Square, c Color) {
+func (b *Board) capturePiece(p Piece, q Piece, mvfrom Square, mvto Square, c Color) {
 	var from u64 = 1 << mvfrom
 	var to u64 = 1 << mvto
 	var fromTo u64 = from ^ to
@@ -187,7 +187,7 @@ func (b *board) capturePiece(p Piece, q Piece, mvfrom Square, mvto Square, c Col
 	b.squares[mvto] = p
 }
 
-func (b *board) replacePiece(p Piece, q Piece, sq Square) {
+func (b *Board) replacePiece(p Piece, q Piece, sq Square) {
 	var square u64 = 1 << sq
 	b.pieces[p] ^= square
 	b.pieces[q] ^= square
@@ -196,7 +196,7 @@ func (b *board) replacePiece(p Piece, q Piece, sq Square) {
 	b.squares[sq] = q
 }
 
-func (b *board) removePiece(p Piece, sq Square, c Color) {
+func (b *Board) removePiece(p Piece, sq Square, c Color) {
 	var square u64 = 1 << sq
 	b.pieces[p] ^= square
 	b.occupied ^= square
@@ -205,11 +205,11 @@ func (b *board) removePiece(p Piece, sq Square, c Color) {
 	b.squares[sq] = EMPTY
 }
 
-func (b *board) makeMoveFromUCI(uci string) {
+func (b *Board) makeMoveFromUCI(uci string) {
 	b.makeMove(fromUCI(uci, *b))
 }
 
-func (b *board) makeMove(mv Move) {
+func (b *Board) makeMove(mv Move) {
 	var entry prev = prev{move: mv, kW: b.kW, qW: b.qW, kB: b.kB, qB: b.qB, enpassant: b.enpassant}
 	b.history = append(b.history, entry)
 
@@ -288,7 +288,7 @@ func (b *board) makeMove(mv Move) {
 	}
 }
 
-func (b *board) undo() {
+func (b *Board) undo() {
 	prevEntry := b.history[len(b.history)-1]
 	prevMove := prevEntry.move
 	switch prevMove.movetype {
@@ -338,7 +338,7 @@ func (b *board) undo() {
 	b.history = b.history[:len(b.history)-1]
 }
 
-func (b *board) print() {
+func (b *Board) print() {
 	s := "\n"
 	for i := 56; i >= 0; i -= 8 {
 		for j := 0; j < 8; j++ {
@@ -349,7 +349,7 @@ func (b *board) print() {
 	fmt.Print(s)
 }
 
-func (b *board) printFromBitBoards() {
+func (b *Board) printFromBitBoards() {
 	s := "\n"
 	for i := 56; i >= 0; i -= 8 {
 		for j := 0; j < 8; j++ {
@@ -380,7 +380,7 @@ func (b *board) printFromBitBoards() {
 }
 
 // For testing purposes only
-func (b *board) getStringFromBitBoards() string {
+func (b *Board) getStringFromBitBoards() string {
 	s := "\n"
 	for i := 56; i >= 0; i -= 8 {
 		for j := 0; j < 8; j++ {

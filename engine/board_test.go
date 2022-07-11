@@ -22,10 +22,10 @@ func init() {
 // Move generation testing suite. A lot of the test-case FENs are from this awesome repo:
 // https://github.com/schnitzi/chessmovegen/tree/master/src/main/resources/testcases
 
-// Test initStartPos() method by making sure of correct default values
+// Test InitStartPos() method by making sure of correct default values
 func TestStartPos(t *testing.T) {
-	b := board{}
-	b.initStartPos()
+	b := Board{}
+	b.InitStartPos()
 
 	name := "castlingRights"
 	want := true
@@ -46,8 +46,8 @@ func TestStartPos(t *testing.T) {
 
 // Test enpassant when in pseudo-pin
 func TestEnPassantPseudoPin(t *testing.T) {
-	b := board{}
-	b.initFEN("rnbq1bnr/ppp1pppp/8/8/k2p3R/8/PPPPPPPP/RNBQKBN1 w - - 0 1")
+	b := Board{}
+	b.InitFEN("rnbq1bnr/ppp1pppp/8/8/k2p3R/8/PPPPPPPP/RNBQKBN1 w - - 0 1")
 	b.makeMoveFromUCI("e2e4")
 
 	if b.enpassant != e3 {
@@ -69,8 +69,8 @@ func TestEnPassantPseudoPin(t *testing.T) {
 // Two en passant options allowed
 func TestTwoEnPassant(t *testing.T) {
 	fen := "7k/8/8/8/pPp5/8/8/7K b - b3 0 1"
-	b := board{}
-	b.initFEN(fen)
+	b := Board{}
+	b.InitFEN(fen)
 
 	moves := b.generateLegalMoves()
 	uciMoves := []string{}
@@ -91,8 +91,8 @@ func TestTwoEnPassant(t *testing.T) {
 // Two en passant options but one of the pawns is pinned
 func TestTwoEnpassantOneLegal(t *testing.T) {
 	fen := "8/8/4k3/8/2pPp3/8/B7/7K b - d3 0 1"
-	b := board{}
-	b.initFEN(fen)
+	b := Board{}
+	b.InitFEN(fen)
 
 	moves := b.generateLegalMoves()
 	uciMoves := []string{}
@@ -113,8 +113,8 @@ func TestTwoEnpassantOneLegal(t *testing.T) {
 // All 8 pawns present for both sides but no pawn moves
 func TestNoPawnMoves(t *testing.T) {
 	fen := "8/4k3/1p1p1p1p/pPpPpPpP/P1P1P1P1/8/5K2/8 w - - 0 1"
-	b := board{}
-	b.initFEN(fen)
+	b := Board{}
+	b.InitFEN(fen)
 
 	moves := b.generateLegalMoves()
 	uciMoves := []string{}
@@ -135,8 +135,8 @@ func TestNoPawnMoves(t *testing.T) {
 
 // Test that castling is not possible when squares between are attacked
 func TestCastlingIfSquaresAttacked(t *testing.T) {
-	b := board{}
-	b.initFEN("rnbq1rk1/pppp1ppp/5n2/2b1p3/2B1P3/5P2/PPPPN1PP/RNBQK2R w KQ - 5 5")
+	b := Board{}
+	b.InitFEN("rnbq1rk1/pppp1ppp/5n2/2b1p3/2B1P3/5P2/PPPPN1PP/RNBQK2R w KQ - 5 5")
 
 	moves := b.generateLegalMoves()
 
@@ -153,8 +153,8 @@ func TestCastlingIfSquaresAttacked(t *testing.T) {
 // Test that all moves are correct on a complex position
 func TestAllMoves(t *testing.T) {
 	fen := "r3r1k1/pp3pbp/1qp1b1p1/2B5/2BP4/Q1n2N2/P4PPP/3R1K1R w - - 4 18"
-	b := board{}
-	b.initFEN(fen)
+	b := Board{}
+	b.InitFEN(fen)
 
 	moves := b.generateLegalMoves()
 	uciMoves := []string{}
@@ -181,8 +181,8 @@ func TestAllMoves(t *testing.T) {
 // Test number of generated moves for a board with a large amount of moves
 func TestAllMovesHuge(t *testing.T) {
 	fen := "R6R/3Q4/1Q4Q1/4Q3/2Q4Q/Q4Q2/pp1Q4/kBNN1KB1 w - - 0 1"
-	b := board{}
-	b.initFEN(fen)
+	b := Board{}
+	b.InitFEN(fen)
 
 	moves := b.generateLegalMoves()
 	uciMoves := []string{}
@@ -199,8 +199,8 @@ func TestAllMovesHuge(t *testing.T) {
 
 // Test case where all eight black pawns promote with captures
 func TestPromotion(t *testing.T) {
-	b := board{}
-	b.initFEN("3k4/8/1K6/8/8/8/pppppppp/RRRRRRRR b - - 0 1")
+	b := Board{}
+	b.InitFEN("3k4/8/1K6/8/8/8/pppppppp/RRRRRRRR b - - 0 1")
 
 	moves := b.generateLegalMoves()
 	uciMoves := []string{}
@@ -232,8 +232,8 @@ func TestPromotion(t *testing.T) {
 
 // Test that make and undo move with promotion (capture and promotion) work
 func TestMakeAndUndoMovePromotion(t *testing.T) {
-	b := board{}
-	b.initFEN("3k4/8/1K6/8/8/8/pppppppp/RRRRRRRR b - - 0 1")
+	b := Board{}
+	b.InitFEN("3k4/8/1K6/8/8/8/pppppppp/RRRRRRRR b - - 0 1")
 	orig := b.getStringFromBitBoards()
 
 	b.makeMoveFromUCI("b2a1q")
@@ -271,8 +271,8 @@ func TestMakeAndUndoMovePromotion(t *testing.T) {
 // Test that make and undo move with en passant work
 func TestMakeAndUndoEnPassant(t *testing.T) {
 	fen := "7k/8/8/8/pPp5/8/8/7K b - b3 0 1"
-	b := board{}
-	b.initFEN(fen)
+	b := Board{}
+	b.InitFEN(fen)
 
 	orig := b.getStringFromBitBoards()
 
@@ -310,8 +310,8 @@ func TestMakeAndUndoEnPassant(t *testing.T) {
 // Test undoing a capture
 func TestUndoMoveCapture(t *testing.T) {
 	fen := "r3r1k1/pp3pbp/1qp1b1p1/2B5/2BP4/Q1n2N2/P4PPP/3R1K1R w - - 4 18"
-	b := board{}
-	b.initFEN(fen)
+	b := Board{}
+	b.InitFEN(fen)
 
 	orig := b.getStringFromBitBoards()
 

@@ -24,7 +24,7 @@ func (m Move) toUCI() string {
 	return s
 }
 
-func fromUCI(uci string, b board) Move {
+func fromUCI(uci string, b Board) Move {
 	// parse UCI string into Move
 	// should only be necessary for testing, as UCI gives fen position
 	var m = Move{}

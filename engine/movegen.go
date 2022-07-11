@@ -1,6 +1,6 @@
 package engine
 
-func (b *board) getAllAttacks(o Color, occupied u64) u64 {
+func (b *Board) getAllAttacks(o Color, occupied u64) u64 {
 	// Generate all squares attacked/defended by opponent
 	var attackedSquares u64 = 0
 
@@ -84,7 +84,7 @@ func getRookAttacks(sq Square, bb u64) u64 {
 	return rookAttacks[sq][magicIndex>>rookShifts[sq]]
 }
 
-func (b *board) generateMovesFromLocs(m *[]Move, sq Square, locs u64, c Color) {
+func (b *Board) generateMovesFromLocs(m *[]Move, sq Square, locs u64, c Color) {
 	var lsb Square
 	var bbLSB u64
 	var piece Piece
@@ -137,13 +137,13 @@ func (b *board) generateMovesFromLocs(m *[]Move, sq Square, locs u64, c Color) {
 	}
 }
 
-func (b *board) getKingMoves(m *[]Move, sq Square, attacks u64, player u64, c Color) {
+func (b *Board) getKingMoves(m *[]Move, sq Square, attacks u64, player u64, c Color) {
 	var kingMoves u64 = kingAttacks(sq) & ^attacks & ^player
 	b.generateMovesFromLocs(m, sq, kingMoves, c)
 
 }
 
-func (b *board) getKnightMoves(m *[]Move, knights u64, pinned u64, player u64, c Color, allowed u64) {
+func (b *Board) getKnightMoves(m *[]Move, knights u64, pinned u64, player u64, c Color, allowed u64) {
 	// since a pinned knight means no possible moves, can just mask by non-pinned
 	knights &= ^pinned
 
@@ -160,7 +160,7 @@ func (b *board) getKnightMoves(m *[]Move, knights u64, pinned u64, player u64, c
 	}
 }
 
-func (b *board) getPawnMoves(m *[]Move, pawns u64, pinned u64, occupied u64, opponents u64, c Color, allowed u64) {
+func (b *Board) getPawnMoves(m *[]Move, pawns u64, pinned u64, occupied u64, opponents u64, c Color, allowed u64) {
 	// have to handle pinned pawns (TODO)
 	// promotion & enpassant will be handled in generateMovesFromLocs
 	var pinnedPawns u64 = pawns & pinned
@@ -217,7 +217,7 @@ func (b *board) getPawnMoves(m *[]Move, pawns u64, pinned u64, occupied u64, opp
 	}
 }
 
-func (b *board) getBishopMoves(m *[]Move, bishops u64, pinned u64, player u64, opponents u64, c Color, allowed u64) {
+func (b *Board) getBishopMoves(m *[]Move, bishops u64, pinned u64, player u64, opponents u64, c Color, allowed u64) {
 	var pinnedBishops u64 = bishops & pinned
 	var kingLoc Square
 
@@ -250,7 +250,7 @@ func (b *board) getBishopMoves(m *[]Move, bishops u64, pinned u64, player u64, o
 	}
 }
 
-func (b *board) getRookMoves(m *[]Move, rooks u64, pinned u64, player u64, opponents u64, c Color, allowed u64) {
+func (b *Board) getRookMoves(m *[]Move, rooks u64, pinned u64, player u64, opponents u64, c Color, allowed u64) {
 	var pinnedRooks u64 = rooks & pinned
 	var kingLoc Square
 	if pinnedRooks != 0 {
@@ -282,7 +282,7 @@ func (b *board) getRookMoves(m *[]Move, rooks u64, pinned u64, player u64, oppon
 	}
 }
 
-func (b *board) getQueenMoves(m *[]Move, queens u64, pinned u64, player u64, opponents u64, c Color, allowed u64) {
+func (b *Board) getQueenMoves(m *[]Move, queens u64, pinned u64, player u64, opponents u64, c Color, allowed u64) {
 	var pinnedQueens u64 = queens & pinned
 	var kingLoc Square
 	if pinnedQueens != 0 {
@@ -315,7 +315,7 @@ func (b *board) getQueenMoves(m *[]Move, queens u64, pinned u64, player u64, opp
 	}
 }
 
-func (b *board) getCastlingMoves(m *[]Move, pKing Square, attacks u64, c Color) {
+func (b *Board) getCastlingMoves(m *[]Move, pKing Square, attacks u64, c Color) {
 	var castlingKingsidePossible bool = false
 	var castlingQueensidePossible bool = false
 
@@ -343,7 +343,7 @@ func (b *board) getCastlingMoves(m *[]Move, pKing Square, attacks u64, c Color) 
 	}
 }
 
-func (b *board) generateLegalMoves() []Move {
+func (b *Board) generateLegalMoves() []Move {
 	// Setup move list. Will be appending moves to this
 	var m []Move = []Move{}
 
