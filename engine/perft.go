@@ -67,7 +67,7 @@ func RunPerfTests(position string, maxDepth int) {
 	b.printFromBitBoards()
 	fmt.Println()
 
-	for depth := 0; depth <= maxDepth; depth++ {
+	for depth := 1; depth <= maxDepth; depth++ {
 		start := time.Now()
 		nodes := Perft(&b, depth)
 		duration := time.Since(start)
@@ -97,28 +97,28 @@ func RunTests() {
 	// Perft tests: https://www.chessprogramming.org/Perft_Results
 
 	fmt.Println("Position 1: ")
-	// // startpos (works to depth 6)
+	// // startpos (works to depth 6) 119,060,324 (4,865,609 = depth 5)
 	RunPerfTests("startpos", 6)
 
 	fmt.Println("Position 2: ")
-	// // position 2 (works to depth 6)
-	RunPerfTests("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", 6)
+	// // position 2 (works to depth 6) 8031647685 (193690690 = depth 5)
+	RunPerfTests("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", 5)
 
 	fmt.Println("Position 3: ")
-	// // position 3 (works to depth 8)
-	RunPerfTests("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1", 8)
+	// // position 3 (works to depth 8) 3009794393 (178633661 = depth 7)
+	RunPerfTests("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1", 7)
 
 	fmt.Println("Position 4: ")
-	// // position 4 (works to depth 6)
-	RunPerfTests("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1", 6)
+	// // position 4 (works to depth 6) 706045033 (15833292 = depth 5)
+	RunPerfTests("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1", 5)
 
 	fmt.Println("Position 5: ")
-	// // position 5 (works to depth 5)
+	// // position 5 (works to depth 5)  89,941,194
 	RunPerfTests("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8", 5)
 
 	fmt.Println("Position 6: ")
-	// // position 6 (works to depth 6)
-	RunPerfTests("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10", 6)
+	// // position 6 (works to depth 6) 6,923,051,137 (164,075,551 = depth 5)
+	RunPerfTests("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10", 5)
 
 	// More Perft tests: https://www.chessprogramming.net/perfect-perft/
 	// Perft 6: 1134888
