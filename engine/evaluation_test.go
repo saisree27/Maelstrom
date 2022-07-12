@@ -47,7 +47,7 @@ func TestMaterial(t *testing.T) {
 	b := Board{}
 	b.InitFEN(fen)
 
-	material := totalMaterial(&b)
+	material, _ := totalMaterialAndPieces(&b)
 	if material != 0 {
 		t.Errorf("TestMaterial (equal): got %d, wanted %d", material, 0)
 	}
@@ -56,7 +56,7 @@ func TestMaterial(t *testing.T) {
 	b = Board{}
 	b.InitFEN(fen)
 
-	material = totalMaterial(&b)
+	material, _ = totalMaterialAndPieces(&b)
 	if material != 100 {
 		t.Errorf("TestMaterial (white pawn up): got %d, wanted %d", material, 100)
 	}
@@ -65,7 +65,7 @@ func TestMaterial(t *testing.T) {
 	b = Board{}
 	b.InitFEN(fen)
 
-	material = totalMaterial(&b)
+	material, _ = totalMaterialAndPieces(&b)
 	if material != 900 {
 		t.Errorf("TestMaterial (white queen up): got %d, wanted %d", material, 900)
 	}
@@ -74,7 +74,7 @@ func TestMaterial(t *testing.T) {
 	b = Board{}
 	b.InitFEN(fen)
 
-	material = totalMaterial(&b)
+	material, _ = totalMaterialAndPieces(&b)
 	if material != -900 {
 		t.Errorf("TestMaterial (black queen up): got %d, wanted %d", material, -900)
 	}
@@ -83,7 +83,7 @@ func TestMaterial(t *testing.T) {
 	b = Board{}
 	b.InitFEN(fen)
 
-	material = totalMaterial(&b)
+	material, _ = totalMaterialAndPieces(&b)
 	if material != -100 {
 		t.Errorf("TestMaterial (black pawn up): got %d, wanted %d", material, -100)
 	}

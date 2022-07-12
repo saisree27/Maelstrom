@@ -191,9 +191,9 @@ const (
 	R8
 )
 
-var almostPromotion = map[Color]Rank{WHITE: R7, BLACK: R2}
-var startingRank = map[Color]Rank{WHITE: R2, BLACK: R7}
-var pawnPushDirection = map[Color]Direction{WHITE: NORTH, BLACK: SOUTH}
+var almostPromotion = []Rank{WHITE: R7, BLACK: R2}
+var startingRank = []Rank{WHITE: R2, BLACK: R7}
+var pawnPushDirection = []Direction{WHITE: NORTH, BLACK: SOUTH}
 
 type Square int
 
@@ -356,15 +356,15 @@ func initializePawnAttacks() {
 	}
 }
 
-var colorToPawnLookup = map[Color]*[64]u64{
+var colorToPawnLookup = []*[64]u64{
 	WHITE: &whitePawnAttacksSquareLookup, BLACK: &blackPawnAttacksSquareLookup,
 }
 
-var colorToPawnLookupReverse = map[Color]*[64]u64{
+var colorToPawnLookupReverse = []*[64]u64{
 	WHITE: &blackPawnAttacksSquareLookup, BLACK: &whitePawnAttacksSquareLookup,
 }
 
-var colorToKingLookup = map[Color]Piece{
+var colorToKingLookup = []Piece{
 	WHITE: wK, BLACK: bK,
 }
 

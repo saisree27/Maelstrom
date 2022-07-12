@@ -6,7 +6,7 @@ var factor = map[Color]int{
 }
 
 var material = map[Piece]int{
-	wP: 100, bP: -100,
+	wP: 150, bP: -150,
 	wN: 300, bN: -300,
 	wB: 300, bB: -300,
 	wR: 500, bR: -500,
@@ -15,25 +15,25 @@ var material = map[Piece]int{
 	EMPTY: 0,
 }
 
-var whitePawnSquareTable = [64]int{
-	0, 0, 0, 0, 0, 0, 0, 0,
-	5, 10, -30, -30, -30, 10, 10, 5,
-	-1, -5, -15, -30, 36, -10, -5, -1,
-	-5, -15, 40, 40, 40, -10, 0, -5,
-	5, 5, 10, 25, 25, 10, 5, 5,
-	10, 10, 20, 30, 30, 20, 10, 10,
-	50, 50, 50, 50, 50, 50, 50, 50,
-	65, 65, 65, 65, 65, 65, 65, 65,
+var reversePSQ = [64]int{
+	56, 57, 58, 59, 60, 61, 62, 63,
+	48, 49, 50, 51, 52, 53, 54, 55,
+	40, 41, 42, 43, 44, 45, 46, 47,
+	32, 33, 34, 35, 36, 37, 38, 39,
+	24, 25, 26, 27, 28, 29, 30, 31,
+	16, 17, 18, 19, 20, 21, 22, 23,
+	8, 9, 10, 11, 12, 13, 14, 15,
+	0, 1, 2, 3, 4, 5, 6, 7,
 }
 
-var blackPawnSquareTable = [64]int{
-	65, 65, 65, 65, 65, 65, 65, 65,
-	50, 50, 50, 50, 50, 50, 50, 50,
-	10, 10, 20, 30, 30, 20, 10, 10,
-	5, 5, 10, 25, 25, 10, 5, 5,
+var pawnSquareTable = [64]int{
+	0, 0, 0, 0, 0, 0, 0, 0,
+	5, 10, -20, -20, -20, 10, 10, 5,
+	5, 10, 0, 0, 0, 0, -20, 5,
 	-5, -15, 40, 40, 40, -10, 0, -5,
-	-1, -5, -15, -30, 36, -10, -5, -1,
-	5, 10, -30, -30, -30, 10, 10, 5,
+	5, 5, 10, 25, 25, 10, 5, 5,
+	10, 10, 20, 30, 30, 20, 10, 10,
+	30, 30, 50, 50, 50, 50, 30, 30,
 	0, 0, 0, 0, 0, 0, 0, 0,
 }
 
@@ -60,18 +60,18 @@ var bishopSquareTable = [64]int{
 }
 
 var rookSquareTable = [64]int{
-	-10, -10, 0, 5, 5, 0, -10, -10,
-	-15, 0, 0, 0, 0, 0, 0, -15,
-	-5, 0, 0, 0, 0, 0, 0, -5,
-	-5, 0, 0, 0, 0, 0, 0, -5,
-	-5, 0, 0, 0, 0, 0, 0, -5,
-	-5, 0, 0, 0, 0, 0, 0, -5,
+	-10, -10, 3, 5, 5, 3, -10, -10,
+	-15, 0, 0, 5, 5, 0, 0, -15,
+	-5, 0, 0, 5, 5, 0, 0, -5,
+	-5, 0, 0, 5, 5, 0, 0, -5,
+	-5, 0, 0, 5, 5, 0, 0, -5,
+	-5, 0, 0, 5, 5, 0, 0, -5,
 	5, 10, 10, 10, 10, 10, 10, 5,
 	0, 0, 0, 0, 0, 0, 0, 0,
 }
 
 var queenSquareTable = [64]int{
-	-20, -10, -10, -5, -5, -10, -10, -20,
+	-20, -10, -10, 5, -5, -10, -10, -20,
 	-10, 0, 0, 0, 0, 0, 0, -10,
 	-10, -5, -5, -5, -5, -5, 0, -10,
 	0, 0, 5, 5, 5, 5, 0, -5,
@@ -82,14 +82,25 @@ var queenSquareTable = [64]int{
 }
 
 var kingSquareTableMiddlegame = [64]int{
-	20, 30, 15, -75, -11, -75, 30, 20,
-	20, 20, -50, -200, -200, -65, 20, 20,
+	10, 30, 25, -10, -10, -15, 30, 10,
+	0, -5, -50, -75, -75, -65, -5, 0,
 	-10, -20, -20, -20, -20, -20, -20, -10,
 	-20, -30, -30, -40, -40, -30, -30, -20,
 	-30, -40, -40, -50, -60, -40, -40, -30,
 	-30, -40, -65, -50, -50, -40, -40, -30,
-	-30, -40, -50, -200, -200, -40, -40, -30,
+	-30, -40, -50, -75, -75, -40, -40, -30,
 	-30, -40, -60, -75, -75, -60, -40, -30,
+}
+
+var kingSquareTableEndgame = [64]int{
+	-50, -10, 0, 0, 0, 0, -10, -50,
+	-10, 0, 10, 10, 10, 10, 0, -10,
+	0, 10, 15, 15, 15, 15, 10, 0,
+	0, 10, 15, 20, 20, 15, 10, 0,
+	0, 10, 15, 20, 20, 15, 10, 0,
+	0, 10, 15, 15, 15, 15, 10, 0,
+	-10, 0, 10, 10, 10, 10, 0, -10,
+	-50, -10, 0, 0, 0, 0, -10, -50,
 }
 
 // Returns an evaluation of the position in cp
@@ -99,54 +110,120 @@ func evaluate(b *Board) int {
 	moves := b.generateLegalMoves()
 	if len(moves) == 0 {
 		if b.isCheck(b.turn) {
-			return winVal * factor[b.turn]
+			// if white is in check, then val should be -1000000
+			return winVal * factor[reverseColor(b.turn)]
 		} else {
 			return 0
 		}
 	}
 
 	eval := 0
-	eval += totalMaterial(b)
-	eval += int(float64(piecePosition(b)))
+
+	material, total := totalMaterialAndPieces(b)
+
+	eval += material
+	eval += piecePosition(b, total)
+
+	player := b.turn
+	opponent := reverseColor(b.turn)
+
+	playerAttacks := b.getAllAttacks(player, b.occupied, b.getColorPieces(rook, player), b.getColorPieces(bishop, player))
+
+	eval += (popCount(playerAttacks) * factor[b.turn]) * 5
+
+	opponentAttacks := b.getAllAttacks(opponent, b.occupied, b.getColorPieces(rook, opponent), b.getColorPieces(bishop, opponent))
+
+	eval -= (popCount(opponentAttacks) * factor[b.turn]) * 5
+
+	// during opening, harsh penalty for minor pieces not yet developed
+	if b.plyCnt <= 25 {
+		whiteKnightsAndBishops := b.getColorPieces(knight, WHITE) | b.getColorPieces(bishop, WHITE)
+		blackKnightsAndBishops := b.getColorPieces(knight, BLACK) | b.getColorPieces(bishop, BLACK)
+
+		eval -= popCount(whiteKnightsAndBishops&ranks[R1]) * 50
+		eval += popCount(blackKnightsAndBishops&ranks[R8]) * 50
+	}
+
+	if total >= 15 && b.pieces[wQ]|b.pieces[bQ] == 0 {
+		// penalty/reward for air around king
+		whiteKingAttacks := kingAttacksSquareLookup[bitScanForward(b.getColorPieces(king, WHITE))]
+		air := popCount(whiteKingAttacks & b.empty)
+		if air > 2 {
+			eval -= air * 40
+		}
+
+		blackKingAttacks := kingAttacksSquareLookup[bitScanForward(b.getColorPieces(king, BLACK))]
+		air = popCount(blackKingAttacks & b.empty)
+		if air > 2 {
+			eval += air * 40
+		}
+	}
+
+	if b.plyCnt <= 25 {
+		// during opening, harsh penalty/reward if castling rights are gone and queens are still on
+		if !(b.OO || b.OOO) && !((b.squares[g1] == wK && b.squares[h1] != wR) || b.squares[c1] == wK && b.squares[a1] != wR && b.squares[b1] != wR) {
+			eval -= 150
+		}
+		if !(b.oo || b.ooo) && !((b.squares[g8] == bK && b.squares[h8] != bR) || b.squares[c8] == bK && b.squares[a8] != bR && b.squares[b8] != bR) {
+			eval += 150
+		}
+	}
+
 	return eval
 }
 
-func totalMaterial(b *Board) int {
+func totalMaterialAndPieces(b *Board) (int, int) {
 	sum := 0
+	total := 0
+
 	for _, piece := range b.squares {
 		sum += material[piece]
+		if piece != EMPTY {
+			total++
+		}
 	}
-	return sum
+	return sum, total
 }
 
-func piecePosition(b *Board) int {
+func piecePosition(b *Board, totalPieces int) int {
 	sum := 0
+	noQueensLeft := b.pieces[wQ]|b.pieces[bQ] == 0
+	switchEndgame := (totalPieces <= 20 && noQueensLeft) || (totalPieces <= 10)
+
 	for i, piece := range b.squares {
 		switch piece {
 		case wK:
-			sum += kingSquareTableMiddlegame[i]
+			if switchEndgame {
+				sum += kingSquareTableEndgame[i]
+			} else {
+				sum += kingSquareTableMiddlegame[i]
+			}
 		case bK:
-			sum += kingSquareTableMiddlegame[i] * -1
+			if switchEndgame {
+				sum += kingSquareTableEndgame[reversePSQ[i]] * -1
+			} else {
+				sum += kingSquareTableMiddlegame[reversePSQ[i]] * -1
+			}
 		case wN:
 			sum += knightSquareTable[i]
 		case bN:
-			sum += knightSquareTable[i] * -1
+			sum += knightSquareTable[reversePSQ[i]] * -1
 		case wB:
 			sum += bishopSquareTable[i]
 		case bB:
-			sum += bishopSquareTable[i] * -1
+			sum += bishopSquareTable[reversePSQ[i]] * -1
 		case wR:
 			sum += rookSquareTable[i]
 		case bR:
-			sum += rookSquareTable[i] * -1
+			sum += rookSquareTable[reversePSQ[i]] * -1
 		case wQ:
 			sum += queenSquareTable[i]
 		case bQ:
-			sum += queenSquareTable[i] * -1
+			sum += queenSquareTable[reversePSQ[i]] * -1
 		case wP:
-			sum += whitePawnSquareTable[i]
+			sum += pawnSquareTable[i]
 		case bP:
-			sum += blackPawnSquareTable[i] * -1
+			sum += pawnSquareTable[reversePSQ[i]] * -1
 		}
 	}
 	return sum

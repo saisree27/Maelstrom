@@ -324,6 +324,8 @@ func (b *Board) makeMove(mv Move) {
 	} else {
 		b.enpassant = EMPTYSQ
 	}
+
+	b.plyCnt++
 }
 
 func (b *Board) undoNoUpdate(prevMove Move) {
@@ -415,6 +417,7 @@ func (b *Board) undo() {
 	b.turn = reverseColor(b.turn)
 
 	b.history = b.history[:len(b.history)-1]
+	b.plyCnt--
 }
 
 func (b *Board) isCheck(c Color) bool {
