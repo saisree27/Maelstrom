@@ -61,7 +61,7 @@ func (b *Board) InitStartPos() {
 		} else if i >= 48 {
 			b.putPiece(b.squares[i], Square(i), BLACK)
 		} else {
-			b.empty ^= u64(1 << i)
+			b.empty ^= sToBB[i]
 		}
 	}
 	b.turn = WHITE
@@ -144,21 +144,21 @@ func (b *Board) putPiece(p Piece, s Square, c Color) {
 	b.squares[s] = p
 
 	if p != EMPTY {
-		var square u64 = (1 << s)
+		var square u64 = sToBB[s]
 		b.colors[c] |= square
 		b.pieces[p] |= square
 		b.occupied |= square
 		b.empty &= ^square
 	} else {
-		var square u64 = (1 << s)
+		var square u64 = sToBB[s]
 		b.empty |= square
 		b.occupied &= ^square
 	}
 }
 
 func (b *Board) movePiece(p Piece, mvfrom Square, mvto Square, c Color) {
-	var from u64 = 1 << mvfrom
-	var to u64 = 1 << mvto
+	var from u64 = sToBB[mvfrom]
+	var to u64 = sToBB[mvto]
 	var fromTo u64 = from ^ to
 
 	b.pieces[p] ^= fromTo
@@ -172,8 +172,8 @@ func (b *Board) movePiece(p Piece, mvfrom Square, mvto Square, c Color) {
 }
 
 func (b *Board) capturePiece(p Piece, q Piece, mvfrom Square, mvto Square, c Color) {
-	var from u64 = 1 << mvfrom
-	var to u64 = 1 << mvto
+	var from u64 = sToBB[mvfrom]
+	var to u64 = sToBB[mvto]
 	var fromTo u64 = from ^ to
 	b.pieces[p] ^= fromTo
 	b.colors[c] ^= fromTo
@@ -188,7 +188,7 @@ func (b *Board) capturePiece(p Piece, q Piece, mvfrom Square, mvto Square, c Col
 }
 
 func (b *Board) replacePiece(p Piece, q Piece, sq Square) {
-	var square u64 = 1 << sq
+	var square u64 = sToBB[sq]
 	b.pieces[p] ^= square
 	b.pieces[q] ^= square
 
@@ -197,7 +197,7 @@ func (b *Board) replacePiece(p Piece, q Piece, sq Square) {
 }
 
 func (b *Board) removePiece(p Piece, sq Square, c Color) {
-	var square u64 = 1 << sq
+	var square u64 = sToBB[sq]
 	b.pieces[p] ^= square
 	b.occupied ^= square
 	b.empty ^= square
@@ -207,6 +207,44 @@ func (b *Board) removePiece(p Piece, sq Square, c Color) {
 
 func (b *Board) makeMoveFromUCI(uci string) {
 	b.makeMove(fromUCI(uci, *b))
+}
+
+func (b *Board) makeMoveNoUpdate(mv Move) {
+	switch mv.movetype {
+	case QUIET:
+		b.movePiece(mv.piece, mv.from, mv.to, mv.colorMoved)
+	case CAPTURE:
+		b.capturePiece(mv.piece, mv.captured, mv.from, mv.to, mv.colorMoved)
+	case PROMOTION:
+		b.movePiece(mv.piece, mv.from, mv.to, mv.colorMoved)
+		b.replacePiece(mv.piece, mv.promote, mv.to)
+	case CAPTUREANDPROMOTION:
+		b.capturePiece(mv.piece, mv.captured, mv.from, mv.to, mv.colorMoved)
+		b.replacePiece(mv.piece, mv.promote, mv.to)
+	case KCASTLE:
+		if mv.colorMoved == WHITE {
+			b.movePiece(wK, e1, g1, WHITE)
+			b.movePiece(wR, h1, f1, WHITE)
+		} else {
+			b.movePiece(bK, e8, g8, BLACK)
+			b.movePiece(bR, h8, f8, BLACK)
+		}
+	case QCASTLE:
+		if mv.colorMoved == WHITE {
+			b.movePiece(wK, e1, c1, WHITE)
+			b.movePiece(wR, a1, d1, WHITE)
+		} else {
+			b.movePiece(bK, e8, c8, BLACK)
+			b.movePiece(bR, a8, d8, BLACK)
+		}
+	case ENPASSANT:
+		b.movePiece(mv.piece, mv.from, mv.to, mv.colorMoved)
+		if mv.colorMoved == WHITE {
+			b.removePiece(bP, mv.to.goDirection(SOUTH), BLACK)
+		} else {
+			b.removePiece(wP, mv.to.goDirection(NORTH), WHITE)
+		}
+	}
 }
 
 func (b *Board) makeMove(mv Move) {
@@ -288,6 +326,46 @@ func (b *Board) makeMove(mv Move) {
 	}
 }
 
+func (b *Board) undoNoUpdate(prevMove Move) {
+	switch prevMove.movetype {
+	case QUIET:
+		b.movePiece(prevMove.piece, prevMove.to, prevMove.from, prevMove.colorMoved)
+	case CAPTURE:
+		b.movePiece(prevMove.piece, prevMove.to, prevMove.from, prevMove.colorMoved)
+		b.putPiece(prevMove.captured, prevMove.to, reverseColor(prevMove.colorMoved))
+	case PROMOTION:
+		b.removePiece(prevMove.promote, prevMove.to, prevMove.colorMoved)
+		b.putPiece(prevMove.piece, prevMove.from, prevMove.colorMoved)
+	case CAPTUREANDPROMOTION:
+		b.removePiece(prevMove.promote, prevMove.to, prevMove.colorMoved)
+		b.putPiece(prevMove.piece, prevMove.from, prevMove.colorMoved)
+		b.putPiece(prevMove.captured, prevMove.to, reverseColor(prevMove.colorMoved))
+	case KCASTLE:
+		if prevMove.colorMoved == WHITE {
+			b.movePiece(wK, g1, e1, WHITE)
+			b.movePiece(wR, f1, h1, WHITE)
+		} else {
+			b.movePiece(bK, g8, e8, BLACK)
+			b.movePiece(bR, f8, h8, BLACK)
+		}
+	case QCASTLE:
+		if prevMove.colorMoved == WHITE {
+			b.movePiece(wK, c1, e1, WHITE)
+			b.movePiece(wR, d1, a1, WHITE)
+		} else {
+			b.movePiece(bK, c8, e8, BLACK)
+			b.movePiece(bR, d8, a8, BLACK)
+		}
+	case ENPASSANT:
+		b.movePiece(prevMove.piece, prevMove.to, prevMove.from, prevMove.colorMoved)
+		if prevMove.colorMoved == WHITE {
+			b.putPiece(bP, prevMove.to.goDirection(SOUTH), BLACK)
+		} else {
+			b.putPiece(wP, prevMove.to.goDirection(NORTH), WHITE)
+		}
+	}
+}
+
 func (b *Board) undo() {
 	prevEntry := b.history[len(b.history)-1]
 	prevMove := prevEntry.move
@@ -339,15 +417,12 @@ func (b *Board) undo() {
 	b.history = b.history[:len(b.history)-1]
 }
 
-func (b *Board) isCheck() bool {
-	player := reverseColor(b.turn)
-	opponent := b.turn
+func (b *Board) isCheck(c Color) bool {
+	player := c
+	opponent := reverseColor(c)
 
 	playerKing := b.getColorPieces(king, player)
-	attacks := b.getAllAttacks(opponent, b.occupied)
-
-	// TODO: optimize by stopping getAllAttacks early if check is found
-	return popCount(playerKing&attacks) >= 1
+	return b.attacksOn(opponent, b.occupied, playerKing, true)
 }
 
 func (b *Board) print() {

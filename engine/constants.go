@@ -386,8 +386,8 @@ func initializeSQLookup() {
 // Function to get sliding attacks on a given line/diagonal
 // Implementation from https://github.com/nkarve/surge
 func slidingAttacks(s Square, b u64, locs u64) u64 {
-	a := (locs & b) - (1<<s)*2
-	c := (bits.Reverse64(uint64(b&locs)) - bits.Reverse64(1<<s)*2)
+	a := (locs & b) - (sToBB[s])*2
+	c := (bits.Reverse64(uint64(b&locs)) - bits.Reverse64(uint64(sToBB[s]))*2)
 	d := bits.Reverse64(c)
 	return (a ^ u64(d)) & locs
 }

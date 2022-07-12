@@ -22,7 +22,16 @@ func printBitBoard(u u64) {
 }
 
 func popCount(u u64) int {
-	return bits.OnesCount64(uint64(u))
+	count := 0
+	for {
+		if u == 0 {
+			break
+		}
+		count++
+		u &= u - 1
+	}
+	return count
+	// return bits.OnesCount64(uint64(u))
 }
 
 // Below bitboard operations are for ease of use when generating legal moves

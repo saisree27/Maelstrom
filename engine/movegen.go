@@ -1,6 +1,67 @@
 package engine
 
-func (b *Board) getAllAttacks(o Color, occupied u64) u64 {
+func (b *Board) attacksOn(o Color, occupied u64, kingSquare u64, check bool) bool {
+	// optimized helper function in looking for attacks on square
+
+	var attacked u64 = 0
+	if !check {
+		// don't have to worry about king attacks when looking for checks
+		var opponentKing Square = Square(bitScanForward(b.getColorPieces(king, o)))
+		attacked |= kingAttacks(opponentKing)
+	}
+
+	var opponentKnights u64 = b.getColorPieces(knight, o)
+	var lsb int
+	for {
+		if opponentKnights == 0 {
+			break
+		}
+		lsb = popLSB(&opponentKnights)
+		attacked |= knightAttacks(Square(lsb))
+	}
+
+	if attacked&kingSquare != 0 {
+		return true
+	}
+
+	var opponentBishops u64 = b.getColorPieces(bishop, o) | b.getColorPieces(queen, o)
+	for {
+		if opponentBishops == 0 {
+			break
+		}
+		lsb = popLSB(&opponentBishops)
+		attacked |= getBishopAttacks(Square(lsb), occupied)
+	}
+	if attacked&kingSquare != 0 {
+		return true
+	}
+
+	var opponentRooks u64 = b.getColorPieces(rook, o) | b.getColorPieces(queen, o)
+	for {
+		if opponentRooks == 0 {
+			break
+		}
+		lsb = popLSB(&opponentRooks)
+		attacked |= getRookAttacks(Square(lsb), occupied)
+	}
+
+	if attacked&kingSquare != 0 {
+		return true
+	}
+	// var opponentQueens u64 = b.getColorPieces(queen, o)
+	// for {
+	// 	if opponentQueens == 0 {
+	// 		break
+	// 	}
+	// 	lsb = popLSB(&opponentQueens)
+	// 	attacked |= (getRookAttacks(Square(lsb), occupied) | getBishopAttacks(Square(lsb), occupied))
+	// }
+
+	attacked |= allPawnAttacks(b.getColorPieces(pawn, o), o)
+	return attacked&kingSquare != 0
+}
+
+func (b *Board) getAllAttacks(o Color, occupied u64, ortho u64, diag u64) u64 {
 	// Generate all squares attacked/defended by opponent
 	var attackedSquares u64 = 0
 
@@ -27,8 +88,8 @@ func (b *Board) getAllAttacks(o Color, occupied u64) u64 {
 		attackedSquares |= knightAttacks(Square(lsb))
 	}
 
-	// TODO: Slider pieces (bishop, rook, queen)
-	var opponentBishops u64 = b.getColorPieces(bishop, o)
+	// Consider queen to be both rook and bishop so don't have to use another call
+	var opponentBishops u64 = diag
 	for {
 		if opponentBishops == 0 {
 			break
@@ -37,7 +98,7 @@ func (b *Board) getAllAttacks(o Color, occupied u64) u64 {
 		attackedSquares |= getBishopAttacks(Square(lsb), occupied^playerKing)
 	}
 
-	var opponentRooks u64 = b.getColorPieces(rook, o)
+	var opponentRooks u64 = ortho
 	for {
 		if opponentRooks == 0 {
 			break
@@ -46,14 +107,14 @@ func (b *Board) getAllAttacks(o Color, occupied u64) u64 {
 		attackedSquares |= getRookAttacks(Square(lsb), occupied^playerKing)
 	}
 
-	var opponentQueens u64 = b.getColorPieces(queen, o)
-	for {
-		if opponentQueens == 0 {
-			break
-		}
-		lsb = popLSB(&opponentQueens)
-		attackedSquares |= (getRookAttacks(Square(lsb), occupied^playerKing) | getBishopAttacks(Square(lsb), occupied^playerKing))
-	}
+	// var opponentQueens u64 = b.getColorPieces(queen, o)
+	// for {
+	// 	if opponentQueens == 0 {
+	// 		break
+	// 	}
+	// 	lsb = popLSB(&opponentQueens)
+	// 	attackedSquares |= (getRookAttacks(Square(lsb), occupied^playerKing) | getBishopAttacks(Square(lsb), occupied^playerKing))
+	// }
 
 	return attackedSquares
 }
@@ -361,8 +422,13 @@ func (b *Board) generateLegalMoves() []Move {
 	// Set to all bits by default
 	var allowed u64 = 0xFFFFFFFFFFFFFFFF
 
+	var orthogonalUs u64 = b.getColorPieces(rook, player) | b.getColorPieces(queen, player)
+	var diagonalUs u64 = b.getColorPieces(bishop, player) | b.getColorPieces(queen, player)
+	var orthogonalThem u64 = b.getColorPieces(rook, opponent) | b.getColorPieces(queen, opponent)
+	var diagonalThem u64 = b.getColorPieces(bishop, opponent) | b.getColorPieces(queen, opponent)
+
 	// Find all squares controlled by opponent
-	var attacks u64 = b.getAllAttacks(opponent, b.occupied)
+	var attacks u64 = b.getAllAttacks(opponent, b.occupied, orthogonalThem, diagonalThem)
 	// printBitBoard(attacks)
 
 	// STEP 1: Generate king moves, since we can look for checks after
@@ -382,8 +448,8 @@ func (b *Board) generateLegalMoves() []Move {
 	checkers |= (knightAttacks(playerKing) & b.getColorPieces(knight, opponent))
 
 	// 2b: get bishop/rook/queen attacks and check if there are pieces between them and the king
-	var pinPoss u64 = (getBishopAttacks(playerKing, b.colors[opponent]) & (b.getColorPieces(bishop, opponent) | b.getColorPieces(queen, opponent)))
-	pinPoss |= (getRookAttacks(playerKing, b.colors[opponent]) & (b.getColorPieces(rook, opponent) | b.getColorPieces(queen, opponent)))
+	var pinPoss u64 = (getBishopAttacks(playerKing, b.colors[opponent]) & diagonalThem)
+	pinPoss |= (getRookAttacks(playerKing, b.colors[opponent]) & orthogonalThem)
 
 	var pinned u64 = 0
 	var lsb int
@@ -426,7 +492,7 @@ func (b *Board) generateLegalMoves() []Move {
 				move := Move{from: lsb, to: b.enpassant, movetype: ENPASSANT, captured: checkerPiece, colorMoved: player, piece: b.squares[lsb]}
 
 				b.makeMove(move)
-				if b.isCheck() {
+				if b.isCheck(player) {
 					b.undo()
 				} else {
 					b.undo()
@@ -447,14 +513,14 @@ func (b *Board) generateLegalMoves() []Move {
 		if player == WHITE {
 			possibleCaptures |= blackPawnAttacksSquareLookup[checker] & b.pieces[wP]
 			possibleCaptures |= knightAttacks(checker) & b.pieces[wN]
-			possibleCaptures |= getBishopAttacks(checker, b.occupied) & (b.pieces[wB] | b.pieces[wQ])
-			possibleCaptures |= getRookAttacks(checker, b.occupied) & (b.pieces[wR] | b.pieces[wQ])
+			possibleCaptures |= getBishopAttacks(checker, b.occupied) & diagonalUs
+			possibleCaptures |= getRookAttacks(checker, b.occupied) & orthogonalUs
 			possibleCaptures &= ^pinned
 		} else {
 			possibleCaptures |= whitePawnAttacksSquareLookup[checker] & b.pieces[bP]
 			possibleCaptures |= knightAttacks(checker) & b.pieces[bN]
-			possibleCaptures |= getBishopAttacks(checker, b.occupied) & (b.pieces[bB] | b.pieces[bQ])
-			possibleCaptures |= getRookAttacks(checker, b.occupied) & (b.pieces[bR] | b.pieces[bQ])
+			possibleCaptures |= getBishopAttacks(checker, b.occupied) & diagonalUs
+			possibleCaptures |= getRookAttacks(checker, b.occupied) & orthogonalUs
 			possibleCaptures &= ^pinned
 		}
 
@@ -465,7 +531,7 @@ func (b *Board) generateLegalMoves() []Move {
 			}
 			lsb = Square(popLSB(&possibleCaptures))
 
-			b.generateMovesFromLocs(&m, lsb, 1<<checker, player)
+			b.generateMovesFromLocs(&m, lsb, sToBB[checker], player)
 		}
 
 		if checkerPiece == bN || checkerPiece == wN {
@@ -481,9 +547,8 @@ func (b *Board) generateLegalMoves() []Move {
 
 		b.getKnightMoves(&m, b.getColorPieces(knight, player), pinned, playerPieces, player, allowed)
 		b.getPawnMoves(&m, b.getColorPieces(pawn, player), pinned, b.occupied, opponentPieces, player, allowed)
-		b.getBishopMoves(&m, b.getColorPieces(bishop, player), pinned, playerPieces, opponentPieces, player, allowed)
-		b.getRookMoves(&m, b.getColorPieces(rook, player), pinned, playerPieces, opponentPieces, player, allowed)
-		b.getQueenMoves(&m, b.getColorPieces(queen, player), pinned, playerPieces, opponentPieces, player, allowed)
+		b.getBishopMoves(&m, diagonalUs, pinned, playerPieces, opponentPieces, player, allowed)
+		b.getRookMoves(&m, orthogonalUs, pinned, playerPieces, opponentPieces, player, allowed)
 
 		return m
 	}
@@ -496,16 +561,10 @@ func (b *Board) generateLegalMoves() []Move {
 	b.getPawnMoves(&m, playerPawns, pinned, b.occupied, opponentPieces, player, allowed)
 
 	// STEP 4: Calculate bishop moves
-	var playerBishops u64 = b.getColorPieces(bishop, player)
-	b.getBishopMoves(&m, playerBishops, pinned, playerPieces, opponentPieces, player, allowed)
+	b.getBishopMoves(&m, diagonalUs, pinned, playerPieces, opponentPieces, player, allowed)
 
 	// STEP 5: Calculate rook moves
-	var playerRooks u64 = b.getColorPieces(rook, player)
-	b.getRookMoves(&m, playerRooks, pinned, playerPieces, opponentPieces, player, allowed)
-
-	// STEP 5: Calculate rook moves
-	var playerQueens u64 = b.getColorPieces(queen, player)
-	b.getQueenMoves(&m, playerQueens, pinned, playerPieces, opponentPieces, player, allowed)
+	b.getRookMoves(&m, orthogonalUs, pinned, playerPieces, opponentPieces, player, allowed)
 
 	// STEP 6: Castling
 	b.getCastlingMoves(&m, playerKing, attacks, player)
@@ -522,18 +581,13 @@ func (b *Board) generateLegalMoves() []Move {
 			lsb := Square(popLSB(&unpinnedPawns))
 			move := Move{from: lsb, to: b.enpassant, movetype: ENPASSANT, captured: b.squares[b.enpassant], colorMoved: player, piece: b.squares[lsb]}
 
-			b.makeMove(move)
-			if b.isCheck() {
-				b.undo()
+			b.makeMoveNoUpdate(move)
+			if b.isCheck(player) {
+				b.undoNoUpdate(move)
 			} else {
-				b.undo()
+				b.undoNoUpdate(move)
 				m = append(m, move)
 			}
-			// if slidingAttacks(playerKing,
-			// 	b.occupied^sToBB[lsb]^shiftBitboard(sToBB[b.enpassant], pawnPushDirection[opponent]),
-			// 	ranks[sqToRank(playerKing)]&(b.getColorPieces(rook, opponent)|b.getColorPieces(queen, opponent))) == 0 {
-			// 	m = append(m, Move{from: lsb, to: b.enpassant, movetype: ENPASSANT, captured: b.squares[b.enpassant], colorMoved: player, piece: b.squares[lsb]})
-			// }
 		}
 
 		pinnedPawns := pawns & pinned & line[b.enpassant][playerKing]
