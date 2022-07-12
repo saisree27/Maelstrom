@@ -411,9 +411,11 @@ func (b *Board) generateLegalMoves() []Move {
 		var checker Square = Square(bitScanForward(checkers))
 		var checkerPiece = b.squares[checker]
 
-		if checker == b.enpassant {
+		var enPassantShift Square = b.enpassant + Square(pawnPushDirection[opponent])
+
+		if checker == enPassantShift && (checkerPiece == wP || checkerPiece == bP) {
 			// en passant check capture
-			pawns := colorToPawnLookup[opponent][checker] & playerPawns
+			pawns := colorToPawnLookup[opponent][b.enpassant] & playerPawns
 
 			unpinnedPawns := pawns & ^pinned
 			for {
@@ -421,10 +423,14 @@ func (b *Board) generateLegalMoves() []Move {
 					break
 				}
 				lsb := Square(popLSB(&unpinnedPawns))
-				if slidingAttacks(playerKing,
-					b.occupied^sToBB[lsb]^shiftBitboard(sToBB[checker], pawnPushDirection[opponent]),
-					ranks[sqToRank(playerKing)]&(b.getColorPieces(rook, opponent)|b.getColorPieces(queen, opponent))) == 0 {
-					m = append(m, Move{from: lsb, to: checker, movetype: ENPASSANT, captured: checkerPiece, colorMoved: player, piece: b.squares[lsb]})
+				move := Move{from: lsb, to: b.enpassant, movetype: ENPASSANT, captured: checkerPiece, colorMoved: player, piece: b.squares[lsb]}
+
+				b.makeMove(move)
+				if b.isCheck() {
+					b.undo()
+				} else {
+					b.undo()
+					m = append(m, move)
 				}
 			}
 
@@ -514,11 +520,20 @@ func (b *Board) generateLegalMoves() []Move {
 				break
 			}
 			lsb := Square(popLSB(&unpinnedPawns))
-			if slidingAttacks(playerKing,
-				b.occupied^sToBB[lsb]^shiftBitboard(sToBB[b.enpassant], pawnPushDirection[opponent]),
-				ranks[sqToRank(playerKing)]&(b.getColorPieces(rook, opponent)|b.getColorPieces(queen, opponent))) == 0 {
-				m = append(m, Move{from: lsb, to: b.enpassant, movetype: ENPASSANT, captured: b.squares[b.enpassant], colorMoved: player, piece: b.squares[lsb]})
+			move := Move{from: lsb, to: b.enpassant, movetype: ENPASSANT, captured: b.squares[b.enpassant], colorMoved: player, piece: b.squares[lsb]}
+
+			b.makeMove(move)
+			if b.isCheck() {
+				b.undo()
+			} else {
+				b.undo()
+				m = append(m, move)
 			}
+			// if slidingAttacks(playerKing,
+			// 	b.occupied^sToBB[lsb]^shiftBitboard(sToBB[b.enpassant], pawnPushDirection[opponent]),
+			// 	ranks[sqToRank(playerKing)]&(b.getColorPieces(rook, opponent)|b.getColorPieces(queen, opponent))) == 0 {
+			// 	m = append(m, Move{from: lsb, to: b.enpassant, movetype: ENPASSANT, captured: b.squares[b.enpassant], colorMoved: player, piece: b.squares[lsb]})
+			// }
 		}
 
 		pinnedPawns := pawns & pinned & line[b.enpassant][playerKing]

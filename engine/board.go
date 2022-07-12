@@ -339,6 +339,17 @@ func (b *Board) undo() {
 	b.history = b.history[:len(b.history)-1]
 }
 
+func (b *Board) isCheck() bool {
+	player := reverseColor(b.turn)
+	opponent := b.turn
+
+	playerKing := b.getColorPieces(king, player)
+	attacks := b.getAllAttacks(opponent, b.occupied)
+
+	// TODO: optimize by stopping getAllAttacks early if check is found
+	return popCount(playerKing&attacks) >= 1
+}
+
 func (b *Board) print() {
 	s := "\n"
 	for i := 56; i >= 0; i -= 8 {

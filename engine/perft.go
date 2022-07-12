@@ -53,7 +53,7 @@ func Divide(b *Board, depth int) int {
 	return numNodes
 }
 
-func RunPerfTests(position string) {
+func RunPerfTests(position string, maxDepth int) {
 	fmt.Println("------RUNNING PERFT------")
 	fmt.Println("Input position: ")
 
@@ -67,7 +67,7 @@ func RunPerfTests(position string) {
 	b.printFromBitBoards()
 	fmt.Println()
 
-	for depth := 0; depth <= 6; depth++ {
+	for depth := 0; depth <= maxDepth; depth++ {
 		start := time.Now()
 		nodes := Perft(&b, depth)
 		duration := time.Since(start)
