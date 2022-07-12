@@ -2,7 +2,6 @@ package engine
 
 import (
 	"fmt"
-	"strconv"
 )
 
 func orderMovesPV(moves *[]Move, prev *[]Move) {
@@ -140,10 +139,11 @@ func RunSelfPlay(position string, depth int) {
 
 		score := 0
 
-		var inputDepth string
-		fmt.Scanln(&inputDepth)
+		newDepth := depth
+		// var inputDepth string
+		// fmt.Scanln(&inputDepth)
 
-		newDepth, _ := strconv.Atoi(inputDepth)
+		// newDepth, _ := strconv.Atoi(inputDepth)
 
 		for i := 1; i <= newDepth; i++ {
 			line = []Move{}

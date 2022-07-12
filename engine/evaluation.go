@@ -6,7 +6,7 @@ var factor = map[Color]int{
 }
 
 var material = map[Piece]int{
-	wP: 150, bP: -150,
+	wP: 120, bP: -120,
 	wN: 300, bN: -300,
 	wB: 300, bB: -300,
 	wR: 500, bR: -500,
@@ -28,12 +28,12 @@ var reversePSQ = [64]int{
 
 var pawnSquareTable = [64]int{
 	0, 0, 0, 0, 0, 0, 0, 0,
-	5, 10, -20, -20, -20, 10, 10, 5,
-	5, 10, 0, 0, 0, 0, -20, 5,
-	-5, -15, 40, 40, 40, -10, 0, -5,
-	5, 5, 10, 25, 25, 10, 5, 5,
-	10, 10, 20, 30, 30, 20, 10, 10,
-	30, 30, 50, 50, 50, 50, 30, 30,
+	10, 10, 0, -10, -10, 0, 10, 10,
+	5, 0, 0, 5, 5, 0, 0, 5,
+	0, 0, 10, 20, 20, 10, 0, 0,
+	5, 5, 5, 10, 10, 5, 5, 5,
+	10, 10, 10, 20, 20, 10, 10, 10,
+	20, 20, 20, 30, 30, 20, 20, 20,
 	0, 0, 0, 0, 0, 0, 0, 0,
 }
 
@@ -50,7 +50,7 @@ var knightSquareTable = [64]int{
 
 var bishopSquareTable = [64]int{
 	-20, -10, -20, -10, -10, -20, -10, -20,
-	-10, 5, 0, 0, 0, 0, 30, -10,
+	-10, 5, 0, -10, -10, 0, 30, -10,
 	-10, 10, 10, 10, 10, 10, 10, -10,
 	-10, 0, 10, 10, 10, 15, 15, -10,
 	-10, 10, 5, 10, 10, 15, 15, -10,
@@ -103,6 +103,13 @@ var kingSquareTableEndgame = [64]int{
 	-50, -10, 0, 0, 0, 0, -10, -50,
 }
 
+var minorPieceDevelopment = 30
+var kingAir = 30
+var noCastlingRights = 80
+var pawnsBlocked = 20
+var mobility = 10
+var centerControl = 25
+
 // Returns an evaluation of the position in cp
 // 1000000 or -1000000 is designated as checkmate
 // Evaluations are not in the perspective of the player
@@ -121,53 +128,70 @@ func evaluate(b *Board) int {
 
 	material, total := totalMaterialAndPieces(b)
 
-	eval += material
+	eval += int(float64(material) * 1.2)
 	eval += piecePosition(b, total)
 
-	player := b.turn
-	opponent := reverseColor(b.turn)
+	whiteAttacks := b.getAllAttacks(WHITE, b.occupied, b.getColorPieces(rook, WHITE), b.getColorPieces(bishop, WHITE))
 
-	playerAttacks := b.getAllAttacks(player, b.occupied, b.getColorPieces(rook, player), b.getColorPieces(bishop, player))
+	eval += popCount(whiteAttacks) * mobility
 
-	eval += (popCount(playerAttacks) * factor[b.turn]) * 5
+	blackAttacks := b.getAllAttacks(BLACK, b.occupied, b.getColorPieces(rook, BLACK), b.getColorPieces(bishop, BLACK))
 
-	opponentAttacks := b.getAllAttacks(opponent, b.occupied, b.getColorPieces(rook, opponent), b.getColorPieces(bishop, opponent))
-
-	eval -= (popCount(opponentAttacks) * factor[b.turn]) * 5
+	eval -= popCount(blackAttacks) * mobility
 
 	// during opening, harsh penalty for minor pieces not yet developed
 	if b.plyCnt <= 25 {
 		whiteKnightsAndBishops := b.getColorPieces(knight, WHITE) | b.getColorPieces(bishop, WHITE)
 		blackKnightsAndBishops := b.getColorPieces(knight, BLACK) | b.getColorPieces(bishop, BLACK)
 
-		eval -= popCount(whiteKnightsAndBishops&ranks[R1]) * 50
-		eval += popCount(blackKnightsAndBishops&ranks[R8]) * 50
+		eval -= popCount(whiteKnightsAndBishops&ranks[R1]) * minorPieceDevelopment
+		eval += popCount(blackKnightsAndBishops&ranks[R8]) * minorPieceDevelopment
 	}
 
-	if total >= 15 && b.pieces[wQ]|b.pieces[bQ] == 0 {
+	if total >= 15 && b.pieces[wQ]|b.pieces[bQ] != 0 {
 		// penalty/reward for air around king
 		whiteKingAttacks := kingAttacksSquareLookup[bitScanForward(b.getColorPieces(king, WHITE))]
 		air := popCount(whiteKingAttacks & b.empty)
 		if air > 2 {
-			eval -= air * 40
+			eval -= air * kingAir
 		}
 
 		blackKingAttacks := kingAttacksSquareLookup[bitScanForward(b.getColorPieces(king, BLACK))]
 		air = popCount(blackKingAttacks & b.empty)
 		if air > 2 {
-			eval += air * 40
+			eval += air * kingAir
 		}
 	}
 
 	if b.plyCnt <= 25 {
 		// during opening, harsh penalty/reward if castling rights are gone and queens are still on
 		if !(b.OO || b.OOO) && !((b.squares[g1] == wK && b.squares[h1] != wR) || b.squares[c1] == wK && b.squares[a1] != wR && b.squares[b1] != wR) {
-			eval -= 150
+			eval -= noCastlingRights
 		}
 		if !(b.oo || b.ooo) && !((b.squares[g8] == bK && b.squares[h8] != bR) || b.squares[c8] == bK && b.squares[a8] != bR && b.squares[b8] != bR) {
-			eval += 150
+			eval += noCastlingRights
 		}
 	}
+
+	// check if pawns are blocked by pieces of same color
+	whitePawns := b.getColorPieces(pawn, WHITE)
+	blockedCount := popCount(shiftBitboard(whitePawns, NORTH) & b.colors[WHITE])
+
+	eval -= blockedCount * pawnsBlocked
+
+	blackPawns := b.getColorPieces(pawn, BLACK)
+	blockedCount = popCount(shiftBitboard(blackPawns, SOUTH) & b.colors[BLACK])
+
+	eval += blockedCount * pawnsBlocked
+
+	// center control
+	whiteControl := b.getColorPieces(pawn, WHITE) | whiteAttacks
+	whiteCenterControl := (whiteControl & sToBB[e4]) | (whiteControl & sToBB[e5]) | (whiteControl & sToBB[d4]) | (whiteControl & sToBB[d4])
+
+	blackControl := b.getColorPieces(pawn, BLACK) | blackAttacks
+	blackCenterControl := (blackControl & sToBB[e4]) | (blackControl & sToBB[e5]) | (blackControl & sToBB[d4]) | (blackControl & sToBB[d4])
+
+	eval += (popCount(whiteCenterControl) - popCount(blackCenterControl)) * centerControl
 
 	return eval
 }
