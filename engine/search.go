@@ -37,15 +37,15 @@ func quiesce(b *Board, limit int, alpha int, beta int, c Color) int {
 	return alpha
 }
 
-func orderMovesPV(moves *[]Move, prev *[]Move) {
+func orderMovesPV(moves *[]Move, pv Move) {
 	for i, mv := range *moves {
-		if mv.toUCI() == (*prev)[0].toUCI() {
-			(*moves)[i], (*moves)[0] = (*moves)[0], (*prev)[0]
+		if mv == pv {
+			(*moves)[i], (*moves)[0] = (*moves)[0], pv
 		}
 	}
 }
 
-func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool, line *[]Move, prev *[]Move) int {
+func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool, line *[]Move) int {
 	pv := []Move{}
 
 	if depth <= 0 {
@@ -53,10 +53,6 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	}
 
 	legalMoves := b.generateLegalMoves()
-
-	if depth == rd && depth > 1 {
-		orderMovesPV(&legalMoves, prev)
-	}
 
 	if len(legalMoves) == 0 {
 		return evaluate(b) * factor[c]
@@ -67,11 +63,26 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	}
 
 	bestScore := 0
+	bestMove := Move{}
+	oldAlpha := alpha
+
+	res, found := probeTT(b, &bestScore, &alpha, &beta, depth, &bestMove)
+	if res {
+		*line = []Move{}
+		*line = append(*line, bestMove)
+		*line = append(*line, pv...)
+		return found
+	}
+
+	if depth > 1 {
+		orderMovesPV(&legalMoves, bestMove)
+	}
+
 	hasNotJustPawns := b.getColorPieces(queen, c) | b.getColorPieces(rook, c) | b.getColorPieces(bishop, c) | b.getColorPieces(knight, c)
 
 	if doNull && b.plyCnt > 0 && hasNotJustPawns != 0 && depth >= R+1 && !b.isCheck(c) {
 		b.makeNullMove()
-		bestScore = -pvs(b, depth-R-1, rd, -beta, -beta+1, reverseColor(c), false, &pv, prev)
+		bestScore = -pvs(b, depth-R-1, rd, -beta, -beta+1, reverseColor(c), false, &pv)
 		b.undoNullMove()
 
 		if bestScore >= beta {
@@ -82,10 +93,10 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	for i, move := range legalMoves {
 		b.makeMove(move)
 		if i == 0 {
-			bestScore = -pvs(b, depth-1, rd, -beta, -alpha, reverseColor(c), true, &pv, prev)
+			bestScore = -pvs(b, depth-1, rd, -beta, -alpha, reverseColor(c), true, &pv)
 			b.undo()
 			if bestScore > alpha {
-
+				bestMove = move
 				*line = []Move{}
 				*line = append(*line, move)
 				*line = append(*line, pv...)
@@ -96,11 +107,12 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 				alpha = bestScore
 			}
 		} else {
-			score := -pvs(b, depth-1, rd, -alpha-1, -alpha, reverseColor(c), true, &pv, prev)
+			score := -pvs(b, depth-1, rd, -alpha-1, -alpha, reverseColor(c), true, &pv)
 			if score > alpha && score < beta {
-				score = -pvs(b, depth-1, rd, -beta, -alpha, reverseColor(c), true, &pv, prev)
+				score = -pvs(b, depth-1, rd, -beta, -alpha, reverseColor(c), true, &pv)
 			}
 			if score > alpha {
+				bestMove = move
 				alpha = score
 				*line = []Move{}
 
@@ -114,10 +126,20 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 				if score >= beta {
 					break
 				}
-				bestScore = score
 			}
 		}
 	}
+
+	var flag bound
+	if bestScore <= oldAlpha {
+		flag = upper
+	} else if bestScore >= beta {
+		flag = lower
+	} else {
+		flag = exact
+	}
+
+	storeEntry(b, bestScore, flag, bestMove, depth)
 
 	return bestScore
 }

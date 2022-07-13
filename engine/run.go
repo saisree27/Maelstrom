@@ -15,6 +15,7 @@ func initializeEverything() {
 	initLine()
 	initializeSQLookup()
 	initZobrist()
+	initializeTTable()
 }
 
 func Run(command string, position string, depth int) {
@@ -50,18 +51,12 @@ func RunSearch(position string, depth int) {
 
 	b.printFromBitBoards()
 
-	prev := []Move{}
 	for i := 1; i <= depth; i++ {
 		line := []Move{}
 
 		fmt.Printf("Depth %d: ", i)
 
-		score := pvs(&b, i, i, -winVal-1, winVal+1, b.turn, true, &line, &prev) * factor[b.turn]
-
-		if score == winVal || score == -winVal {
-			fmt.Println("Found mate.")
-			break
-		}
+		score := pvs(&b, i, i, -winVal-1, winVal+1, b.turn, true, &line) * factor[b.turn]
 
 		fmt.Print(score)
 		fmt.Print(" ")
@@ -74,8 +69,11 @@ func RunSearch(position string, depth int) {
 		fmt.Print(strLine)
 		fmt.Println()
 
-		prev = make([]Move, len(line))
-		copy(prev, line)
+		if score == winVal || score == -winVal {
+			fmt.Println("Found mate.")
+			break
+		}
+
 	}
 }
 
@@ -100,7 +98,6 @@ func RunSelfPlay(position string, depth int) {
 		b.printFromBitBoards()
 
 		line := []Move{}
-		prev := []Move{}
 
 		score := 0
 
@@ -124,7 +121,7 @@ func RunSelfPlay(position string, depth int) {
 
 			fmt.Printf("Depth %d: ", i)
 
-			score = pvs(&b, i, i, -winVal-1, winVal+1, b.turn, true, &line, &prev)
+			score = pvs(&b, i, i, -winVal-1, winVal+1, b.turn, true, &line)
 
 			if score == winVal || score == -winVal {
 				fmt.Println("Found mate.")
@@ -138,12 +135,6 @@ func RunSelfPlay(position string, depth int) {
 			for i, _ := range line {
 				strLine = append(strLine, line[i].toUCI())
 			}
-
-			fmt.Print(strLine)
-			fmt.Println()
-
-			prev = make([]Move, len(line))
-			copy(prev, line)
 		}
 		bestMove := line[0]
 
@@ -184,7 +175,6 @@ func RunPlay(position string, depth int, player Color) {
 			movesPlayed = append(movesPlayed, move)
 		} else {
 			line := []Move{}
-			prev := []Move{}
 
 			score := 0
 
@@ -193,7 +183,7 @@ func RunPlay(position string, depth int, player Color) {
 
 				fmt.Printf("Depth %d: ", i)
 
-				score = pvs(&b, i, i, -winVal-1, winVal+1, b.turn, true, &line, &prev)
+				score = pvs(&b, i, i, -winVal-1, winVal+1, b.turn, true, &line)
 
 				if score == winVal || score == -winVal {
 					fmt.Println("Found mate.")
@@ -211,8 +201,6 @@ func RunPlay(position string, depth int, player Color) {
 				fmt.Print(strLine)
 				fmt.Println()
 
-				prev = make([]Move, len(line))
-				copy(prev, line)
 			}
 			bestMove := line[0]
 
