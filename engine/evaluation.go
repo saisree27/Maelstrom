@@ -82,14 +82,14 @@ var queenSquareTable = [64]int{
 }
 
 var kingSquareTableMiddlegame = [64]int{
-	10, 30, 25, -10, -10, -15, 30, 10,
-	0, -5, -50, -75, -75, -65, -5, 0,
-	-10, -20, -20, -20, -20, -20, -20, -10,
-	-20, -30, -30, -40, -40, -30, -30, -20,
-	-30, -40, -40, -50, -60, -40, -40, -30,
-	-30, -40, -65, -50, -50, -40, -40, -30,
-	-30, -40, -50, -75, -75, -40, -40, -30,
-	-30, -40, -60, -75, -75, -60, -40, -30,
+	0, 5, 5, -10, -10, 0, 10, 5,
+	-30, -30, -30, -30, -30, -30, -30, -30,
+	-50, -50, -50, -50, -50, -50, -50, -50,
+	-70, -70, -70, -70, -70, -70, -70, -70,
+	-70, -70, -70, -70, -70, -70, -70, -70,
+	-70, -70, -70, -70, -70, -70, -70, -70,
+	-70, -70, -70, -70, -70, -70, -70, -70,
+	-70, -70, -70, -70, -70, -70, -70, -70,
 }
 
 var kingSquareTableEndgame = [64]int{
@@ -103,7 +103,7 @@ var kingSquareTableEndgame = [64]int{
 	-50, -10, 0, 0, 0, 0, -10, -50,
 }
 
-var minorPieceDevelopment = 15
+var minorPieceDevelopment = 20
 var kingAir = 20
 var noCastlingRights = 80
 var castled = 44
@@ -140,14 +140,12 @@ func evaluate(b *Board) int {
 
 	eval -= popCount(blackAttacks) * mobility
 
-	// during opening, harsh penalty for minor pieces not yet developed
-	if b.plyCnt <= 25 {
-		whiteKnightsAndBishops := b.getColorPieces(knight, WHITE) | b.getColorPieces(bishop, WHITE)
-		blackKnightsAndBishops := b.getColorPieces(knight, BLACK) | b.getColorPieces(bishop, BLACK)
+	// harsh penalty for minor pieces not yet developed
+	whiteKnightsAndBishops := b.getColorPieces(knight, WHITE) | b.getColorPieces(bishop, WHITE)
+	blackKnightsAndBishops := b.getColorPieces(knight, BLACK) | b.getColorPieces(bishop, BLACK)
 
-		eval -= popCount(whiteKnightsAndBishops&ranks[R1]) * minorPieceDevelopment
-		eval += popCount(blackKnightsAndBishops&ranks[R8]) * minorPieceDevelopment
-	}
+	eval -= popCount(whiteKnightsAndBishops&ranks[R1]) * minorPieceDevelopment
+	eval += popCount(blackKnightsAndBishops&ranks[R8]) * minorPieceDevelopment
 
 	if total >= 15 && b.pieces[wQ]|b.pieces[bQ] != 0 {
 		// penalty/reward for air around king

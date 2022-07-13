@@ -1,5 +1,7 @@
 package engine
 
+import "strings"
+
 func initializeEverything() {
 	initializeKingAttacks()
 	initializeKnightAttacks()
@@ -22,5 +24,13 @@ func Run(command string, position string, depth int) {
 	}
 	if command == "selfplay" {
 		RunSelfPlay(position, depth)
+	}
+	if strings.Contains(command, "play") {
+		color := strings.Split(command, " ")[1]
+		if color == "white" {
+			RunPlay(position, depth, WHITE)
+		} else {
+			RunPlay(position, depth, BLACK)
+		}
 	}
 }

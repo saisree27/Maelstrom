@@ -55,7 +55,8 @@ func (b *Board) InitStartPos() {
 		EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY,
 		EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY,
 		bP, bP, bP, bP, bP, bP, bP, bP,
-		bR, bN, bB, bQ, bK, bB, bN, bR}
+		bR, bN, bB, bQ, bK, bB, bN, bR,
+	}
 
 	for i := 0; i < 64; i++ {
 		if i < 16 {
@@ -468,8 +469,9 @@ func (b *Board) print() {
 }
 
 func (b *Board) printFromBitBoards() {
-	s := "\n"
+	s := "   +---+---+---+---+---+---+---+---+\n"
 	for i := 56; i >= 0; i -= 8 {
+		s += " " + fmt.Sprint(i/8+1) + " "
 		for j := 0; j < 8; j++ {
 			if b.occupied&u64(1<<(i+j)) != 0 {
 				var found = false
@@ -479,7 +481,7 @@ func (b *Board) printFromBitBoards() {
 							fmt.Println("Duplicate pieces...")
 						} else {
 							found = true
-							s += Piece(k).toString() + " "
+							s += "| " + Piece(k).toString() + " "
 						}
 					}
 				}
@@ -487,13 +489,16 @@ func (b *Board) printFromBitBoards() {
 					fmt.Println("Piece is in occupied bitboard not not present in any of the pieces bitboard...")
 				}
 			} else if b.empty&u64(1<<(i+j)) != 0 {
-				s += EMPTY.toString() + " "
+				s += "| " + EMPTY.toString() + " "
 			} else {
 				fmt.Println("Square is not represented in either occupied or empty...")
 			}
 		}
-		s += "\n"
+		s += "| " + "\n"
+		s += "   +---+---+---+---+---+---+---+---+\n"
 	}
+
+	s += "     A   B   C   D   E   F   G   H\n"
 	fmt.Print(s)
 }
 
