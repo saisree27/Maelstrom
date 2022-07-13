@@ -4,6 +4,35 @@ import (
 	"fmt"
 )
 
+func quiesce(b *Board, alpha int, beta int, c Color) int {
+	eval := evaluate(b) * factor[c]
+	if eval >= beta {
+		return beta
+	}
+
+	if alpha < eval {
+		alpha = eval
+	}
+
+	// TODO: optimize so we only calculate captures
+	legalMoves := b.generateLegalMoves()
+	for _, move := range legalMoves {
+		if move.movetype == CAPTURE || move.movetype == CAPTUREANDPROMOTION || move.movetype == ENPASSANT {
+			b.makeMove(move)
+			score := -quiesce(b, -beta, -alpha, reverseColor(c))
+			b.undo()
+
+			if score >= beta {
+				return beta
+			}
+			if score > alpha {
+				alpha = score
+			}
+		}
+	}
+	return alpha
+}
+
 func orderMovesPV(moves *[]Move, prev *[]Move) {
 	for i, mv := range *moves {
 		if mv.toUCI() == (*prev)[0].toUCI() {
@@ -16,7 +45,7 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, line *[]Move
 	pv := []Move{}
 
 	if depth <= 0 {
-		return evaluate(b) * factor[c]
+		return quiesce(b, alpha, beta, c)
 	}
 
 	legalMoves := b.generateLegalMoves()
