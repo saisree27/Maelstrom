@@ -12,6 +12,7 @@ type Move struct {
 	captured   Piece    // piece which may have been captured
 	colorMoved Color    // side which is moving
 	promote    Piece    // promotion piece
+	null       bool     // null move (default false)
 }
 
 func (m Move) toUCI() string {

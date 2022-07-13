@@ -1,5 +1,8 @@
 package engine
 
+// null move pruning
+var R = 3
+
 func quiesce(b *Board, limit int, alpha int, beta int, c Color) int {
 	eval := evaluate(b) * factor[c]
 	if eval >= beta {
@@ -42,7 +45,7 @@ func orderMovesPV(moves *[]Move, prev *[]Move) {
 	}
 }
 
-func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, line *[]Move, prev *[]Move) int {
+func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool, line *[]Move, prev *[]Move) int {
 	pv := []Move{}
 
 	if depth <= 0 {
@@ -64,11 +67,22 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, line *[]Move
 	}
 
 	bestScore := 0
+	hasNotJustPawns := b.getColorPieces(queen, c) | b.getColorPieces(rook, c) | b.getColorPieces(bishop, c) | b.getColorPieces(knight, c)
+
+	if doNull && b.plyCnt > 0 && hasNotJustPawns != 0 && depth >= R+1 && !b.isCheck(c) {
+		b.makeNullMove()
+		bestScore = -pvs(b, depth-R-1, rd, -beta, -beta+1, reverseColor(c), false, &pv, prev)
+		b.undoNullMove()
+
+		if bestScore >= beta {
+			return beta
+		}
+	}
 
 	for i, move := range legalMoves {
 		b.makeMove(move)
 		if i == 0 {
-			bestScore = -pvs(b, depth-1, rd, -beta, -alpha, reverseColor(c), &pv, prev)
+			bestScore = -pvs(b, depth-1, rd, -beta, -alpha, reverseColor(c), true, &pv, prev)
 			b.undo()
 			if bestScore > alpha {
 
@@ -82,9 +96,9 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, line *[]Move
 				alpha = bestScore
 			}
 		} else {
-			score := -pvs(b, depth-1, rd, -alpha-1, -alpha, reverseColor(c), &pv, prev)
+			score := -pvs(b, depth-1, rd, -alpha-1, -alpha, reverseColor(c), true, &pv, prev)
 			if score > alpha && score < beta {
-				score = -pvs(b, depth-1, rd, -beta, -alpha, reverseColor(c), &pv, prev)
+				score = -pvs(b, depth-1, rd, -beta, -alpha, reverseColor(c), true, &pv, prev)
 			}
 			if score > alpha {
 				alpha = score

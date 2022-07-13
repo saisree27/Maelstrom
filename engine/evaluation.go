@@ -109,7 +109,7 @@ var noCastlingRights = 80
 var castled = 30
 var pawnsBlocked = 15
 var mobility = 3
-var centerControl = 10
+var centerControl = 15
 var materialFactor = 1.2
 
 // Returns an evaluation of the position in cp
@@ -258,7 +258,7 @@ func totalMaterialAndPieces(b *Board) (int, int) {
 func piecePosition(b *Board, totalPieces int) int {
 	sum := 0
 	noQueensLeft := b.pieces[wQ]|b.pieces[bQ] == 0
-	switchEndgame := (totalPieces <= 20 && noQueensLeft) || (totalPieces <= 10)
+	switchEndgame := (totalPieces <= 15 && noQueensLeft) || (totalPieces <= 10)
 
 	for i, piece := range b.squares {
 		switch piece {

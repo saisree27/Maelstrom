@@ -547,6 +547,7 @@ func initLine() {
 }
 
 var zobristTable [13][64]u64
+var turnHash u64
 
 func initZobrist() {
 	rand.Seed(42)
@@ -555,6 +556,7 @@ func initZobrist() {
 			zobristTable[i][j] = u64(rand.Uint64())
 		}
 	}
+	turnHash = u64(rand.Uint64())
 }
 
 // Some slice functions for unit testing and possibly other things in the engine

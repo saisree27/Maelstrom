@@ -73,6 +73,7 @@ func (b *Board) InitStartPos() {
 	b.OOO = true
 	b.oo = true
 	b.ooo = true
+	b.zobrist ^= turnHash
 }
 
 func (b *Board) InitFEN(fen string) {
@@ -138,6 +139,9 @@ func (b *Board) InitFEN(fen string) {
 
 	moveCount := attrs[5]
 	b.moveCount, _ = strconv.Atoi(moveCount)
+	b.zobrist ^= turnHash
+
+	b.plyCnt = b.moveCount * 2
 }
 
 func (b *Board) getColorPieces(p PieceType, c Color) u64 {
@@ -339,6 +343,7 @@ func (b *Board) makeMove(mv Move) {
 	}
 
 	b.plyCnt++
+	b.zobrist ^= turnHash
 }
 
 func (b *Board) undoNoUpdate(prevMove Move) {
@@ -434,13 +439,36 @@ func (b *Board) undo() {
 	b.plyCnt--
 }
 
+func (b *Board) makeNullMove() {
+	var entry prev = prev{move: Move{null: true}, OO: b.OO, OOO: b.OOO, oo: b.oo, ooo: b.ooo, enpassant: b.enpassant, hash: b.zobrist}
+	b.history = append(b.history, entry)
+
+	b.plyCnt++
+	b.enpassant = EMPTYSQ
+	b.turn = reverseColor(b.turn)
+	b.zobrist ^= turnHash
+}
+
+func (b *Board) undoNullMove() {
+	prevEntry := b.history[len(b.history)-1]
+	b.OO = prevEntry.OO
+	b.OOO = prevEntry.OOO
+	b.oo = prevEntry.oo
+	b.ooo = prevEntry.ooo
+	b.enpassant = prevEntry.enpassant
+	b.zobrist = prevEntry.hash
+	b.turn = reverseColor(b.turn)
+
+	b.history = b.history[:len(b.history)-1]
+	b.plyCnt--
+}
+
 func (b *Board) isCheck(c Color) bool {
 	checkers := u64(0)
 	playerKing := Square(bitScanForward(b.getColorPieces(king, c)))
 	orthogonalThem := b.getColorPieces(rook, reverseColor(c)) | b.getColorPieces(queen, reverseColor(c))
 	diagonalThem := b.getColorPieces(bishop, reverseColor(c)) | b.getColorPieces(queen, reverseColor(c))
 
-	// 2a: get checks of pawns and knight since we don't need to check for pieces in between
 	if c == WHITE {
 		checkers |= (whitePawnAttacksSquareLookup[playerKing] & b.pieces[bP])
 	} else {
@@ -456,7 +484,6 @@ func (b *Board) isCheck(c Color) bool {
 		return true
 	}
 
-	// 2b: get bishop/rook/queen attacks and check if there are pieces between them and the king
 	var pinPoss u64 = (getBishopAttacks(playerKing, b.colors[reverseColor(c)]) & diagonalThem)
 	pinPoss |= (getRookAttacks(playerKing, b.colors[reverseColor(c)]) & orthogonalThem)
 
@@ -483,7 +510,7 @@ func (b *Board) isThreeFoldRep() bool {
 	matches := 0
 	for i := len(b.history) - 1; i >= 0; i-- {
 		entry := b.history[i]
-		if entry.hash == hash {
+		if entry.hash == hash && !entry.move.null {
 			matches++
 		}
 		if matches >= 2 {
