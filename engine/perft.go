@@ -15,7 +15,6 @@ func init() {
 	initLine()
 	initializeSQLookup()
 	initZobrist()
-	fmt.Println("Finished initialization.")
 }
 
 func Perft(b *Board, depth int) int {

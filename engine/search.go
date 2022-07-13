@@ -1,6 +1,11 @@
 package engine
 
-// null move pruning
+import (
+	"fmt"
+	"time"
+)
+
+// null move pruning constant R
 var R = 3
 
 func quiesce(b *Board, limit int, alpha int, beta int, c Color) int {
@@ -17,7 +22,6 @@ func quiesce(b *Board, limit int, alpha int, beta int, c Color) int {
 		return eval
 	}
 
-	// TODO: optimize so we only calculate captures
 	legalMoves := b.generateCaptures()
 
 	for _, move := range legalMoves {
@@ -142,4 +146,45 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	storeEntry(b, bestScore, flag, bestMove, depth)
 
 	return bestScore
+}
+
+func searchWithTime(b *Board, movetime int64) Move {
+	fmt.Printf("Searching position with %d time remaining. \n", movetime)
+	startTime := time.Now()
+	line := []Move{}
+	prevBest := Move{}
+
+	for i := 1; i <= 100; i++ {
+		duration := time.Since(startTime).Milliseconds()
+		timeRemaining := movetime - duration
+		fmt.Printf("Time remaining: %d \n", timeRemaining)
+
+		if movetime > timeRemaining*2 {
+			// We will probably take twice as much time in the new iteration
+			// than the previous one, so probably wise not to go into the new iteration
+			break
+		}
+
+		fmt.Printf("Depth %d: ", i)
+
+		score := pvs(b, i, i, -winVal-1, winVal+1, b.turn, true, &line) * factor[b.turn]
+
+		fmt.Print(score)
+		fmt.Print(" ")
+
+		strLine := []string{}
+		for i, _ := range line {
+			strLine = append(strLine, line[i].toUCI())
+		}
+
+		fmt.Print(strLine)
+		fmt.Println()
+
+		if score == winVal || score == -winVal {
+			fmt.Println("Found mate.")
+			break
+		}
+		prevBest = line[0]
+	}
+	return prevBest
 }
