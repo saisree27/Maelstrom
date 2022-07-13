@@ -29,6 +29,10 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, line *[]Move
 		return evaluate(b) * factor[c]
 	}
 
+	if b.isThreeFoldRep() {
+		return 0
+	}
+
 	bestScore := 0
 
 	for i, move := range legalMoves {

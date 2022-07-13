@@ -2,6 +2,7 @@ package engine
 
 import (
 	"math/bits"
+	"math/rand"
 	"reflect"
 	"sort"
 )
@@ -541,6 +542,17 @@ func initLine() {
 				line[i][j] =
 					(slidingBishopAttacksForInitialization(i, 0) & slidingBishopAttacksForInitialization(j, 0)) | 1<<i | 1<<j
 			}
+		}
+	}
+}
+
+var zobristTable [13][64]u64
+
+func initZobrist() {
+	rand.Seed(42)
+	for i := 0; i < 13; i++ {
+		for j := 0; j < 64; j++ {
+			zobristTable[i][j] = u64(rand.Uint64())
 		}
 	}
 }

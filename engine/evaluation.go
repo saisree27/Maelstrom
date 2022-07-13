@@ -6,7 +6,7 @@ var factor = map[Color]int{
 }
 
 var material = map[Piece]int{
-	wP: 120, bP: -120,
+	wP: 100, bP: -100,
 	wN: 300, bN: -300,
 	wB: 300, bB: -300,
 	wR: 500, bR: -500,
@@ -103,12 +103,13 @@ var kingSquareTableEndgame = [64]int{
 	-50, -10, 0, 0, 0, 0, -10, -50,
 }
 
-var minorPieceDevelopment = 30
-var kingAir = 30
+var minorPieceDevelopment = 15
+var kingAir = 20
 var noCastlingRights = 80
-var pawnsBlocked = 20
-var mobility = 10
-var centerControl = 25
+var castled = 44
+var pawnsBlocked = 13
+var mobility = 5
+var centerControl = 15
 
 // Returns an evaluation of the position in cp
 // 1000000 or -1000000 is designated as checkmate
@@ -170,6 +171,13 @@ func evaluate(b *Board) int {
 		}
 		if !(b.oo || b.ooo) && !((b.squares[g8] == bK && b.squares[h8] != bR) || b.squares[c8] == bK && b.squares[a8] != bR && b.squares[b8] != bR) {
 			eval += noCastlingRights
+		}
+
+		if b.squares[e1] == wK {
+			eval -= castled
+		}
+		if b.squares[e8] == bK {
+			eval += castled
 		}
 	}
 

@@ -33,6 +33,7 @@ type prev struct {
 	oo        bool   // Black Kingside castling history
 	ooo       bool   // Black Queenside castling history
 	enpassant Square // En passant square history
+	hash      u64    // Zobrist hash of prev position
 }
 
 func newBoard() *Board {
@@ -45,6 +46,7 @@ func newBoard() *Board {
 }
 
 func (b *Board) InitStartPos() {
+	b.zobrist = 0
 	b.squares = [64]Piece{
 		wR, wN, wB, wQ, wK, wB, wN, wR,
 		wP, wP, wP, wP, wP, wP, wP, wP,
@@ -73,6 +75,7 @@ func (b *Board) InitStartPos() {
 }
 
 func (b *Board) InitFEN(fen string) {
+	b.zobrist = 0
 	for s := a1; s <= h8; s++ {
 		b.putPiece(EMPTY, s, WHITE)
 	}
@@ -149,10 +152,12 @@ func (b *Board) putPiece(p Piece, s Square, c Color) {
 		b.pieces[p] |= square
 		b.occupied |= square
 		b.empty &= ^square
+		b.zobrist ^= zobristTable[p][s]
 	} else {
 		var square u64 = sToBB[s]
 		b.empty |= square
 		b.occupied &= ^square
+		b.zobrist ^= zobristTable[p][s]
 	}
 }
 
@@ -169,6 +174,8 @@ func (b *Board) movePiece(p Piece, mvfrom Square, mvto Square, c Color) {
 	// update mailbox representation
 	b.squares[mvfrom] = EMPTY
 	b.squares[mvto] = p
+
+	b.zobrist ^= zobristTable[p][mvfrom] ^ zobristTable[p][mvto] ^ zobristTable[EMPTY][mvto] ^ zobristTable[EMPTY][mvfrom]
 }
 
 func (b *Board) capturePiece(p Piece, q Piece, mvfrom Square, mvto Square, c Color) {
@@ -185,6 +192,8 @@ func (b *Board) capturePiece(p Piece, q Piece, mvfrom Square, mvto Square, c Col
 	// update mailbox representation
 	b.squares[mvfrom] = EMPTY
 	b.squares[mvto] = p
+
+	b.zobrist ^= zobristTable[p][mvfrom] ^ zobristTable[p][mvto] ^ zobristTable[q][mvto] ^ zobristTable[EMPTY][mvfrom]
 }
 
 func (b *Board) replacePiece(p Piece, q Piece, sq Square) {
@@ -194,6 +203,8 @@ func (b *Board) replacePiece(p Piece, q Piece, sq Square) {
 
 	// update mailbox representation
 	b.squares[sq] = q
+
+	b.zobrist ^= zobristTable[p][sq] ^ zobristTable[q][sq]
 }
 
 func (b *Board) removePiece(p Piece, sq Square, c Color) {
@@ -203,6 +214,7 @@ func (b *Board) removePiece(p Piece, sq Square, c Color) {
 	b.empty ^= square
 	b.colors[c] ^= square
 	b.squares[sq] = EMPTY
+	b.zobrist ^= zobristTable[p][sq]
 }
 
 func (b *Board) makeMoveFromUCI(uci string) {
@@ -248,7 +260,7 @@ func (b *Board) makeMoveNoUpdate(mv Move) {
 }
 
 func (b *Board) makeMove(mv Move) {
-	var entry prev = prev{move: mv, OO: b.OO, OOO: b.OOO, oo: b.oo, ooo: b.ooo, enpassant: b.enpassant}
+	var entry prev = prev{move: mv, OO: b.OO, OOO: b.OOO, oo: b.oo, ooo: b.ooo, enpassant: b.enpassant, hash: b.zobrist}
 	b.history = append(b.history, entry)
 
 	switch mv.movetype {
@@ -414,6 +426,7 @@ func (b *Board) undo() {
 	b.oo = prevEntry.oo
 	b.ooo = prevEntry.ooo
 	b.enpassant = prevEntry.enpassant
+	b.zobrist = prevEntry.hash
 	b.turn = reverseColor(b.turn)
 
 	b.history = b.history[:len(b.history)-1]
@@ -426,6 +439,21 @@ func (b *Board) isCheck(c Color) bool {
 
 	playerKing := b.getColorPieces(king, player)
 	return b.attacksOn(opponent, b.occupied, playerKing, true)
+}
+
+func (b *Board) isThreeFoldRep() bool {
+	hash := b.zobrist
+	matches := 0
+	for i := len(b.history) - 1; i >= 0; i-- {
+		entry := b.history[i]
+		if entry.hash == hash {
+			matches++
+		}
+		if matches >= 2 {
+			break
+		}
+	}
+	return matches >= 2
 }
 
 func (b *Board) print() {

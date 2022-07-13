@@ -18,6 +18,7 @@ func init() {
 	initSquaresBetween()
 	initLine()
 	initializeSQLookup()
+	initZobrist()
 }
 
 // Move generation testing suite. A lot of the test-case FENs are from this awesome repo:
@@ -340,7 +341,7 @@ func TestUndoMoveCapture(t *testing.T) {
 	}
 }
 
-// In a given position, check that all moves can be made and unmade correctly (includes some perft calls)
+// In a given position, check that all moves can be made and unmade correctly (includes some perft calls) and that all stats are correct
 func TestAllMovesMakeUnmake(t *testing.T) {
 	fen := "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1"
 	b := Board{}
@@ -348,16 +349,16 @@ func TestAllMovesMakeUnmake(t *testing.T) {
 
 	orig := b.getStringFromBitBoards()
 
-	stats := fmt.Sprintf("Castling: %t %t %t %t, En passant: %q, Turn: %d, History: %d, Occupied: %d, Empty: %d, White: %d, Black: %d \n", b.oo, b.ooo, b.OO, b.OOO, squareToStringMap[b.enpassant], b.turn, len(b.history), b.occupied, b.empty, b.colors[WHITE], b.colors[BLACK])
+	stats := fmt.Sprintf("Castling: %t %t %t %t, En passant: %q, Turn: %d, History: %d, Occupied: %d, Empty: %d, White: %d, Black: %d, Hash: %d\n", b.oo, b.ooo, b.OO, b.OOO, squareToStringMap[b.enpassant], b.turn, len(b.history), b.occupied, b.empty, b.colors[WHITE], b.colors[BLACK], b.zobrist)
 
 	moves := b.generateLegalMoves()
 	for _, m := range moves {
 		b.makeMove(m)
-		_ = Perft(&b, 3)
 
+		_ = Perft(&b, 4)
 		b.undo()
 
-		newStats := fmt.Sprintf("Castling: %t %t %t %t, En passant: %q, Turn: %d, History: %d, Occupied: %d, Empty: %d, White: %d, Black: %d \n", b.oo, b.ooo, b.OO, b.OOO, squareToStringMap[b.enpassant], b.turn, len(b.history), b.occupied, b.empty, b.colors[WHITE], b.colors[BLACK])
+		newStats := fmt.Sprintf("Castling: %t %t %t %t, En passant: %q, Turn: %d, History: %d, Occupied: %d, Empty: %d, White: %d, Black: %d, Hash: %d\n", b.oo, b.ooo, b.OO, b.OOO, squareToStringMap[b.enpassant], b.turn, len(b.history), b.occupied, b.empty, b.colors[WHITE], b.colors[BLACK], b.zobrist)
 
 		new := b.getStringFromBitBoards()
 
@@ -368,5 +369,27 @@ func TestAllMovesMakeUnmake(t *testing.T) {
 		if stats != newStats {
 			t.Errorf("TestAllMovesMakeUnMake (stats): got %s, wanted %s", newStats, stats)
 		}
+	}
+}
+
+func TestThreeFoldRep(t *testing.T) {
+	b := Board{}
+	b.InitStartPos()
+
+	b.makeMoveFromUCI("e2e4")
+	b.makeMoveFromUCI("e7e5")
+	b.makeMoveFromUCI("g1f3")
+	b.makeMoveFromUCI("g8f6")
+	b.makeMoveFromUCI("f3g1")
+	b.makeMoveFromUCI("f6g8")
+	b.makeMoveFromUCI("g1f3")
+	b.makeMoveFromUCI("g8f6")
+	b.makeMoveFromUCI("f3g1")
+	b.makeMoveFromUCI("f6g8")
+
+	res := b.isThreeFoldRep()
+
+	if !res {
+		t.Errorf("TestThreeFoldRepo (true): got %t, wanted %t", res, true)
 	}
 }

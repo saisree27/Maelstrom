@@ -85,6 +85,6 @@ func TestMaterial(t *testing.T) {
 
 	material, _ = totalMaterialAndPieces(&b)
 	if material != -100 {
-		t.Errorf("TestMaterial (black pawn up): got %d, wanted %d", material, -100)
+		t.Errorf("TestMaterial (black pawn up): got %d, wanted %d", material, -120)
 	}
 }

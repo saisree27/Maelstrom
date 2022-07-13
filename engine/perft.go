@@ -14,6 +14,7 @@ func init() {
 	initSquaresBetween()
 	initLine()
 	initializeSQLookup()
+	initZobrist()
 	fmt.Println("Finished initialization.")
 }
 

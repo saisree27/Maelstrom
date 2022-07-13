@@ -9,6 +9,7 @@ func initializeEverything() {
 	initSquaresBetween()
 	initLine()
 	initializeSQLookup()
+	initZobrist()
 }
 
 func Run(command string, position string, depth int) {
