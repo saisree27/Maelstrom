@@ -598,3 +598,188 @@ func (b *Board) generateLegalMoves() []Move {
 	}
 	return m
 }
+
+func (b *Board) generateCaptures() []Move {
+	var m []Move = []Move{}
+
+	// Get player and opponent colors
+	var player Color = b.turn
+	var opponent Color = reverseColor(b.turn)
+
+	// Lookup all player pieces and opponent pieces
+	var playerPieces u64 = b.colors[player]
+	var opponentPieces u64 = b.colors[opponent]
+
+	// get player pawns
+	var playerPawns u64 = b.getColorPieces(pawn, player)
+
+	// Mask that specifies which squares are pieces allowed to move
+	// Set to opponent pieces since we want only captures
+	var allowed u64 = opponentPieces
+
+	var orthogonalUs u64 = b.getColorPieces(rook, player) | b.getColorPieces(queen, player)
+	var diagonalUs u64 = b.getColorPieces(bishop, player) | b.getColorPieces(queen, player)
+	var orthogonalThem u64 = b.getColorPieces(rook, opponent) | b.getColorPieces(queen, opponent)
+	var diagonalThem u64 = b.getColorPieces(bishop, opponent) | b.getColorPieces(queen, opponent)
+
+	// Find all squares controlled by opponent
+	var attacks u64 = b.getAllAttacks(opponent, b.occupied, orthogonalThem, diagonalThem)
+	// printBitBoard(attacks)
+
+	// STEP 1: Generate king moves, since we can look for checks after
+	// Get player king square
+	var playerKing Square = Square(bitScanForward(b.getColorPieces(king, player)))
+	b.getKingMoves(&m, playerKing, attacks|^allowed, playerPieces, player)
+
+	var checkers u64 = 0
+
+	// 2a: get checks of pawns and knight since we don't need to check for pieces in between
+	if player == WHITE {
+		checkers |= (whitePawnAttacksSquareLookup[playerKing] & b.pieces[bP])
+	} else {
+		checkers |= (blackPawnAttacksSquareLookup[playerKing] & b.pieces[wP])
+	}
+	checkers |= (knightAttacks(playerKing) & b.getColorPieces(knight, opponent))
+
+	// 2b: get bishop/rook/queen attacks and check if there are pieces between them and the king
+	var pinPoss u64 = (getBishopAttacks(playerKing, b.colors[opponent]) & diagonalThem)
+	pinPoss |= (getRookAttacks(playerKing, b.colors[opponent]) & orthogonalThem)
+
+	var pinned u64 = 0
+	var lsb int
+	var piecesBetween u64
+	for {
+		if pinPoss == 0 {
+			break
+		}
+		lsb = popLSB(&pinPoss)
+		piecesBetween = squaresBetween[playerKing][lsb] & playerPieces
+
+		if piecesBetween == 0 {
+			checkers ^= sToBB[lsb]
+		} else if piecesBetween != 0 && (piecesBetween&(piecesBetween-1)) == 0 {
+			// only one piece between player and king, since otherwise there is no pin
+			pinned ^= piecesBetween
+		}
+	}
+
+	var numCheckers int = popCount(checkers)
+	if numCheckers == 2 {
+		// double check so only king moves allowed
+		return m
+	} else if numCheckers == 1 {
+		var checker Square = Square(bitScanForward(checkers))
+		var checkerPiece = b.squares[checker]
+
+		var enPassantShift Square = b.enpassant + Square(pawnPushDirection[opponent])
+
+		if checker == enPassantShift && (checkerPiece == wP || checkerPiece == bP) {
+			// en passant check capture
+			pawns := colorToPawnLookup[opponent][b.enpassant] & playerPawns
+
+			unpinnedPawns := pawns & ^pinned
+			for {
+				if unpinnedPawns == 0 {
+					break
+				}
+				lsb := Square(popLSB(&unpinnedPawns))
+				move := Move{from: lsb, to: b.enpassant, movetype: ENPASSANT, captured: checkerPiece, colorMoved: player, piece: b.squares[lsb]}
+
+				b.makeMove(move)
+				if b.isCheck(player) {
+					b.undo()
+				} else {
+					b.undo()
+					m = append(m, move)
+				}
+			}
+
+			pinnedPawns := pawns & pinned & line[checker][playerKing]
+			if pinnedPawns != 0 {
+				sq := Square(bitScanForward(pinnedPawns))
+				m = append(m, Move{from: sq, to: checker, movetype: ENPASSANT, captured: checkerPiece, colorMoved: player, piece: b.squares[lsb]})
+			}
+
+		}
+
+		// get possible captures of the checker
+		var possibleCaptures u64 = 0
+		if player == WHITE {
+			possibleCaptures |= blackPawnAttacksSquareLookup[checker] & b.pieces[wP]
+			possibleCaptures |= knightAttacks(checker) & b.pieces[wN]
+			possibleCaptures |= getBishopAttacks(checker, b.occupied) & diagonalUs
+			possibleCaptures |= getRookAttacks(checker, b.occupied) & orthogonalUs
+			possibleCaptures &= ^pinned
+		} else {
+			possibleCaptures |= whitePawnAttacksSquareLookup[checker] & b.pieces[bP]
+			possibleCaptures |= knightAttacks(checker) & b.pieces[bN]
+			possibleCaptures |= getBishopAttacks(checker, b.occupied) & diagonalUs
+			possibleCaptures |= getRookAttacks(checker, b.occupied) & orthogonalUs
+			possibleCaptures &= ^pinned
+		}
+
+		var lsb Square
+		for {
+			if possibleCaptures == 0 {
+				break
+			}
+			lsb = Square(popLSB(&possibleCaptures))
+
+			b.generateMovesFromLocs(&m, lsb, sToBB[checker], player)
+		}
+
+		if checkerPiece == bN || checkerPiece == wN {
+			// can only capture checker and move king, which has been handled above
+			return m
+		} else if checkerPiece == bP || checkerPiece == wP {
+			// TODO: add enpassant capture of checks
+			return m
+		}
+		return m
+	}
+
+	var playerKnights u64 = b.getColorPieces(knight, player)
+	b.getKnightMoves(&m, playerKnights, pinned, playerPieces, player, allowed)
+
+	// STEP 3: Calculate pawn moves
+	b.getPawnMoves(&m, playerPawns, pinned, b.occupied, opponentPieces, player, allowed)
+
+	// STEP 4: Calculate bishop moves
+	b.getBishopMoves(&m, diagonalUs, pinned, playerPieces, opponentPieces, player, allowed)
+
+	// STEP 5: Calculate rook moves
+	b.getRookMoves(&m, orthogonalUs, pinned, playerPieces, opponentPieces, player, allowed)
+
+	// STEP 6: Castling
+	b.getCastlingMoves(&m, playerKing, attacks, player)
+
+	// STEP 7: En passant
+	if b.enpassant != EMPTYSQ {
+		pawns := colorToPawnLookup[opponent][b.enpassant] & playerPawns
+
+		unpinnedPawns := pawns & ^pinned
+		for {
+			if unpinnedPawns == 0 {
+				break
+			}
+			lsb := Square(popLSB(&unpinnedPawns))
+			move := Move{from: lsb, to: b.enpassant, movetype: ENPASSANT, captured: b.squares[b.enpassant], colorMoved: player, piece: b.squares[lsb]}
+
+			b.makeMoveNoUpdate(move)
+			if b.isCheck(player) {
+				b.undoNoUpdate(move)
+			} else {
+				b.undoNoUpdate(move)
+				m = append(m, move)
+			}
+		}
+
+		pinnedPawns := pawns & pinned & line[b.enpassant][playerKing]
+		if pinnedPawns != 0 {
+			sq := Square(bitScanForward(pinnedPawns))
+			m = append(m, Move{from: sq, to: b.enpassant, movetype: ENPASSANT, captured: b.squares[b.enpassant], colorMoved: player, piece: b.squares[lsb]})
+		}
+	}
+
+	return m
+}

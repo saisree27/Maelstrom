@@ -1,10 +1,6 @@
 package engine
 
-import (
-	"fmt"
-)
-
-func quiesce(b *Board, alpha int, beta int, c Color) int {
+func quiesce(b *Board, limit int, alpha int, beta int, c Color) int {
 	eval := evaluate(b) * factor[c]
 	if eval >= beta {
 		return beta
@@ -14,12 +10,17 @@ func quiesce(b *Board, alpha int, beta int, c Color) int {
 		alpha = eval
 	}
 
+	if limit == 0 {
+		return eval
+	}
+
 	// TODO: optimize so we only calculate captures
-	legalMoves := b.generateLegalMoves()
+	legalMoves := b.generateCaptures()
+
 	for _, move := range legalMoves {
 		if move.movetype == CAPTURE || move.movetype == CAPTUREANDPROMOTION || move.movetype == ENPASSANT {
 			b.makeMove(move)
-			score := -quiesce(b, -beta, -alpha, reverseColor(c))
+			score := -quiesce(b, limit-1, -beta, -alpha, reverseColor(c))
 			b.undo()
 
 			if score >= beta {
@@ -45,7 +46,7 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, line *[]Move
 	pv := []Move{}
 
 	if depth <= 0 {
-		return quiesce(b, alpha, beta, c)
+		return quiesce(b, 4, alpha, beta, c)
 	}
 
 	legalMoves := b.generateLegalMoves()
@@ -105,178 +106,4 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, line *[]Move
 	}
 
 	return bestScore
-}
-
-func RunSearch(position string, depth int) {
-	b := Board{}
-
-	if position == "startpos" {
-		b.InitStartPos()
-	} else {
-		fen := position
-		b.InitFEN(fen)
-	}
-
-	b.printFromBitBoards()
-
-	prev := []Move{}
-	for i := 1; i <= depth; i++ {
-		line := []Move{}
-
-		fmt.Printf("Depth %d: ", i)
-
-		score := pvs(&b, i, i, -winVal-1, winVal+1, b.turn, &line, &prev) * factor[b.turn]
-
-		if score == winVal || score == -winVal {
-			fmt.Println("Found mate.")
-			break
-		}
-
-		fmt.Print(score)
-		fmt.Print(" ")
-
-		strLine := []string{}
-		for i, _ := range line {
-			strLine = append(strLine, line[i].toUCI())
-		}
-
-		fmt.Print(strLine)
-		fmt.Println()
-
-		prev = make([]Move, len(line))
-		copy(prev, line)
-	}
-}
-
-func RunSelfPlay(position string, depth int) {
-	b := Board{}
-	if position == "startpos" {
-		b.InitStartPos()
-	} else {
-		fen := position
-		b.InitFEN(fen)
-	}
-
-	movesPlayed := []string{}
-
-	legals := b.generateLegalMoves()
-	for {
-		if len(legals) == 0 {
-			break
-		}
-
-		b.printFromBitBoards()
-
-		line := []Move{}
-		prev := []Move{}
-
-		score := 0
-
-		newDepth := depth
-		for i := 1; i <= newDepth; i++ {
-			line = []Move{}
-
-			fmt.Printf("Depth %d: ", i)
-
-			score = pvs(&b, i, i, -winVal-1, winVal+1, b.turn, &line, &prev)
-
-			if score == winVal || score == -winVal {
-				fmt.Println("Found mate.")
-				break
-			}
-
-			fmt.Print(score * factor[b.turn])
-			fmt.Print(" ")
-
-			strLine := []string{}
-			for i, _ := range line {
-				strLine = append(strLine, line[i].toUCI())
-			}
-
-			fmt.Print(strLine)
-			fmt.Println()
-
-			prev = make([]Move, len(line))
-			copy(prev, line)
-		}
-		bestMove := line[0]
-
-		fmt.Printf("SCORE: %d\n", score*factor[b.turn])
-
-		movesPlayed = append(movesPlayed, bestMove.toUCI())
-		b.makeMove(bestMove)
-
-		fmt.Println(movesPlayed)
-	}
-}
-
-func RunPlay(position string, depth int, player Color) {
-	b := Board{}
-	if position == "startpos" {
-		b.InitStartPos()
-	} else {
-		fen := position
-		b.InitFEN(fen)
-	}
-	movesPlayed := []string{}
-
-	legals := b.generateLegalMoves()
-	for {
-		if len(legals) == 0 {
-			break
-		}
-
-		b.printFromBitBoards()
-
-		if b.turn == player {
-			fmt.Println("Your turn: ")
-			var move string
-
-			fmt.Scanln(&move)
-
-			b.makeMoveFromUCI(move)
-			movesPlayed = append(movesPlayed, move)
-		} else {
-			line := []Move{}
-			prev := []Move{}
-
-			score := 0
-
-			for i := 1; i <= depth; i++ {
-				line = []Move{}
-
-				fmt.Printf("Depth %d: ", i)
-
-				score = pvs(&b, i, i, -winVal-1, winVal+1, b.turn, &line, &prev)
-
-				if score == winVal || score == -winVal {
-					fmt.Println("Found mate.")
-					break
-				}
-
-				fmt.Print(score * factor[b.turn])
-				fmt.Print(" ")
-
-				strLine := []string{}
-				for i, _ := range line {
-					strLine = append(strLine, line[i].toUCI())
-				}
-
-				fmt.Print(strLine)
-				fmt.Println()
-
-				prev = make([]Move, len(line))
-				copy(prev, line)
-			}
-			bestMove := line[0]
-
-			fmt.Printf("SCORE: %d\n", score*factor[b.turn])
-
-			movesPlayed = append(movesPlayed, bestMove.toUCI())
-			b.makeMove(bestMove)
-
-			fmt.Print("Moves played: ")
-			fmt.Println(movesPlayed)
-		}
-	}
 }

@@ -390,6 +390,40 @@ func TestThreeFoldRep(t *testing.T) {
 	res := b.isThreeFoldRep()
 
 	if !res {
-		t.Errorf("TestThreeFoldRepo (true): got %t, wanted %t", res, true)
+		t.Errorf("TestThreeFoldRep (true): got %t, wanted %t", res, true)
+	}
+}
+
+func TestGenerateCaptures(t *testing.T) {
+	fen := "r3r1k1/pp3pbp/1qp1b1p1/2B5/2BP4/Q1n2N2/P4PPP/3R1K1R w - - 4 18"
+	b := Board{}
+	b.InitFEN(fen)
+
+	m := b.generateCaptures()
+	strMoves := []string{}
+	for _, mv := range m {
+		strMoves = append(strMoves, mv.toUCI())
+	}
+
+	actualCaptures := []string{"c4e6", "c5b6", "a3c3", "a3a7"}
+	result := checkSameElements(actualCaptures, strMoves)
+	if result == false {
+		t.Errorf("TestGenerateCaptures (not in check): got %v, wanted %v", strMoves, actualCaptures)
+	}
+
+	fen = "r3r1k1/pp3pbp/1qp3p1/2B5/2bP4/Q1n2N1P/P4PP1/3R1K1R w - - 0 19"
+	b = Board{}
+	b.InitFEN(fen)
+
+	m = b.generateCaptures()
+	strMoves = []string{}
+	for _, mv := range m {
+		strMoves = append(strMoves, mv.toUCI())
+	}
+
+	actualCaptures = []string{}
+	result = checkSameElements(actualCaptures, strMoves)
+	if result == false {
+		t.Errorf("TestGenerateCaptures (in check): got %v, wanted %v", strMoves, actualCaptures)
 	}
 }

@@ -6,9 +6,9 @@ var factor = map[Color]int{
 }
 
 var material = map[Piece]int{
-	wP: 100, bP: -100,
+	wP: 120, bP: -120,
 	wN: 300, bN: -300,
-	wB: 300, bB: -300,
+	wB: 310, bB: -310,
 	wR: 500, bR: -500,
 	wQ: 900, bQ: -900,
 	wK: 0, bK: 0,
@@ -28,9 +28,9 @@ var reversePSQ = [64]int{
 
 var pawnSquareTable = [64]int{
 	0, 0, 0, 0, 0, 0, 0, 0,
-	10, 10, 0, -10, -10, 0, 10, 10,
+	10, 10, 0, -15, -15, 0, 10, 10,
 	5, 0, 0, 5, 5, 0, 0, 5,
-	0, 0, 10, 20, 20, 10, 0, 0,
+	0, 0, 10, 10, 10, 10, 0, 0,
 	5, 5, 5, 10, 10, 5, 5, 5,
 	10, 10, 10, 20, 20, 10, 10, 10,
 	20, 20, 20, 30, 30, 20, 20, 20,
@@ -103,13 +103,14 @@ var kingSquareTableEndgame = [64]int{
 	-50, -10, 0, 0, 0, 0, -10, -50,
 }
 
-var minorPieceDevelopment = 20
+var minorPieceDevelopment = 30
 var kingAir = 20
 var noCastlingRights = 80
-var castled = 44
-var pawnsBlocked = 13
-var mobility = 5
-var centerControl = 15
+var castled = 30
+var pawnsBlocked = 15
+var mobility = 3
+var centerControl = 10
+var materialFactor = 1.2
 
 // Returns an evaluation of the position in cp
 // 1000000 or -1000000 is designated as checkmate
@@ -125,11 +126,50 @@ func evaluate(b *Board) int {
 		}
 	}
 
+	// modify piece square table based on king loc
+	whiteKing := Square(bitScanForward(b.getColorPieces(king, WHITE)))
+	if whiteKing == g1 || whiteKing == h1 || whiteKing == h2 || whiteKing == g2 || whiteKing == f1 || whiteKing == f2 {
+		pawnSquareTable[g4] = -50
+		pawnSquareTable[h4] = -50
+		pawnSquareTable[f4] = -50
+
+		pawnSquareTable[a4] = 20
+		pawnSquareTable[b4] = 20
+		pawnSquareTable[c4] = 20
+	} else if whiteKing == a1 || whiteKing == b1 || whiteKing == b2 || whiteKing == a2 || whiteKing == c1 || whiteKing == c2 {
+		pawnSquareTable[g4] = 20
+		pawnSquareTable[h4] = 20
+		pawnSquareTable[f4] = 20
+
+		pawnSquareTable[a4] = -50
+		pawnSquareTable[b4] = -50
+		pawnSquareTable[c4] = -50
+	}
+
+	blackKing := Square(bitScanForward(b.getColorPieces(king, BLACK)))
+	if blackKing == g8 || whiteKing == h8 || whiteKing == h7 || whiteKing == g7 || whiteKing == f7 || whiteKing == f8 {
+		pawnSquareTable[g4] = -20
+		pawnSquareTable[h4] = -20
+		pawnSquareTable[f4] = -20
+
+		pawnSquareTable[a4] = 20
+		pawnSquareTable[b4] = 20
+		pawnSquareTable[c4] = 20
+	} else if whiteKing == a8 || whiteKing == b8 || whiteKing == b7 || whiteKing == a7 || whiteKing == c7 || whiteKing == c8 {
+		pawnSquareTable[g4] = 20
+		pawnSquareTable[h4] = 20
+		pawnSquareTable[f4] = 20
+
+		pawnSquareTable[a4] = -20
+		pawnSquareTable[b4] = -20
+		pawnSquareTable[c4] = -20
+	}
+
 	eval := 0
 
 	material, total := totalMaterialAndPieces(b)
 
-	eval += int(float64(material) * 1.2)
+	eval += int(float64(material) * materialFactor)
 	eval += piecePosition(b, total)
 
 	whiteAttacks := b.getAllAttacks(WHITE, b.occupied, b.getColorPieces(rook, WHITE), b.getColorPieces(bishop, WHITE))
@@ -149,13 +189,13 @@ func evaluate(b *Board) int {
 
 	if total >= 15 && b.pieces[wQ]|b.pieces[bQ] != 0 {
 		// penalty/reward for air around king
-		whiteKingAttacks := kingAttacksSquareLookup[bitScanForward(b.getColorPieces(king, WHITE))]
+		whiteKingAttacks := kingAttacksSquareLookup[whiteKing]
 		air := popCount(whiteKingAttacks & b.empty)
 		if air > 2 {
 			eval -= air * kingAir
 		}
 
-		blackKingAttacks := kingAttacksSquareLookup[bitScanForward(b.getColorPieces(king, BLACK))]
+		blackKingAttacks := kingAttacksSquareLookup[blackKing]
 		air = popCount(blackKingAttacks & b.empty)
 		if air > 2 {
 			eval += air * kingAir
@@ -190,11 +230,11 @@ func evaluate(b *Board) int {
 
 	eval += blockedCount * pawnsBlocked
 
-	// center control
-	whiteControl := b.getColorPieces(pawn, WHITE) | whiteAttacks
+	// center control (just pawns)
+	whiteControl := b.getColorPieces(pawn, WHITE)
 	whiteCenterControl := (whiteControl & sToBB[e4]) | (whiteControl & sToBB[e5]) | (whiteControl & sToBB[d4]) | (whiteControl & sToBB[d4])
 
-	blackControl := b.getColorPieces(pawn, BLACK) | blackAttacks
+	blackControl := b.getColorPieces(pawn, BLACK)
 	blackCenterControl := (blackControl & sToBB[e4]) | (blackControl & sToBB[e5]) | (blackControl & sToBB[d4]) | (blackControl & sToBB[d4])
 
 	eval += (popCount(whiteCenterControl) - popCount(blackCenterControl)) * centerControl

@@ -435,11 +435,47 @@ func (b *Board) undo() {
 }
 
 func (b *Board) isCheck(c Color) bool {
-	player := c
-	opponent := reverseColor(c)
+	checkers := u64(0)
+	playerKing := Square(bitScanForward(b.getColorPieces(king, c)))
+	orthogonalThem := b.getColorPieces(rook, reverseColor(c)) | b.getColorPieces(queen, reverseColor(c))
+	diagonalThem := b.getColorPieces(bishop, reverseColor(c)) | b.getColorPieces(queen, reverseColor(c))
 
-	playerKing := b.getColorPieces(king, player)
-	return b.attacksOn(opponent, b.occupied, playerKing, true)
+	// 2a: get checks of pawns and knight since we don't need to check for pieces in between
+	if c == WHITE {
+		checkers |= (whitePawnAttacksSquareLookup[playerKing] & b.pieces[bP])
+	} else {
+		checkers |= (blackPawnAttacksSquareLookup[playerKing] & b.pieces[wP])
+	}
+
+	if checkers != 0 {
+		return true
+	}
+
+	checkers |= (knightAttacks(playerKing) & b.getColorPieces(knight, reverseColor(c)))
+	if checkers != 0 {
+		return true
+	}
+
+	// 2b: get bishop/rook/queen attacks and check if there are pieces between them and the king
+	var pinPoss u64 = (getBishopAttacks(playerKing, b.colors[reverseColor(c)]) & diagonalThem)
+	pinPoss |= (getRookAttacks(playerKing, b.colors[reverseColor(c)]) & orthogonalThem)
+
+	var lsb int
+	var piecesBetween u64
+	for {
+		if pinPoss == 0 {
+			break
+		}
+		lsb = popLSB(&pinPoss)
+		piecesBetween = squaresBetween[playerKing][lsb] & b.colors[c]
+
+		if piecesBetween == 0 {
+			checkers ^= sToBB[lsb]
+			return true
+		}
+	}
+
+	return checkers != 0
 }
 
 func (b *Board) isThreeFoldRep() bool {
