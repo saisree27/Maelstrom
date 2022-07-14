@@ -125,12 +125,10 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	}
 
 	for i, move := range legalMoves {
-		if depth == rd || depth == rd-1 {
-			duration := time.Since(st).Milliseconds()
-			if duration*2 > tR {
-				*line = []Move{}
-				return 0
-			}
+		duration := time.Since(st).Milliseconds()
+		if duration+duration>>1 > tR {
+			*line = []Move{}
+			return 0
 		}
 		b.makeMove(move)
 		if i == 0 {

@@ -1,64 +1,28 @@
 package engine
 
-func (b *Board) attacksOn(o Color, occupied u64, kingSquare u64, check bool) bool {
-	// optimized helper function in looking for attacks on square
+func (b *Board) getNumPins(o Color, occupied u64, kingLoc Square) int {
+	diagonalThem := b.getColorPieces(rook, o) | b.getColorPieces(queen, o)
+	orthogonalThem := b.getColorPieces(bishop, o) | b.getColorPieces(queen, o)
 
-	var attacked u64 = 0
-	if !check {
-		// don't have to worry about king attacks when looking for checks
-		var opponentKing Square = Square(bitScanForward(b.getColorPieces(king, o)))
-		attacked |= kingAttacks(opponentKing)
-	}
+	var pinPoss u64 = (getBishopAttacks(kingLoc, b.colors[o]) & diagonalThem)
+	pinPoss |= (getRookAttacks(kingLoc, b.colors[o]) & orthogonalThem)
 
-	var opponentKnights u64 = b.getColorPieces(knight, o)
+	var pinned int = 0
 	var lsb int
+	var piecesBetween u64
 	for {
-		if opponentKnights == 0 {
+		if pinPoss == 0 {
 			break
 		}
-		lsb = popLSB(&opponentKnights)
-		attacked |= knightAttacks(Square(lsb))
-	}
+		lsb = popLSB(&pinPoss)
+		piecesBetween = squaresBetween[kingLoc][lsb] & b.pieces[reverseColor(o)]
 
-	if attacked&kingSquare != 0 {
-		return true
-	}
-
-	var opponentBishops u64 = b.getColorPieces(bishop, o) | b.getColorPieces(queen, o)
-	for {
-		if opponentBishops == 0 {
-			break
+		if piecesBetween != 0 && (piecesBetween&(piecesBetween-1)) == 0 {
+			// only one piece between player and king, since otherwise there is no pin
+			pinned++
 		}
-		lsb = popLSB(&opponentBishops)
-		attacked |= getBishopAttacks(Square(lsb), occupied)
 	}
-	if attacked&kingSquare != 0 {
-		return true
-	}
-
-	var opponentRooks u64 = b.getColorPieces(rook, o) | b.getColorPieces(queen, o)
-	for {
-		if opponentRooks == 0 {
-			break
-		}
-		lsb = popLSB(&opponentRooks)
-		attacked |= getRookAttacks(Square(lsb), occupied)
-	}
-
-	if attacked&kingSquare != 0 {
-		return true
-	}
-	// var opponentQueens u64 = b.getColorPieces(queen, o)
-	// for {
-	// 	if opponentQueens == 0 {
-	// 		break
-	// 	}
-	// 	lsb = popLSB(&opponentQueens)
-	// 	attacked |= (getRookAttacks(Square(lsb), occupied) | getBishopAttacks(Square(lsb), occupied))
-	// }
-
-	attacked |= allPawnAttacks(b.getColorPieces(pawn, o), o)
-	return attacked&kingSquare != 0
+	return pinned
 }
 
 func (b *Board) getAllAttacks(o Color, occupied u64, ortho u64, diag u64) u64 {

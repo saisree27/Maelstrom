@@ -28,7 +28,7 @@ var reversePSQ = [64]int{
 
 var pawnSquareTable = [64]int{
 	0, 0, 0, 0, 0, 0, 0, 0,
-	10, 10, 0, -15, -15, 0, 10, 10,
+	10, 10, 0, -20, -20, 0, 10, 10,
 	5, 0, 0, 5, 5, 0, 0, 5,
 	0, 0, 10, 10, 10, 10, 0, 0,
 	5, 5, 5, 10, 10, 5, 5, 5,
@@ -107,10 +107,14 @@ var minorPieceDevelopment = 30
 var kingAir = 20
 var noCastlingRights = 80
 var castled = 30
-var pawnsBlocked = 15
+var pawnsBlocked = 20
 var mobility = 3
 var centerControl = 15
 var materialFactor = 1.2
+var doubledPawnsPenalty = 30
+var materialBasedOnTotalPieces = 1.2
+var pinPenalty = 25
+var cutoffForMaterialAndPSTs = 600
 
 // Returns an evaluation of the position in cp
 // 1000000 or -1000000 is designated as checkmate
@@ -177,8 +181,17 @@ func evaluate(b *Board) int {
 
 	material, total := totalMaterialAndPieces(b)
 
-	eval += int(float64(material) * materialFactor)
+	if total <= 15 {
+		eval += int(float64(material) * materialFactor * materialBasedOnTotalPieces)
+	} else {
+		eval += int(float64(material) * materialFactor)
+	}
+
 	eval += piecePosition(b, total)
+
+	if eval >= cutoffForMaterialAndPSTs || eval <= -cutoffForMaterialAndPSTs {
+		return eval
+	}
 
 	whiteAttacks := b.getAllAttacks(WHITE, b.occupied, b.getColorPieces(rook, WHITE), b.getColorPieces(bishop, WHITE))
 
@@ -227,6 +240,10 @@ func evaluate(b *Board) int {
 		}
 	}
 
+	if eval >= 150 || eval <= -150 {
+		return eval
+	}
+
 	// check if pawns are blocked by pieces of same color
 	whitePawns := b.getColorPieces(pawn, WHITE)
 	blockedCount := popCount(shiftBitboard(whitePawns, NORTH) & b.colors[WHITE])
@@ -246,6 +263,22 @@ func evaluate(b *Board) int {
 	blackCenterControl := (blackControl & sToBB[e4]) | (blackControl & sToBB[e5]) | (blackControl & sToBB[d4]) | (blackControl & sToBB[d4])
 
 	eval += (popCount(whiteCenterControl) - popCount(blackCenterControl)) * centerControl
+
+	var whiteDoubled u64
+	var blackDoubled u64
+	for i := A; i <= H; i++ {
+		if i != B && i != G {
+			whiteDoubled = b.pieces[wP] & files[i]
+			blackDoubled = b.pieces[bP] & files[i]
+
+			if whiteDoubled != 0 && (whiteDoubled&(whiteDoubled-1) != 0) {
+				eval -= doubledPawnsPenalty
+			}
+			if blackDoubled != 0 && (blackDoubled&(blackDoubled-1) != 0) {
+				eval += doubledPawnsPenalty
+			}
+		}
+	}
 
 	return eval
 }
