@@ -10,7 +10,7 @@ var material = map[Piece]int{
 	wN: 300, bN: -300,
 	wB: 310, bB: -310,
 	wR: 500, bR: -500,
-	wQ: 900, bQ: -900,
+	wQ: 940, bQ: -940,
 	wK: 0, bK: 0,
 	EMPTY: 0,
 }

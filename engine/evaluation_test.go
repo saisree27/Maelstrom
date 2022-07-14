@@ -66,7 +66,7 @@ func TestMaterial(t *testing.T) {
 	b.InitFEN(fen)
 
 	material, _ = totalMaterialAndPieces(&b)
-	if material != 900 {
+	if material != 940 {
 		t.Errorf("TestMaterial (white queen up): got %d, wanted %d", material, 900)
 	}
 
@@ -75,7 +75,7 @@ func TestMaterial(t *testing.T) {
 	b.InitFEN(fen)
 
 	material, _ = totalMaterialAndPieces(&b)
-	if material != -900 {
+	if material != -940 {
 		t.Errorf("TestMaterial (black queen up): got %d, wanted %d", material, -900)
 	}
 

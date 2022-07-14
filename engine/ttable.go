@@ -24,7 +24,7 @@ type TTable struct {
 var table TTable
 
 func initializeTTable() {
-	table.count = 100000000
+	table.count = 50000000
 	table.entries = make([]TTEntry, table.count)
 }
 
