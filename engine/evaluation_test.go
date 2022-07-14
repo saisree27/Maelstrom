@@ -88,3 +88,45 @@ func TestMaterial(t *testing.T) {
 		t.Errorf("TestMaterial (black pawn up): got %d, wanted %d", material, -120)
 	}
 }
+
+func TestInsufficientMaterial(t *testing.T) {
+	fen := "8/4k3/8/2n5/8/8/8/3K4 w - - 0 1"
+	b := Board{}
+	b.InitFEN(fen)
+
+	if !b.isInsufficientMaterial() {
+		t.Errorf("TestInsufficientMaterial (b+k vs K): got %t, wanted %t", b.isInsufficientMaterial(), true)
+	}
+
+	fen = "8/4k3/2b5/3n4/8/8/8/3K4 w - - 0 1"
+	b = Board{}
+	b.InitFEN(fen)
+
+	if b.isInsufficientMaterial() {
+		t.Errorf("TestInsufficientMaterial (b+n+k vs K): got %t, wanted %t", b.isInsufficientMaterial(), false)
+	}
+
+	fen = "8/4k3/2n5/3n4/8/8/8/3K4 w - - 0 1"
+	b = Board{}
+	b.InitFEN(fen)
+
+	if !b.isInsufficientMaterial() {
+		t.Errorf("TestInsufficientMaterial (n+n+k vs K): got %t, wanted %t", b.isInsufficientMaterial(), true)
+	}
+
+	fen = "8/4k3/2n5/3n4/8/8/4P3/3K4 w - - 0 1"
+	b = Board{}
+	b.InitFEN(fen)
+
+	if b.isInsufficientMaterial() {
+		t.Errorf("TestInsufficientMaterial (n+n+k vs K+P): got %t, wanted %t", b.isInsufficientMaterial(), false)
+	}
+
+	fen = "8/4k3/8/8/8/8/4P3/3K4 w - - 0 1"
+	b = Board{}
+	b.InitFEN(fen)
+
+	if b.isInsufficientMaterial() {
+		t.Errorf("TestInsufficientMaterial (k vs K+P): got %t, wanted %t", b.isInsufficientMaterial(), false)
+	}
+}

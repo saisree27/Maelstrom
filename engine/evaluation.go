@@ -126,6 +126,14 @@ func evaluate(b *Board) int {
 		}
 	}
 
+	if b.isThreeFoldRep() {
+		return 0
+	}
+
+	if b.isInsufficientMaterial() {
+		return 0
+	}
+
 	// modify piece square table based on king loc
 	whiteKing := Square(bitScanForward(b.getColorPieces(king, WHITE)))
 	if whiteKing == g1 || whiteKing == h1 || whiteKing == h2 || whiteKing == g2 || whiteKing == f1 || whiteKing == f2 {

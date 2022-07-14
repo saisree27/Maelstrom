@@ -520,6 +520,32 @@ func (b *Board) isThreeFoldRep() bool {
 	return matches >= 2
 }
 
+func (b *Board) isInsufficientMaterial() bool {
+	numPieces := popCount(b.occupied)
+	if numPieces == 2 {
+		return true
+	}
+	if numPieces == 3 && b.pieces[wP] == 0 && b.pieces[bP] == 0 {
+		return true
+	}
+	if numPieces == 4 {
+		if b.pieces[wN] != 0 {
+			count := popCount(b.pieces[wN])
+			if count == 2 {
+				return true
+			}
+		}
+		if b.pieces[bN] != 0 {
+			count := popCount(b.pieces[bN])
+			if count == 2 {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 func (b *Board) print() {
 	s := "\n"
 	for i := 56; i >= 0; i -= 8 {
