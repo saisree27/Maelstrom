@@ -24,12 +24,12 @@ type TTable struct {
 var table TTable
 
 func initializeTTable() {
-	table.count = 200000000
+	table.count = 100000000
 	table.entries = make([]TTEntry, table.count)
 }
 
-func (t *TTable) clearTTable() {
-	t.entries = make([]TTEntry, t.count)
+func clearTTable() {
+	table.entries = make([]TTEntry, table.count)
 }
 
 func storeEntry(b *Board, score int, bd bound, mv Move, depth int) {

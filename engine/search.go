@@ -49,7 +49,7 @@ func orderMovesPV(moves *[]Move, pv Move) {
 	}
 }
 
-func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool, line *[]Move) int {
+func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool, line *[]Move, tR int64, st time.Time) int {
 	pv := []Move{}
 
 	if depth <= 0 {
@@ -86,7 +86,7 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 
 	if doNull && b.plyCnt > 0 && hasNotJustPawns != 0 && depth >= R+1 && !b.isCheck(c) {
 		b.makeNullMove()
-		bestScore = -pvs(b, depth-R-1, rd, -beta, -beta+1, reverseColor(c), false, &pv)
+		bestScore = -pvs(b, depth-R-1, rd, -beta, -beta+1, reverseColor(c), false, &pv, tR, st)
 		b.undoNullMove()
 
 		if bestScore >= beta {
@@ -95,9 +95,16 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	}
 
 	for i, move := range legalMoves {
+		if depth == rd || depth == rd-1 {
+			duration := time.Since(st).Milliseconds()
+			if duration*2 > tR {
+				*line = []Move{}
+				return 0
+			}
+		}
 		b.makeMove(move)
 		if i == 0 {
-			bestScore = -pvs(b, depth-1, rd, -beta, -alpha, reverseColor(c), true, &pv)
+			bestScore = -pvs(b, depth-1, rd, -beta, -alpha, reverseColor(c), true, &pv, tR, st)
 			b.undo()
 			if bestScore > alpha {
 				bestMove = move
@@ -111,9 +118,9 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 				alpha = bestScore
 			}
 		} else {
-			score := -pvs(b, depth-1, rd, -alpha-1, -alpha, reverseColor(c), true, &pv)
+			score := -pvs(b, depth-1, rd, -alpha-1, -alpha, reverseColor(c), true, &pv, tR, st)
 			if score > alpha && score < beta {
-				score = -pvs(b, depth-1, rd, -beta, -alpha, reverseColor(c), true, &pv)
+				score = -pvs(b, depth-1, rd, -beta, -alpha, reverseColor(c), true, &pv, tR, st)
 			}
 			if score > alpha {
 				bestMove = move
@@ -149,7 +156,6 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 }
 
 func searchWithTime(b *Board, movetime int64) Move {
-	fmt.Printf("Searching position with %d time remaining. \n", movetime)
 	startTime := time.Now()
 	line := []Move{}
 	prevBest := Move{}
@@ -157,7 +163,6 @@ func searchWithTime(b *Board, movetime int64) Move {
 	for i := 1; i <= 100; i++ {
 		duration := time.Since(startTime).Milliseconds()
 		timeRemaining := movetime - duration
-		fmt.Printf("Time remaining: %d \n", timeRemaining)
 
 		if movetime > timeRemaining*2 {
 			// We will probably take twice as much time in the new iteration
@@ -165,25 +170,19 @@ func searchWithTime(b *Board, movetime int64) Move {
 			break
 		}
 
-		fmt.Printf("Depth %d: ", i)
+		score := pvs(b, i, i, -winVal-1, winVal+1, b.turn, true, &line, timeRemaining, time.Now()) * factor[b.turn]
 
-		score := pvs(b, i, i, -winVal-1, winVal+1, b.turn, true, &line) * factor[b.turn]
-
-		fmt.Print(score)
-		fmt.Print(" ")
-
-		strLine := []string{}
-		for i, _ := range line {
-			strLine = append(strLine, line[i].toUCI())
-		}
-
-		fmt.Print(strLine)
-		fmt.Println()
-
-		if score == winVal || score == -winVal {
-			fmt.Println("Found mate.")
+		if len(line) == 0 {
 			break
 		}
+
+		strLine := ""
+		for _, move := range line {
+			strLine += " " + move.toUCI()
+		}
+
+		fmt.Printf("info depth %d score cp %d pv%s\n", i, score, strLine)
+
 		prevBest = line[0]
 	}
 	return prevBest

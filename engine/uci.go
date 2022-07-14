@@ -76,39 +76,34 @@ func processGo(command string, b *Board) {
 	}
 
 	fmt.Println("bestmove " + bestMove.toUCI())
+	clearTTable()
 }
 
 func UciLoop() {
 	b := Board{}
-	for {
-		var command string
+	scanner := bufio.NewScanner(os.Stdin)
 
-		scanner := bufio.NewScanner(os.Stdin)
-		if scanner.Scan() {
-			command = scanner.Text()
-		}
+	for scanner.Scan() {
+		command := scanner.Text()
 
 		if command == "uci" {
+			initializeEverything()
 			fmt.Println("id name Maelstrom")
 			fmt.Println("id author saisree27")
 			fmt.Println("uciok")
 		}
 
 		if command == "isready" {
-			initializeEverything()
 			fmt.Println("readyok")
 		}
 
 		if command == "ucinewgame" {
 			b = Board{}
 			b.InitStartPos()
-			b.printFromBitBoards()
 		}
 
 		if strings.Contains(command, "position") {
-			table.clearTTable()
 			b = processPosition(command)
-			b.printFromBitBoards()
 		}
 
 		if strings.Contains(command, "go") {
