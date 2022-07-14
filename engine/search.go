@@ -2,8 +2,14 @@ package engine
 
 import (
 	"fmt"
+	"sort"
 	"time"
 )
+
+type moveBonus struct {
+	move  Move
+	bonus int
+}
 
 // null move pruning constant R
 var R = 3
@@ -41,11 +47,35 @@ func quiesce(b *Board, limit int, alpha int, beta int, c Color) int {
 	return alpha
 }
 
-func orderMovesPV(moves *[]Move, pv Move) {
+func orderMovesPV(moves *[]Move, pv Move, c Color) {
+	bonuses := []moveBonus{}
 	for i, mv := range *moves {
 		if mv == pv {
 			(*moves)[i], (*moves)[0] = (*moves)[0], pv
+			bonuses = append(bonuses, moveBonus{move: mv, bonus: 30000})
+		} else {
+			if mv.movetype == CAPTUREANDPROMOTION {
+				bonus := material[mv.promote] - material[mv.captured] - material[mv.piece]
+				bonuses = append(bonuses, moveBonus{move: mv, bonus: bonus * factor[c]})
+			} else if mv.movetype == CAPTURE {
+				bonus := -material[mv.captured] - material[mv.piece]
+				bonuses = append(bonuses, moveBonus{move: mv, bonus: bonus * factor[c]})
+			} else if mv.movetype == PROMOTION {
+				bonus := material[mv.promote] - material[mv.piece]
+				bonuses = append(bonuses, moveBonus{move: mv, bonus: bonus * factor[c]})
+			} else {
+				bonus := 0
+				bonuses = append(bonuses, moveBonus{move: mv, bonus: bonus})
+			}
 		}
+	}
+
+	sort.Slice(bonuses, func(i, j int) bool {
+		return bonuses[i].bonus > bonuses[j].bonus
+	})
+
+	for i, b := range bonuses {
+		(*moves)[i] = b.move
 	}
 }
 
@@ -79,7 +109,7 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	}
 
 	if depth > 1 {
-		orderMovesPV(&legalMoves, bestMove)
+		orderMovesPV(&legalMoves, bestMove, c)
 	}
 
 	hasNotJustPawns := b.getColorPieces(queen, c) | b.getColorPieces(rook, c) | b.getColorPieces(bishop, c) | b.getColorPieces(knight, c)
