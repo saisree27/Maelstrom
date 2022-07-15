@@ -57,8 +57,8 @@ func TestMaterial(t *testing.T) {
 	b.InitFEN(fen)
 
 	material, _ = totalMaterialAndPieces(&b)
-	if material != 120 {
-		t.Errorf("TestMaterial (white pawn up): got %d, wanted %d", material, 100)
+	if material != pawnVal {
+		t.Errorf("TestMaterial (white pawn up): got %d, wanted %d", material, pawnVal)
 	}
 
 	fen = "rnb1kb1r/ppp1pppp/5n2/3N4/8/8/PPPP1PPP/R1BQKBNR b KQkq - 0 4"
@@ -66,8 +66,8 @@ func TestMaterial(t *testing.T) {
 	b.InitFEN(fen)
 
 	material, _ = totalMaterialAndPieces(&b)
-	if material != 940 {
-		t.Errorf("TestMaterial (white queen up): got %d, wanted %d", material, 900)
+	if material != queenVal {
+		t.Errorf("TestMaterial (white queen up): got %d, wanted %d", material, queenVal)
 	}
 
 	fen = "rnb1kbnr/ppp1pppp/8/7q/8/8/PPPP1PPP/RNB1KBNR w KQkq - 0 4"
@@ -75,8 +75,8 @@ func TestMaterial(t *testing.T) {
 	b.InitFEN(fen)
 
 	material, _ = totalMaterialAndPieces(&b)
-	if material != -940 {
-		t.Errorf("TestMaterial (black queen up): got %d, wanted %d", material, -900)
+	if material != -queenVal {
+		t.Errorf("TestMaterial (black queen up): got %d, wanted %d", material, -queenVal)
 	}
 
 	fen = "2r5/1p1k1pp1/p2p4/P7/2R4p/1P1b1B1P/2r2PP1/3KR3 w - - 0 31"
@@ -84,8 +84,8 @@ func TestMaterial(t *testing.T) {
 	b.InitFEN(fen)
 
 	material, _ = totalMaterialAndPieces(&b)
-	if material != -120 {
-		t.Errorf("TestMaterial (black pawn up): got %d, wanted %d", material, -120)
+	if material != -pawnVal {
+		t.Errorf("TestMaterial (black pawn up): got %d, wanted %d", material, -pawnVal)
 	}
 }
 

@@ -17,6 +17,7 @@ func initializeEverything() {
 	initializeSQLookup()
 	initZobrist()
 	initializeTTable()
+	initNeighborMasks()
 }
 
 func Run(command string, position string, depth int) {

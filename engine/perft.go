@@ -71,7 +71,7 @@ func RunPerfTests(position string, maxDepth int) {
 		start := time.Now()
 		nodes := Perft(&b, depth)
 		duration := time.Since(start)
-		fmt.Printf("Depth %d, Nodes: %d, Time: %d µs, NPS: %d\n", depth, nodes, duration.Microseconds(), int(nodes*1000000000/(int(duration.Nanoseconds()))))
+		fmt.Printf("Depth %d, Nodes: %d, Time: %d µs, NPS: %d\n", depth, nodes, duration.Microseconds(), int(nodes*1000000000/(int(duration.Nanoseconds() + 1))))
 
 	}
 }

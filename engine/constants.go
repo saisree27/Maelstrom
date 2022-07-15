@@ -54,6 +54,7 @@ type Color int
 const (
 	WHITE Color = iota
 	BLACK
+	NONE
 )
 
 func reverseColor(c Color) Color {
@@ -116,6 +117,9 @@ var stringToPieceMap = map[string]Piece{
 }
 
 func (p Piece) getColor() Color {
+	if p == EMPTY {
+		return NONE
+	}
 	if p == wP || p == wN || p == wB || p == wR || p == wQ || p == wK {
 		return WHITE
 	} else {
@@ -178,6 +182,20 @@ const (
 	G
 	H
 )
+
+var fileNeighbors [8]u64
+
+func initNeighborMasks()  {
+	for f := A; f <= H; f++{
+		if f == A {
+			fileNeighbors[f] = files[B]
+		} else if f == H {
+			fileNeighbors[f] = files[G]
+		} else {
+			fileNeighbors[f] = files[f - 1] | files[f + 1]
+		}
+	}
+}
 
 type Rank int
 
