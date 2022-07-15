@@ -18,13 +18,17 @@ const twoRooksOnSeventh int = 15
 var doubledPawnByFile = []int{
 	A: -35, B: 0, C: -10, D: -20, E: -20, F: -10, G: 0, H: -35,
 }
+
 const tripledPawn int = -40
-const isolatedPawn int = -5 
-const passedPawn int = 20
-const pawnBlockedByPlayer int = -10
+const isolatedPawn int = -5
+const passedPawn int = 30
+const cdPawnBlockedByPlayer int = -10
 
 // Values for other pieces
-const queenEarly int = -30
+const queenEarly int = -20
+const bishopPair int = 20
+const bishopMobility int = 2
+const rookMobility int = 3
 
 // Values for king safety
 // TODO
@@ -43,7 +47,7 @@ var material = map[Piece]int{
 	EMPTY: 0,
 }
 
-var center = map[Square]bool {
+var center = map[Square]bool{
 	e4: true, d4: true, e5: true, d5: true,
 }
 
@@ -165,6 +169,7 @@ func evaluate(b *Board) int {
 	evaluatePawns(b, &eval)
 	evaluateKnights(b, &eval)
 	evaluateBishops(b, &eval)
+	evaluateRooks(b, &eval)
 	evaluateQueens(b, &eval)
 	evaluateKings(b, &eval, total)
 
@@ -191,31 +196,25 @@ func evaluatePawns(b *Board, eval *int) {
 
 	wPawns := wPawnsOrig
 	bPawns := bPawnsOrig
-	
+
 	filesFoundWhite := [8]int{}
 	filesFoundBlack := [8]int{}
 
 	for wPawns != 0 {
 		square := Square(popLSB(&wPawns))
 		*eval += pawnSquareTable[square]
-		
-		if b.squares[square + Square(NORTH)].getColor() == WHITE {
-			if square == c2 {
-				*eval += pawnBlockedByPlayer
-			}
-		}
 
 		// Doubled pawns check
 		file := sqToFile(square)
 		filesFoundWhite[file]++
 
 		// Isolated pawns check
-		if fileNeighbors[file] & wPawnsOrig == 0 {
+		if fileNeighbors[file]&wPawnsOrig == 0 {
 			*eval += isolatedPawn
 		}
 
 		// Passed pawns check
-		if (files[file] | fileNeighbors[file]) & bPawnsOrig == 0 {
+		if (files[file]|fileNeighbors[file])&bPawnsOrig == 0 {
 			*eval += passedPawn
 		}
 	}
@@ -224,23 +223,17 @@ func evaluatePawns(b *Board, eval *int) {
 		square := Square(popLSB(&bPawns))
 		*eval -= pawnSquareTable[reversePSQ[square]]
 
-		if b.squares[square + Square(SOUTH)].getColor() == BLACK {
-			if square == c7 {
-				*eval -= pawnBlockedByPlayer
-			}
-		}
-
 		// Doubled pawns check
 		file := sqToFile(square)
 		filesFoundBlack[file]++
 
 		// Isolated pawns check
-		if fileNeighbors[file] & bPawnsOrig == 0 {
+		if fileNeighbors[file]&bPawnsOrig == 0 {
 			*eval -= isolatedPawn
 		}
 
 		// Passed pawns check
-		if (files[file] | fileNeighbors[file]) & wPawnsOrig == 0 {
+		if (files[file]|fileNeighbors[file])&wPawnsOrig == 0 {
 			*eval -= passedPawn
 		}
 	}
@@ -267,11 +260,21 @@ func evaluateKnights(b *Board, eval *int) {
 	wKnights := b.getColorPieces(knight, WHITE)
 	bKnights := b.getColorPieces(knight, BLACK)
 	for wKnights != 0 {
-		square := popLSB(&wKnights)
+		square := Square(popLSB(&wKnights))
+
+		if square == c3 && b.squares[c2] == wP {
+			*eval += cdPawnBlockedByPlayer
+		}
+
 		*eval += knightSquareTable[square]
 	}
 	for bKnights != 0 {
-		square := popLSB(&bKnights)
+		square := Square(popLSB(&bKnights))
+
+		if square == c6 && b.squares[c7] == bP {
+			*eval -= cdPawnBlockedByPlayer
+		}
+
 		*eval -= knightSquareTable[reversePSQ[square]]
 	}
 }
@@ -279,41 +282,91 @@ func evaluateKnights(b *Board, eval *int) {
 func evaluateBishops(b *Board, eval *int) {
 	// TODO: Add specific evaluation for bishops
 	wBishops := b.getColorPieces(bishop, WHITE)
+	wNum := 0
 	bBishops := b.getColorPieces(bishop, BLACK)
+	bNum := 0
 	for wBishops != 0 {
-		square := popLSB(&wBishops)
+		square := Square(popLSB(&wBishops))
+
+		if square == d3 && b.squares[d2] == wP {
+			*eval += cdPawnBlockedByPlayer
+		}
+
+		attacks := getBishopAttacks(square, b.occupied)
+
+		*eval += popCount(attacks) * bishopMobility
 		*eval += bishopSquareTable[square]
+		wNum++
 	}
+
+	if wNum >= 2 {
+		*eval += bishopPair
+	}
+
 	for bBishops != 0 {
-		square := popLSB(&bBishops)
+		square := Square(popLSB(&bBishops))
+
+		if square == d6 && b.squares[d7] == bP {
+			*eval -= cdPawnBlockedByPlayer
+		}
+
+		attacks := getBishopAttacks(square, b.occupied)
+
+		*eval -= popCount(attacks) * bishopMobility
 		*eval -= bishopSquareTable[reversePSQ[square]]
+		bNum++
+	}
+
+	if bNum >= 2 {
+		*eval -= bishopPair
 	}
 }
 
 func evaluateRooks(b *Board, eval *int) {
-	// TODO: Add specific evaluation for rooks
 	wRooks := b.getColorPieces(rook, WHITE)
 	bRooks := b.getColorPieces(rook, BLACK)
+	pawns := b.pieces[wP] | b.pieces[bP]
 	for wRooks != 0 {
-		square := popLSB(&wRooks)
+		square := Square(popLSB(&wRooks))
+		attacks := getRookAttacks(square, b.occupied)
+		piecesOnFile := files[sqToFile(square)] & pawns
+		if piecesOnFile == 0 {
+			*eval += rookOpenFile
+		} else if piecesOnFile == 1 {
+			*eval += rookSemiOpenFile
+		}
+		*eval += popCount(attacks) * rookMobility
 		*eval += rookSquareTable[square]
 	}
 	for bRooks != 0 {
-		square := popLSB(&bRooks)
+		square := Square(popLSB(&bRooks))
+		attacks := getRookAttacks(square, b.occupied)
+		piecesOnFile := files[sqToFile(square)] & pawns
+		if piecesOnFile == 0 {
+			*eval -= rookOpenFile
+		} else if piecesOnFile == 1 {
+			*eval -= rookSemiOpenFile
+		}
+		*eval -= popCount(attacks) * rookMobility
 		*eval -= rookSquareTable[reversePSQ[square]]
 	}
 }
 
 func evaluateQueens(b *Board, eval *int) {
-	// TODO: Add specific evaluation for queens
 	wQueens := b.getColorPieces(queen, WHITE)
 	bQueens := b.getColorPieces(queen, BLACK)
 	for wQueens != 0 {
-		square := popLSB(&wQueens)
+		square := Square(popLSB(&wQueens))
+		if square != d1 && b.plyCnt <= 10 {
+			*eval += queenEarly
+		}
 		*eval += queenSquareTable[square]
 	}
 	for bQueens != 0 {
-		square := popLSB(&bQueens)
+		square := Square(popLSB(&bQueens))
+		if square != d8 && b.plyCnt <= 10 {
+			*eval -= queenEarly
+		}
 		*eval -= queenSquareTable[reversePSQ[square]]
 	}
 }
