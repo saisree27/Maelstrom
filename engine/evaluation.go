@@ -24,6 +24,14 @@ const isolatedPawn int = -5
 const passedPawn int = 30
 const cdPawnBlockedByPlayer int = -10
 
+var passedPawnRankWhite = []int {
+	0, 0, 5, 25, 45, 100, 200, 0,
+}
+
+var passedPawnRankBlack = []int {
+	0, 200, 100, 45, 25, 5, 0, 0,
+}
+
 // Values for other pieces
 const queenEarly int = -20
 const bishopPair int = 20
@@ -31,7 +39,9 @@ const bishopMobility int = 2
 const rookMobility int = 3
 
 // Values for king safety
-// TODO
+const pawnShieldLeft int = -20
+const pawnShieldUpDown int = -35
+const pawnShieldRight int = -10
 
 var factor = []int{
 	WHITE: 1, BLACK: -1,
@@ -216,6 +226,7 @@ func evaluatePawns(b *Board, eval *int) {
 		// Passed pawns check
 		if (files[file]|fileNeighbors[file])&bPawnsOrig == 0 {
 			*eval += passedPawn
+			*eval += passedPawnRankWhite[sqToRank(square)]
 		}
 	}
 
@@ -235,6 +246,7 @@ func evaluatePawns(b *Board, eval *int) {
 		// Passed pawns check
 		if (files[file]|fileNeighbors[file])&wPawnsOrig == 0 {
 			*eval -= passedPawn
+			*eval -= passedPawnRankBlack[sqToRank(square)]
 		}
 	}
 
@@ -385,5 +397,41 @@ func evaluateKings(b *Board, eval *int, totalPieces int) {
 	} else {
 		*eval += kingSquareTableMiddlegame[wKing]
 		*eval -= kingSquareTableMiddlegame[reversePSQ[bKing]]
+
+		if !b.OO && !b.OOO {
+			// Pawn shield
+			pawns := b.pieces[wP]
+			nw := shiftBitboard(sToBB[wKing], NW) & pawns
+			n := shiftBitboard(sToBB[wKing], NORTH) & pawns
+			ne := shiftBitboard(sToBB[wKing], NE) & pawns
+
+			if nw == 0 {
+				*eval += pawnShieldLeft
+			}
+			if n == 0 {
+				*eval += pawnShieldUpDown
+			}
+			if ne == 0 {
+				*eval += pawnShieldRight
+			}
+		}
+
+		if !b.oo && !b.ooo {
+			// Pawn shield
+			pawns := b.pieces[bP]
+			sw := shiftBitboard(sToBB[bKing], SW) & pawns
+			s := shiftBitboard(sToBB[bKing], SOUTH) & pawns
+			se := shiftBitboard(sToBB[bKing], SE) & pawns
+
+			if sw == 0 {
+				*eval -= pawnShieldLeft
+			}
+			if s == 0 {
+				*eval -= pawnShieldUpDown
+			}
+			if se == 0 {
+				*eval -= pawnShieldRight
+			}
+		}
 	}
 }

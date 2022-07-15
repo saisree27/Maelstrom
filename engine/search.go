@@ -12,9 +12,12 @@ type moveBonus struct {
 }
 
 // null move pruning constant R
-var R = 3
+const R = 3
+
+var nodesSearched = 0
 
 func quiesce(b *Board, limit int, alpha int, beta int, c Color) int {
+	nodesSearched++
 	eval := evaluate(b) * factor[c]
 	if eval >= beta {
 		return beta
@@ -68,7 +71,7 @@ func orderMovesPV(b *Board, moves *[]Move, pv Move, c Color, depth int, rd int) 
 				if depth >= rd-2 {
 					b.makeMove(mv)
 					if b.isCheck(b.turn) {
-						bonus = 100
+						bonus = 50
 					} else {
 						switch mv.piece {
 						case wN:
@@ -110,6 +113,7 @@ func orderMovesPV(b *Board, moves *[]Move, pv Move, c Color, depth int, rd int) 
 }
 
 func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool, line *[]Move, tR int64, st time.Time) int {
+	nodesSearched++
 	pv := []Move{}
 
 	if depth <= 0 {
@@ -228,8 +232,14 @@ func searchWithTime(b *Board, movetime int64) Move {
 	startTime := time.Now()
 	line := []Move{}
 	prevBest := Move{}
+	legalMoves := b.generateLegalMoves()
+
+	if len(legalMoves) == 1 {
+		return legalMoves[0]
+	}
 
 	for i := 1; i <= 100; i++ {
+		nodesSearched = 0
 		duration := time.Since(startTime).Milliseconds()
 		timeRemaining := movetime - duration
 
@@ -238,11 +248,16 @@ func searchWithTime(b *Board, movetime int64) Move {
 			// than the previous one, so probably wise not to go into the new iteration
 			break
 		}
-
+		searchStart := time.Now()
 		score := pvs(b, i, i, -winVal-1, winVal+1, b.turn, true, &line, timeRemaining, time.Now()) * factor[b.turn]
+		timeTaken := time.Since(searchStart).Milliseconds()
 
 		if len(line) == 0 {
 			break
+		}
+
+		if score == winVal || score == -winVal {
+			return line[0]
 		}
 
 		strLine := ""
@@ -250,7 +265,7 @@ func searchWithTime(b *Board, movetime int64) Move {
 			strLine += " " + move.toUCI()
 		}
 
-		fmt.Printf("info depth %d score cp %d pv%s\n", i, score, strLine)
+		fmt.Printf("info depth %d nodes %d time %d score cp %d pv%s\n", i, nodesSearched, timeTaken, score, strLine)
 
 		prevBest = line[0]
 	}

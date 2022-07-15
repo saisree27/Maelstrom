@@ -3,3 +3,4 @@
 *.test
 builds/
 main
+*.exe
