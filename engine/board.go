@@ -525,7 +525,7 @@ func (b *Board) isInsufficientMaterial() bool {
 	if numPieces == 2 {
 		return true
 	}
-	if numPieces == 3 && b.pieces[wP] == 0 && b.pieces[bP] == 0 {
+	if numPieces == 3 && (b.pieces[wN] != 0 || b.pieces[bN] != 0 || b.pieces[wB] != 0 || b.pieces[bB] != 0) {
 		return true
 	}
 	if numPieces == 4 {

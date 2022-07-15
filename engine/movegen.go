@@ -71,15 +71,6 @@ func (b *Board) getAllAttacks(o Color, occupied u64, ortho u64, diag u64) u64 {
 		attackedSquares |= getRookAttacks(Square(lsb), occupied^playerKing)
 	}
 
-	// var opponentQueens u64 = b.getColorPieces(queen, o)
-	// for {
-	// 	if opponentQueens == 0 {
-	// 		break
-	// 	}
-	// 	lsb = popLSB(&opponentQueens)
-	// 	attackedSquares |= (getRookAttacks(Square(lsb), occupied^playerKing) | getBishopAttacks(Square(lsb), occupied^playerKing))
-	// }
-
 	return attackedSquares
 }
 

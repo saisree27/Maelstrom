@@ -5,7 +5,7 @@ import "maelstrom/engine"
 func main() {
 	// engine.Run("search", "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", 6)
 	// engine.Run("search", "3k4/8/8/8/8/3K4/3P4/8 w - - 0 1", 100)
-	// engine.Run("search", "startpos", 10)
+	// engine.Run("search", "startpos", 15)
 	// engine.Run("search", "5r2/8/1R6/ppk3p1/2N3P1/P4b2/1K6/5B2 w - - 0 1", 10)
 	// engine.Run("play white", "startpos", 6)
 	// engine.Run("play black", "startpos", 6)
@@ -17,4 +17,5 @@ func main() {
 	// engine.Run("search", "r5rk/5p1p/5R2/4B3/8/8/7P/7K w - - 0 0", 15)
 	// engine.Run("search", "8/7b/7b/p7/Pp2k3/1P6/KP2p2p/3N4 b - - 0 1", 10)
 	engine.UciLoop()
+	// engine.Run("search", "8/6p1/k1P2p1p/7K/8/8/8/8 w - - 0 1", 100)
 }

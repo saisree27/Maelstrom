@@ -47,7 +47,7 @@ func quiesce(b *Board, limit int, alpha int, beta int, c Color) int {
 	return alpha
 }
 
-func orderMovesPV(moves *[]Move, pv Move, c Color) {
+func orderMovesPV(b *Board, moves *[]Move, pv Move, c Color, depth int, rd int) {
 	bonuses := []moveBonus{}
 	for i, mv := range *moves {
 		if mv == pv {
@@ -65,6 +65,36 @@ func orderMovesPV(moves *[]Move, pv Move, c Color) {
 				bonuses = append(bonuses, moveBonus{move: mv, bonus: bonus * factor[c]})
 			} else {
 				bonus := 0
+				if depth >= rd-2 {
+					b.makeMove(mv)
+					if b.isCheck(b.turn) {
+						bonus = 100
+					} else {
+						switch mv.piece {
+						case wN:
+							bonus = knightSquareTable[mv.to] - knightSquareTable[mv.from]
+						case bN:
+							bonus = knightSquareTable[reversePSQ[mv.to]] - knightSquareTable[reversePSQ[mv.from]]
+						case wB:
+							bonus = bishopSquareTable[mv.to] - bishopSquareTable[mv.from]
+						case bB:
+							bonus = bishopSquareTable[reversePSQ[mv.to]] - bishopSquareTable[reversePSQ[mv.from]]
+						case wR:
+							bonus = rookSquareTable[mv.to] - rookSquareTable[mv.from]
+						case bR:
+							bonus = rookSquareTable[reversePSQ[mv.to]] - rookSquareTable[reversePSQ[mv.from]]
+						case wQ:
+							bonus = queenSquareTable[mv.to] - queenSquareTable[mv.from]
+						case bQ:
+							bonus = queenSquareTable[reversePSQ[mv.to]] - queenSquareTable[reversePSQ[mv.from]]
+						case wP:
+							bonus = pawnSquareTable[mv.to] - pawnSquareTable[mv.from]
+						case bP:
+							bonus += pawnSquareTable[reversePSQ[mv.to]] - pawnSquareTable[reversePSQ[mv.from]]
+						}
+					}
+					b.undo()
+				}
 				bonuses = append(bonuses, moveBonus{move: mv, bonus: bonus})
 			}
 		}
@@ -109,7 +139,7 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	}
 
 	if depth > 1 {
-		orderMovesPV(&legalMoves, bestMove, c)
+		orderMovesPV(b, &legalMoves, bestMove, c, depth, rd)
 	}
 
 	hasNotJustPawns := b.getColorPieces(queen, c) | b.getColorPieces(rook, c) | b.getColorPieces(bishop, c) | b.getColorPieces(knight, c)
@@ -131,6 +161,7 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 			return 0
 		}
 		b.makeMove(move)
+
 		if i == 0 {
 			bestScore = -pvs(b, depth-1, rd, -beta, -alpha, reverseColor(c), true, &pv, tR, st)
 			b.undo()
@@ -146,25 +177,35 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 				alpha = bestScore
 			}
 		} else {
-			score := -pvs(b, depth-1, rd, -alpha-1, -alpha, reverseColor(c), true, &pv, tR, st)
-			if score > alpha && score < beta {
-				score = -pvs(b, depth-1, rd, -beta, -alpha, reverseColor(c), true, &pv, tR, st)
+			score := alpha + 1
+			check := b.isCheck(b.turn)
+			// Late move reduction
+			if i >= 4 && depth >= 3 && move.movetype != CAPTURE && move.movetype != CAPTUREANDPROMOTION && !check {
+				score = -pvs(b, depth-2, rd, -alpha-1, -alpha, reverseColor(c), true, &pv, tR, st)
 			}
 			if score > alpha {
-				bestMove = move
-				alpha = score
-				*line = []Move{}
-
-				*line = append(*line, move)
-				*line = append(*line, pv...)
-
-			}
-			b.undo()
-			if score > bestScore {
-				bestScore = score
-				if score >= beta {
-					break
+				score := -pvs(b, depth-1, rd, -alpha-1, -alpha, reverseColor(c), true, &pv, tR, st)
+				if score > alpha && score < beta {
+					score = -pvs(b, depth-1, rd, -beta, -alpha, reverseColor(c), true, &pv, tR, st)
 				}
+				if score > alpha {
+					bestMove = move
+					alpha = score
+					*line = []Move{}
+
+					*line = append(*line, move)
+					*line = append(*line, pv...)
+
+				}
+				b.undo()
+				if score > bestScore {
+					bestScore = score
+					if score >= beta {
+						break
+					}
+				}
+			} else {
+				b.undo()
 			}
 		}
 	}

@@ -57,7 +57,7 @@ func RunSearch(position string, depth int) {
 
 		fmt.Printf("Depth %d: ", i)
 
-		score := pvs(&b, i, i, -winVal-1, winVal+1, b.turn, true, &line, 100000, time.Now()) * factor[b.turn]
+		score := pvs(&b, i, i, -winVal-1, winVal+1, b.turn, true, &line, 100000000, time.Now()) * factor[b.turn]
 
 		fmt.Print(score)
 		fmt.Print(" ")
@@ -122,7 +122,7 @@ func RunSelfPlay(position string, depth int) {
 
 			fmt.Printf("Depth %d: ", i)
 
-			score = pvs(&b, i, i, -winVal-1, winVal+1, b.turn, true, &line, 100000, time.Now())
+			score = pvs(&b, i, i, -winVal-1, winVal+1, b.turn, true, &line, 100000000, time.Now())
 
 			if score == winVal || score == -winVal {
 				fmt.Println("Found mate.")

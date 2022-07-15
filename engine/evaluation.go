@@ -103,18 +103,17 @@ var kingSquareTableEndgame = [64]int{
 	-50, -10, 0, 0, 0, 0, -10, -50,
 }
 
-var minorPieceDevelopment = 30
+var minorPieceDevelopment = 25
 var kingAir = 20
 var noCastlingRights = 80
 var castled = 30
 var pawnsBlocked = 20
-var mobility = 3
+var mobility = 10
 var centerControl = 15
 var materialFactor = 1.2
-var doubledPawnsPenalty = 30
+var doubledPawnsPenalty = 35
 var materialBasedOnTotalPieces = 1.2
-var pinPenalty = 25
-var cutoffForMaterialAndPSTs = 600
+var cutoffForMaterialAndPSTs = 500
 
 // Returns an evaluation of the position in cp
 // 1000000 or -1000000 is designated as checkmate
@@ -193,11 +192,11 @@ func evaluate(b *Board) int {
 		return eval
 	}
 
-	whiteAttacks := b.getAllAttacks(WHITE, b.occupied, b.getColorPieces(rook, WHITE), b.getColorPieces(bishop, WHITE))
+	whiteAttacks := b.getAllAttacks(WHITE, b.occupied, b.getColorPieces(rook, WHITE)|b.getColorPieces(queen, WHITE), b.getColorPieces(bishop, WHITE)|b.getColorPieces(queen, WHITE))
 
 	eval += popCount(whiteAttacks) * mobility
 
-	blackAttacks := b.getAllAttacks(BLACK, b.occupied, b.getColorPieces(rook, BLACK), b.getColorPieces(bishop, BLACK))
+	blackAttacks := b.getAllAttacks(BLACK, b.occupied, b.getColorPieces(rook, BLACK)|b.getColorPieces(queen, BLACK), b.getColorPieces(bishop, BLACK)|b.getColorPieces(queen, BLACK))
 
 	eval -= popCount(blackAttacks) * mobility
 
@@ -210,15 +209,23 @@ func evaluate(b *Board) int {
 
 	if total >= 15 && b.pieces[wQ]|b.pieces[bQ] != 0 {
 		// penalty/reward for air around king
+		if whiteKing == e1 {
+			kingAir *= 2
+		}
 		whiteKingAttacks := kingAttacksSquareLookup[whiteKing]
 		air := popCount(whiteKingAttacks & b.empty)
-		if air > 2 {
+		if air > 2 || (air > 3 && whiteKing == e1) {
 			eval -= air * kingAir
+		}
+		kingAir /= 2
+
+		if blackKing == e8 {
+			kingAir *= 2
 		}
 
 		blackKingAttacks := kingAttacksSquareLookup[blackKing]
 		air = popCount(blackKingAttacks & b.empty)
-		if air > 2 {
+		if air > 2 || (air > 3 && blackKing == e8) {
 			eval += air * kingAir
 		}
 	}
@@ -238,10 +245,6 @@ func evaluate(b *Board) int {
 		if b.squares[e8] == bK {
 			eval += castled
 		}
-	}
-
-	if eval >= 150 || eval <= -150 {
-		return eval
 	}
 
 	// check if pawns are blocked by pieces of same color
