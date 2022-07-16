@@ -17,6 +17,7 @@ func main() {
 	// engine.Run("search", "r5rk/5p1p/5R2/4B3/8/8/7P/7K w - - 0 0", 15)
 	// engine.Run("search", "8/7b/7b/p7/Pp2k3/1P6/KP2p2p/3N4 b - - 0 1", 10)
 	engine.UciLoop()
+	// engine.Run("search", "3r2k1/pp3pp1/7p/1q6/3P4/5N2/bPQ2PPP/R3r1K1 w - - 0 22", 10)
 
 	// engine.Run("search", "2k2bnr/ppp2ppp/2n5/4pb2/3q4/5B2/PPPN1PPP/R1BQ1RK1 w - - 2 12", 15)
 	// engine.Run("search", "8/6p1/k1P2p1p/7K/8/8/8/8 w - - 0 1", 100)

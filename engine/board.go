@@ -223,7 +223,7 @@ func (b *Board) removePiece(p Piece, sq Square, c Color) {
 }
 
 func (b *Board) makeMoveFromUCI(uci string) {
-	b.makeMove(fromUCI(uci, *b))
+	b.makeMove(fromUCI(uci, b))
 }
 
 func (b *Board) makeMoveNoUpdate(mv Move) {

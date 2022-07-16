@@ -76,7 +76,7 @@ func processGo(command string, b *Board) {
 	}
 
 	fmt.Println("bestmove " + bestMove.toUCI())
-	clearTTable()
+	// clearTTable()
 }
 
 func UciLoop() {

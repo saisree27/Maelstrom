@@ -146,9 +146,17 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		orderMovesPV(b, &legalMoves, bestMove, c, depth, rd)
 	}
 
-	hasNotJustPawns := b.getColorPieces(queen, c) | b.getColorPieces(rook, c) | b.getColorPieces(bishop, c) | b.getColorPieces(knight, c)
+	if depth == 1 {
+		// futility pruning
+		eval := evaluate(b) * factor[c]
+		if eval + knightVal < alpha {
+			return quiesce(b, 4, alpha, beta, c)
+		}
+	}
 
-	if doNull && b.plyCnt > 0 && hasNotJustPawns != 0 && depth >= R+1 && !b.isCheck(c) {
+	hasNotJustPawns := b.colors[c] ^ b.getColorPieces(pawn, c)
+
+	if doNull && hasNotJustPawns != 0 && depth >= R+1 && !b.isCheck(c) && b.plyCnt > 0 {
 		b.makeNullMove()
 		bestScore = -pvs(b, depth-R-1, rd, -beta, -beta+1, reverseColor(c), false, &pv, tR, st)
 		b.undoNullMove()
@@ -160,7 +168,7 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 
 	for i, move := range legalMoves {
 		duration := time.Since(st).Milliseconds()
-		if duration+duration>>1 > tR {
+		if duration > tR {
 			*line = []Move{}
 			return 0
 		}
@@ -231,8 +239,8 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 func searchWithTime(b *Board, movetime int64) Move {
 	startTime := time.Now()
 	line := []Move{}
-	prevBest := Move{}
 	legalMoves := b.generateLegalMoves()
+	prevBest := legalMoves[0]
 
 	if len(legalMoves) == 1 {
 		return legalMoves[0]

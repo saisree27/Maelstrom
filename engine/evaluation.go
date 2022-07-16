@@ -176,12 +176,16 @@ func evaluate(b *Board) int {
 	material, total := totalMaterialAndPieces(b)
 	eval += material
 
-	evaluatePawns(b, &eval)
+	if eval >= rookVal || eval <= -rookVal {
+		return eval
+	}
+
 	evaluateKnights(b, &eval)
 	evaluateBishops(b, &eval)
 	evaluateRooks(b, &eval)
 	evaluateQueens(b, &eval)
 	evaluateKings(b, &eval, total)
+	evaluatePawns(b, &eval)
 
 	return eval
 }

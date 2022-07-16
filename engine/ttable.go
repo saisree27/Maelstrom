@@ -34,12 +34,14 @@ func clearTTable() {
 
 func storeEntry(b *Board, score int, bd bound, mv Move, depth int) {
 	entryIndex := b.zobrist % table.count
-	table.entries[entryIndex] = TTEntry{
-		bestMove: mv,
-		hash:     b.zobrist,
-		bd:       bd,
-		score:    score,
-		depth:    depth,
+	if !(mv.from == a1 && mv.to == a1) {
+		table.entries[entryIndex] = TTEntry{
+			bestMove: mv,
+			hash:     b.zobrist,
+			bd:       bd,
+			score:    score,
+			depth:    depth,
+		}
 	}
 }
 
