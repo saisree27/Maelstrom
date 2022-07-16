@@ -67,16 +67,15 @@ func processGo(command string, b *Board) {
 		bestMove = searchWithTime(b, movetime)
 	} else {
 		if b.turn == WHITE {
-			movetime = wtime/35 + winc*2
+			movetime = wtime/30 + winc - 500
 			bestMove = searchWithTime(b, movetime)
 		} else {
-			movetime = btime/35 + binc*2
+			movetime = btime/30 + binc - 500
 			bestMove = searchWithTime(b, movetime)
 		}
 	}
 
 	fmt.Println("bestmove " + bestMove.toUCI())
-	// clearTTable()
 }
 
 func UciLoop() {

@@ -134,7 +134,7 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	bestMove := Move{}
 	oldAlpha := alpha
 
-	res, found := probeTT(b, &bestScore, &alpha, &beta, depth, &bestMove)
+	res, found := probeTT(b, &bestScore, &alpha, &beta, depth, rd, &bestMove)
 	if res {
 		*line = []Move{}
 		*line = append(*line, bestMove)
@@ -237,10 +237,11 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 }
 
 func searchWithTime(b *Board, movetime int64) Move {
+	b.printFromBitBoards()
 	startTime := time.Now()
 	line := []Move{}
 	legalMoves := b.generateLegalMoves()
-	prevBest := legalMoves[0]
+	prevBest := Move{}
 
 	if len(legalMoves) == 1 {
 		return legalMoves[0]
@@ -264,16 +265,16 @@ func searchWithTime(b *Board, movetime int64) Move {
 			break
 		}
 
-		if score == winVal || score == -winVal {
-			return line[0]
-		}
-
 		strLine := ""
 		for _, move := range line {
 			strLine += " " + move.toUCI()
 		}
 
 		fmt.Printf("info depth %d nodes %d time %d score cp %d pv%s\n", i, nodesSearched, timeTaken, score, strLine)
+
+		if score == winVal || score == -winVal {
+			return line[0]
+		}
 
 		prevBest = line[0]
 	}

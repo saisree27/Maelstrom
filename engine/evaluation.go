@@ -16,20 +16,20 @@ const twoRooksOnSeventh int = 15
 
 // Values for pawn structure
 var doubledPawnByFile = []int{
-	A: -35, B: 0, C: -10, D: -20, E: -20, F: -10, G: 0, H: -35,
+	A: -25, B: 0, C: -5, D: -10, E: -10, F: -5, G: 0, H: -25,
 }
 
-const tripledPawn int = -40
+const tripledPawn int = -35
 const isolatedPawn int = -5
 const passedPawn int = 30
 const cdPawnBlockedByPlayer int = -10
 
 var passedPawnRankWhite = []int {
-	0, 0, 5, 25, 45, 100, 200, 0,
+	-5, -5, 5, 25, 45, 100, 200, 0,
 }
 
 var passedPawnRankBlack = []int {
-	0, 200, 100, 45, 25, 5, 0, 0,
+	0, 200, 100, 45, 25, 5, -5, -5,
 }
 
 // Values for other pieces

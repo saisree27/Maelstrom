@@ -45,7 +45,7 @@ func storeEntry(b *Board, score int, bd bound, mv Move, depth int) {
 	}
 }
 
-func probeTT(b *Board, score *int, alpha *int, beta *int, depth int, m *Move) (bool, int) {
+func probeTT(b *Board, score *int, alpha *int, beta *int, depth int, rd int, m *Move) (bool, int) {
 	entryIndex := b.zobrist % table.count
 	entry := table.entries[entryIndex]
 	if entry.hash == b.zobrist {
@@ -55,11 +55,11 @@ func probeTT(b *Board, score *int, alpha *int, beta *int, depth int, m *Move) (b
 			*score = entry.score
 			switch entry.bd {
 			case upper:
-				if *score < *beta {
+				if *score < *beta && depth != rd {
 					*beta = *score
 				}
 			case lower:
-				if *score > *alpha {
+				if *score > *alpha && depth != rd {
 					*alpha = *score
 				}
 			case exact:
