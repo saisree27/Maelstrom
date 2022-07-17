@@ -176,10 +176,6 @@ func evaluate(b *Board) int {
 	material, total := totalMaterialAndPieces(b)
 	eval += material
 
-	if eval >= rookVal || eval <= -rookVal {
-		return eval
-	}
-
 	evaluateKnights(b, &eval)
 	evaluateBishops(b, &eval)
 	evaluateRooks(b, &eval)

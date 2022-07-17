@@ -275,6 +275,16 @@ func searchWithTime(b *Board, movetime int64) Move {
 			return searchWithTime(b, movetime - duration - timeTaken)
 		}
 
+		for _, mv := range b.generateLegalMoves() {
+			b.makeMove(mv)
+			if b.isThreeFoldRep() {
+				b.undo()
+				clearTTable()
+				return searchWithTime(b, movetime - duration - timeTaken) 
+			}
+			b.undo()
+		}
+
 		b.undo()
 
 		strLine := ""
