@@ -520,6 +520,21 @@ func (b *Board) isThreeFoldRep() bool {
 	return matches >= 2
 }
 
+func (b *Board) isTwoFold() bool {
+	hash := b.zobrist
+	matches := 1
+	for i := len(b.history) - 1; i >= 0; i-- {
+		entry := b.history[i]
+		if entry.hash == hash && !entry.move.null {
+			matches++
+		}
+		if matches >= 2 {
+			break
+		}
+	}
+	return matches >= 2
+}
+
 func (b *Board) isInsufficientMaterial() bool {
 	numPieces := popCount(b.occupied)
 	if numPieces == 2 {

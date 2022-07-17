@@ -16,32 +16,35 @@ const twoRooksOnSeventh int = 15
 
 // Values for pawn structure
 var doubledPawnByFile = []int{
-	A: -25, B: 0, C: -5, D: -10, E: -10, F: -5, G: 0, H: -25,
+	A: -25, B: 0, C: -5, D: -15, E: -15, F: -5, G: 0, H: -20,
 }
 
-const tripledPawn int = -35
-const isolatedPawn int = -5
+const tripledPawn int = -50
+const isolatedPawn int = -15
+const doubledAndIsolated int = -35
+const isolatedPawnBlocked int = -15
 const passedPawn int = 30
 const cdPawnBlockedByPlayer int = -10
 
 var passedPawnRankWhite = []int {
-	-5, -5, 5, 25, 45, 100, 200, 0,
+	-5, -5, 5, 25, 45, 75, 150, 0,
 }
 
 var passedPawnRankBlack = []int {
-	0, 200, 100, 45, 25, 5, -5, -5,
+	0, 150, 75, 45, 25, 5, -5, -5,
 }
 
 // Values for other pieces
-const queenEarly int = -20
-const bishopPair int = 20
-const bishopMobility int = 2
-const rookMobility int = 3
+const queenEarly int = -10
+const bishopPair int = 50
+const bishopMobility int = 3
+const rookMobility int = 4
 
 // Values for king safety
 const pawnShieldLeft int = -20
 const pawnShieldUpDown int = -35
 const pawnShieldRight int = -10
+const kingAir int = -10
 
 var factor = []int{
 	WHITE: 1, BLACK: -1,
@@ -74,7 +77,7 @@ var reversePSQ = [64]int{
 
 var pawnSquareTable = [64]int{
 	0, 0, 0, 0, 0, 0, 0, 0,
-	5, 10, 10, -20, -20, 10, 10, 5,
+	5, 10, 0, -20, -20, 10, 10, 5,
 	5, -5, -10, 0, 0, -10, -5, 5,
 	0, 0, 0, 20, 20, 0, 0, 0,
 	5, 5, 10, 25, 25, 10, 5, 5,
@@ -84,12 +87,12 @@ var pawnSquareTable = [64]int{
 }
 
 var knightSquareTable = [64]int{
-	-50, -40, -30, -30, -30, -30, -40, -50,
+	-50, -30, -30, -30, -30, -30, -30, -50,
 	-40, -20, 0, -5, -5, 0, -20, -40,
-	-50, 0, 10, 15, 15, 10, 0, -50,
-	-30, 5, 15, 20, 20, 15, 5, -30,
-	-30, 0, 15, 20, 20, 15, 0, -30,
-	-30, 5, 10, 15, 15, 10, 5, -30,
+	-30, 0, 10, 15, 15, 10, 0, -30,
+	-50, 5, 15, 20, 20, 15, 5, -50,
+	-45, 0, 15, 20, 20, 15, 0, -45,
+	-50, 5, 10, 15, 15, 10, 5, -50,
 	-40, -20, 0, 5, 5, 0, -20, -40,
 	-50, -40, -30, -30, -30, -30, -40, -50,
 }
@@ -220,13 +223,34 @@ func evaluatePawns(b *Board, eval *int) {
 
 		// Isolated pawns check
 		if fileNeighbors[file]&wPawnsOrig == 0 {
-			*eval += isolatedPawn
+			if filesFoundWhite[file] >= 2 {
+				*eval += doubledAndIsolated
+			} else {
+				*eval += isolatedPawn
+			}
+			if b.squares[square + Square(NORTH)].getColor() == BLACK {
+				*eval += isolatedPawnBlocked
+			}
 		}
 
 		// Passed pawns check
-		if (files[file]|fileNeighbors[file])&bPawnsOrig == 0 {
+		neighborPawns := (files[file]|fileNeighbors[file])&bPawnsOrig
+		if neighborPawns == 0 {
 			*eval += passedPawn
 			*eval += passedPawnRankWhite[sqToRank(square)]
+		} else {
+			passedAhead := true
+			for neighborPawns != 0 {
+				p := Square(popLSB(&neighborPawns))
+				if sqToRank(p) > sqToRank(square) {
+					passedAhead = false
+				}
+			}
+	
+			if passedAhead {
+				*eval += passedPawn
+				*eval += passedPawnRankWhite[sqToRank(square)]
+			}
 		}
 	}
 
@@ -240,13 +264,34 @@ func evaluatePawns(b *Board, eval *int) {
 
 		// Isolated pawns check
 		if fileNeighbors[file]&bPawnsOrig == 0 {
-			*eval -= isolatedPawn
+			if filesFoundBlack[file] >= 2 {
+				*eval -= doubledAndIsolated
+			} else {
+				*eval -= isolatedPawn
+			}
+			if b.squares[square + Square(SOUTH)].getColor() == WHITE {
+				*eval -= isolatedPawnBlocked
+			}
 		}
 
+		neighborPawns := (files[file]|fileNeighbors[file])&wPawnsOrig
 		// Passed pawns check
-		if (files[file]|fileNeighbors[file])&wPawnsOrig == 0 {
+		if neighborPawns == 0 {
 			*eval -= passedPawn
 			*eval -= passedPawnRankBlack[sqToRank(square)]
+		} else {
+			passedAhead := true
+			for neighborPawns != 0 {
+				p := Square(popLSB(&neighborPawns))
+				if sqToRank(p) < sqToRank(square) {
+					passedAhead = false
+				}
+			}
+	
+			if passedAhead {
+				*eval -= passedPawn
+				*eval -= passedPawnRankBlack[sqToRank(square)]
+			}
 		}
 	}
 
@@ -268,7 +313,6 @@ func evaluatePawns(b *Board, eval *int) {
 }
 
 func evaluateKnights(b *Board, eval *int) {
-	// TODO: Add specific evaluation for knights
 	wKnights := b.getColorPieces(knight, WHITE)
 	bKnights := b.getColorPieces(knight, BLACK)
 	for wKnights != 0 {
@@ -384,9 +428,8 @@ func evaluateQueens(b *Board, eval *int) {
 }
 
 func evaluateKings(b *Board, eval *int, totalPieces int) {
-	// TODO: Add specific evaluation for kings
 	noQueensLeft := b.pieces[wQ]|b.pieces[bQ] == 0
-	switchEndgame := (totalPieces <= 15 && noQueensLeft) || (totalPieces <= 10)
+	switchEndgame := totalPieces <= 25 && noQueensLeft
 
 	wKing := Square(bitScanForward(b.getColorPieces(king, WHITE)))
 	bKing := Square(bitScanForward(b.getColorPieces(king, BLACK)))
@@ -414,9 +457,7 @@ func evaluateKings(b *Board, eval *int, totalPieces int) {
 			if ne == 0 {
 				*eval += pawnShieldRight
 			}
-		}
-
-		if !b.oo && !b.ooo {
+		} else if !b.oo && !b.ooo {
 			// Pawn shield
 			pawns := b.pieces[bP]
 			sw := shiftBitboard(sToBB[bKing], SW) & pawns
@@ -432,6 +473,18 @@ func evaluateKings(b *Board, eval *int, totalPieces int) {
 			if se == 0 {
 				*eval -= pawnShieldRight
 			}
+		} else {
+			airW := popCount(kingAttacks(wKing) & b.empty)
+			airB := popCount(kingAttacks(bKing) & b.empty)
+
+			if airW >= 2 {
+				*eval += airW * kingAir
+			}
+
+			if airB >= 2 {
+				*eval -= airB * kingAir
+			}
+
 		}
 	}
 }

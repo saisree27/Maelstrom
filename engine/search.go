@@ -268,24 +268,14 @@ func searchWithTime(b *Board, movetime int64) Move {
 		
 		b.makeMove(line[0])
 
-		if b.isThreeFoldRep() {
+		if b.isTwoFold() && (score * factor[b.turn]) > 0 {
 			b.undo()
 			// TT three-fold issue
-			clearTTable()
-			return searchWithTime(b, movetime - duration - timeTaken)
-		}
-
-		for _, mv := range b.generateLegalMoves() {
-			b.makeMove(mv)
-			if b.isThreeFoldRep() {
-				b.undo()
-				clearTTable()
-				return searchWithTime(b, movetime - duration - timeTaken) 
-			}
+			table.entries[b.zobrist % table.count] = TTEntry{}
+		} else {		
 			b.undo()
 		}
 
-		b.undo()
 
 		strLine := ""
 		for _, move := range line {
