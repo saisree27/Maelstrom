@@ -67,10 +67,18 @@ func processGo(command string, b *Board) {
 		bestMove = searchWithTime(b, movetime)
 	} else {
 		if b.turn == WHITE {
-			movetime = wtime/30 + winc - 500
+			if winc >= 0 {
+				movetime = wtime/25 + winc - 200
+			} else {
+				movetime = wtime/30
+			}
 			bestMove = searchWithTime(b, movetime)
 		} else {
-			movetime = btime/30 + binc - 500
+			if binc >= 0 {
+				movetime = btime/25 + binc - 200
+			} else {
+				movetime = btime/30
+			}
 			bestMove = searchWithTime(b, movetime)
 		}
 	}

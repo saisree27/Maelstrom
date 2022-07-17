@@ -258,7 +258,7 @@ func searchWithTime(b *Board, movetime int64) Move {
 			break
 		}
 		searchStart := time.Now()
-		score := pvs(b, i, i, -winVal-1, winVal+1, b.turn, true, &line, timeRemaining, time.Now()) * factor[b.turn]
+		score := pvs(b, i, i, -winVal-1, winVal+1, b.turn, true, &line, timeRemaining, time.Now())
 		timeTaken := time.Since(searchStart).Milliseconds()
 
 		if len(line) == 0 {
@@ -268,9 +268,10 @@ func searchWithTime(b *Board, movetime int64) Move {
 		
 		b.makeMove(line[0])
 
-		if b.isTwoFold() && (score * factor[b.turn]) > 0 {
+		if b.isTwoFold() && score > 0 {
 			b.undo()
 			// TT three-fold issue
+			fmt.Println("Two-fold repetition encountered, removing TT entry")
 			table.entries[b.zobrist % table.count] = TTEntry{}
 		} else {		
 			b.undo()
@@ -282,7 +283,9 @@ func searchWithTime(b *Board, movetime int64) Move {
 			strLine += " " + move.toUCI()
 		}
 
-		fmt.Printf("info depth %d nodes %d time %d score cp %d pv%s\n", i, nodesSearched, timeTaken, score, strLine)
+		signed := score * factor[b.turn]
+
+		fmt.Printf("info depth %d nodes %d time %d score cp %d pv%s\n", i, nodesSearched, timeTaken, signed, strLine)
 
 		if score == winVal || score == -winVal {
 			return line[0]

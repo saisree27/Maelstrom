@@ -24,6 +24,8 @@ type Board struct {
 	zobrist   u64       // Zobrist hash (TODO)
 	plyCnt    int       // Stores number of half moves played
 	moveCount int       // Stores which move currently we are at
+	whiteCastled bool   // Stores whether white has previously castled
+	blackCastled bool   // Stores whether black has previously castled
 }
 
 type prev struct {
@@ -34,6 +36,8 @@ type prev struct {
 	ooo       bool   // Black Queenside castling history
 	enpassant Square // En passant square history
 	hash      u64    // Zobrist hash of prev position
+	wcastled  bool   // Stores whether white has previously castled
+	bcastled  bool   // Stores whether black has previously castled
 }
 
 func newBoard() *Board {
@@ -265,7 +269,7 @@ func (b *Board) makeMoveNoUpdate(mv Move) {
 }
 
 func (b *Board) makeMove(mv Move) {
-	var entry prev = prev{move: mv, OO: b.OO, OOO: b.OOO, oo: b.oo, ooo: b.ooo, enpassant: b.enpassant, hash: b.zobrist}
+	var entry prev = prev{move: mv, OO: b.OO, OOO: b.OOO, oo: b.oo, ooo: b.ooo, enpassant: b.enpassant, hash: b.zobrist, wcastled: b.whiteCastled, bcastled: b.blackCastled}
 	b.history = append(b.history, entry)
 
 	switch mv.movetype {
@@ -283,17 +287,21 @@ func (b *Board) makeMove(mv Move) {
 		if mv.colorMoved == WHITE {
 			b.movePiece(wK, e1, g1, WHITE)
 			b.movePiece(wR, h1, f1, WHITE)
+			b.whiteCastled = true
 		} else {
 			b.movePiece(bK, e8, g8, BLACK)
 			b.movePiece(bR, h8, f8, BLACK)
+			b.blackCastled = true
 		}
 	case QCASTLE:
 		if mv.colorMoved == WHITE {
 			b.movePiece(wK, e1, c1, WHITE)
 			b.movePiece(wR, a1, d1, WHITE)
+			b.whiteCastled = true
 		} else {
 			b.movePiece(bK, e8, c8, BLACK)
 			b.movePiece(bR, a8, d8, BLACK)
+			b.blackCastled = true
 		}
 	case ENPASSANT:
 		b.movePiece(mv.piece, mv.from, mv.to, mv.colorMoved)
@@ -434,6 +442,8 @@ func (b *Board) undo() {
 	b.enpassant = prevEntry.enpassant
 	b.zobrist = prevEntry.hash
 	b.turn = reverseColor(b.turn)
+	b.whiteCastled = prevEntry.wcastled
+	b.blackCastled = prevEntry.bcastled
 
 	b.history = b.history[:len(b.history)-1]
 	b.plyCnt--

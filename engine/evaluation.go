@@ -16,7 +16,7 @@ const twoRooksOnSeventh int = 15
 
 // Values for pawn structure
 var doubledPawnByFile = []int{
-	A: -25, B: 0, C: -5, D: -15, E: -15, F: -5, G: 0, H: -20,
+	A: -25, B: -5, C: -30, D: -20, E: -20, F: -20, G: -5, H: -20,
 }
 
 const tripledPawn int = -50
@@ -36,7 +36,8 @@ var passedPawnRankBlack = []int {
 
 // Values for other pieces
 const queenEarly int = -10
-const bishopPair int = 50
+const queensNotTradedWhenNotCastled = 15
+const bishopPair int = 30
 const bishopMobility int = 3
 const rookMobility int = 4
 
@@ -45,6 +46,10 @@ const pawnShieldLeft int = -20
 const pawnShieldUpDown int = -35
 const pawnShieldRight int = -10
 const kingAir int = -10
+const notCastled int = -10
+
+const samePieceTwice int = -8
+const piecesOnBackRank int = -15
 
 var factor = []int{
 	WHITE: 1, BLACK: -1,
@@ -78,7 +83,7 @@ var reversePSQ = [64]int{
 var pawnSquareTable = [64]int{
 	0, 0, 0, 0, 0, 0, 0, 0,
 	5, 10, 0, -20, -20, 10, 10, 5,
-	5, -5, -10, 0, 0, -10, -5, 5,
+	5, 0, 0, 0, 0, -10, 0, 5,
 	0, 0, 0, 20, 20, 0, 0, 0,
 	5, 5, 10, 25, 25, 10, 5, 5,
 	10, 10, 20, 30, 30, 20, 10, 10,
@@ -185,6 +190,38 @@ func evaluate(b *Board) int {
 	evaluateQueens(b, &eval)
 	evaluateKings(b, &eval, total)
 	evaluatePawns(b, &eval)
+
+	if b.plyCnt <= 30 {
+		length := len(b.history)
+		for i := length - 3; i > 0; i-- {
+			if b.history[i + 2].move.from == b.history[i].move.to {
+				if reverseColor(b.turn) == WHITE && b.history[i + 2].move.piece != wP {
+					eval += samePieceTwice
+				} else if b.history[i + 2].move.piece != bP {
+					eval -= samePieceTwice
+				}
+			}
+		}
+
+		if !b.whiteCastled {
+			eval += notCastled
+		}
+		if !b.blackCastled {
+			eval -= notCastled
+		}
+
+		wPiecesOnBackRank := (b.colors[WHITE] ^ b.pieces[wR]) & ranks[R1]
+		bPiecesOnBackRank := (b.colors[BLACK] ^ b.pieces[bR]) & ranks[R8]
+
+		eval += (popCount(wPiecesOnBackRank) - popCount(bPiecesOnBackRank)) * piecesOnBackRank
+	}
+
+	if !b.whiteCastled && b.pieces[bQ] != 0 {
+		eval -= queensNotTradedWhenNotCastled
+	}
+	if !b.blackCastled && b.pieces[wQ] != 0 {
+		eval += queensNotTradedWhenNotCastled
+	}
 
 	return eval
 }
