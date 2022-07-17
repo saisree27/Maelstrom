@@ -265,6 +265,18 @@ func searchWithTime(b *Board, movetime int64) Move {
 			break
 		}
 
+		
+		b.makeMove(line[0])
+
+		if b.isThreeFoldRep() {
+			b.undo()
+			// TT three-fold issue
+			clearTTable()
+			return searchWithTime(b, movetime - duration - timeTaken)
+		}
+
+		b.undo()
+
 		strLine := ""
 		for _, move := range line {
 			strLine += " " + move.toUCI()
