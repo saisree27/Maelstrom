@@ -16,7 +16,7 @@ func initializeEverything() {
 	initLine()
 	initializeSQLookup()
 	initZobrist()
-	initializeTTable()
+	initializeTTable(4096)
 	initNeighborMasks()
 }
 

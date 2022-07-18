@@ -1,5 +1,7 @@
 package engine
 
+import "unsafe"
+
 type bound int
 
 const (
@@ -23,8 +25,8 @@ type TTable struct {
 
 var table TTable
 
-func initializeTTable() {
-	table.count = 5000000
+func initializeTTable(megabytes int) {
+	table.count = u64(megabytes) * 1024 * 1024 / u64(unsafe.Sizeof(TTEntry{}))
 	table.entries = make([]TTEntry, table.count)
 }
 
