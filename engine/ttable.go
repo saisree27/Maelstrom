@@ -1,6 +1,8 @@
 package engine
 
-import "unsafe"
+import (
+	"unsafe"
+)
 
 type bound int
 

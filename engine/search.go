@@ -15,6 +15,8 @@ type moveBonus struct {
 const R = 3
 
 var nodesSearched = 0
+var killerMoves = [100][2]Move{}
+// var historyHeuristic = [100][64][64]int{}
 
 func quiesce(b *Board, limit int, alpha int, beta int, c Color) int {
 	nodesSearched++
@@ -68,35 +70,33 @@ func orderMovesPV(b *Board, moves *[]Move, pv Move, c Color, depth int, rd int) 
 				bonuses = append(bonuses, moveBonus{move: mv, bonus: bonus * factor[c]})
 			} else {
 				bonus := 0
-				if depth >= rd-2 {
-					b.makeMove(mv)
-					if b.isCheck(b.turn) {
-						bonus = 50
-					} else {
-						switch mv.piece {
-						case wN:
-							bonus = knightSquareTable[mv.to] - knightSquareTable[mv.from]
-						case bN:
-							bonus = knightSquareTable[reversePSQ[mv.to]] - knightSquareTable[reversePSQ[mv.from]]
-						case wB:
-							bonus = bishopSquareTable[mv.to] - bishopSquareTable[mv.from]
-						case bB:
-							bonus = bishopSquareTable[reversePSQ[mv.to]] - bishopSquareTable[reversePSQ[mv.from]]
-						case wR:
-							bonus = rookSquareTable[mv.to] - rookSquareTable[mv.from]
-						case bR:
-							bonus = rookSquareTable[reversePSQ[mv.to]] - rookSquareTable[reversePSQ[mv.from]]
-						case wQ:
-							bonus = queenSquareTable[mv.to] - queenSquareTable[mv.from]
-						case bQ:
-							bonus = queenSquareTable[reversePSQ[mv.to]] - queenSquareTable[reversePSQ[mv.from]]
-						case wP:
-							bonus = pawnSquareTable[mv.to] - pawnSquareTable[mv.from]
-						case bP:
-							bonus += pawnSquareTable[reversePSQ[mv.to]] - pawnSquareTable[reversePSQ[mv.from]]
-						}
+				if mv.toUCI() == killerMoves[depth][0].toUCI() {
+					bonus = 150
+				} else if mv.toUCI() == killerMoves[depth][1].toUCI() {
+					bonus = 140
+				} else if depth == rd {
+					switch mv.piece {
+					case wN:
+						bonus = knightSquareTable[mv.to] - knightSquareTable[mv.from]
+					case bN:
+						bonus = knightSquareTable[reversePSQ[mv.to]] - knightSquareTable[reversePSQ[mv.from]]
+					case wB:
+						bonus = bishopSquareTable[mv.to] - bishopSquareTable[mv.from]
+					case bB:
+						bonus = bishopSquareTable[reversePSQ[mv.to]] - bishopSquareTable[reversePSQ[mv.from]]
+					case wR:
+						bonus = rookSquareTable[mv.to] - rookSquareTable[mv.from]
+					case bR:
+						bonus = rookSquareTable[reversePSQ[mv.to]] - rookSquareTable[reversePSQ[mv.from]]
+					case wQ:
+						bonus = queenSquareTable[mv.to] - queenSquareTable[mv.from]
+					case bQ:
+						bonus = queenSquareTable[reversePSQ[mv.to]] - queenSquareTable[reversePSQ[mv.from]]
+					case wP:
+						bonus = pawnSquareTable[mv.to] - pawnSquareTable[mv.from]
+					case bP:
+						bonus += pawnSquareTable[reversePSQ[mv.to]] - pawnSquareTable[reversePSQ[mv.from]]
 					}
-					b.undo()
 				}
 				bonuses = append(bonuses, moveBonus{move: mv, bonus: bonus})
 			}
@@ -184,6 +184,11 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 				*line = append(*line, pv...)
 
 				if bestScore >= beta {
+					if killerMoves[depth][0].toUCI() != move.toUCI() {
+						killerMoves[depth][1] = killerMoves[depth][0]
+						killerMoves[depth][0] = move
+					}
+					// historyHeuristic[depth][move.from][move.to]++
 					break
 				}
 				alpha = bestScore
@@ -213,6 +218,11 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 				if score > bestScore {
 					bestScore = score
 					if score >= beta {
+						if killerMoves[depth][0].toUCI() != move.toUCI() {
+							killerMoves[depth][1] = killerMoves[depth][0]
+							killerMoves[depth][0] = move
+						}
+						// historyHeuristic[depth][move.from][move.to]++
 						break
 					}
 				}

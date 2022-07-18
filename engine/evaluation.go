@@ -23,15 +23,15 @@ const tripledPawn int = -50
 const isolatedPawn int = -15
 const doubledAndIsolated int = -35
 const isolatedPawnBlocked int = -15
-const passedPawn int = 30
+const passedPawn int = 25
 const cdPawnBlockedByPlayer int = -10
 
 var passedPawnRankWhite = []int {
-	-5, -5, 5, 25, 45, 75, 150, 0,
+	-5, -5, 5, 5, 25, 45, 150, 0,
 }
 
 var passedPawnRankBlack = []int {
-	0, 150, 75, 45, 25, 5, -5, -5,
+	0, 150, 45, 25, 5, 5, -5, -5,
 }
 
 // Values for other pieces
