@@ -269,6 +269,7 @@ func searchWithTime(b *Board, movetime int64) Move {
 		b.makeMove(line[0])
 
 		if b.isTwoFold() && score > 0 {
+			table.entries[b.zobrist % table.count] = TTEntry{}
 			b.undo()
 			// TT three-fold issue
 			fmt.Println("Two-fold repetition encountered, removing TT entry")
