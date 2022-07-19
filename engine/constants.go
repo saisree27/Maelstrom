@@ -48,6 +48,9 @@ const h1a8Diagonal = 0x0102040810204080
 const lightSquares = 0x55AA55AA55AA55AA
 const darkSquares = 0xAA55AA55AA55AA55
 
+const queenside = 0xf0f0f0f0f0f0f0f
+const kingside  = 0xf0f0f0f0f0f0f0f0
+
 // Defining color (white = 0, black = 1)
 type Color int
 

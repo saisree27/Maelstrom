@@ -23,8 +23,9 @@ const tripledPawn int = -50
 const isolatedPawn int = -15
 const doubledAndIsolated int = -35
 const isolatedPawnBlocked int = -15
-const passedPawn int = 25
-const cdPawnBlockedByPlayer int = -10
+const passedPawn int = 15
+const passedPawnBlocked int = -20
+const cdPawnBlockedByPlayer int = -50
 
 var passedPawnRankWhite = []int {
 	-5, -5, 5, 5, 25, 45, 150, 0,
@@ -35,20 +36,20 @@ var passedPawnRankBlack = []int {
 }
 
 // Values for other pieces
-const queenEarly int = -10
+const queenEarly int = -7
 const queensNotTradedWhenNotCastled = 15
 const bishopPair int = 30
 const bishopMobility int = 3
 const rookMobility int = 4
 
 // Values for king safety
-const pawnShieldLeft int = -20
-const pawnShieldUpDown int = -35
-const pawnShieldRight int = -10
+const pawnShieldLeft int = -10
+const pawnShieldUpDown int = -25
+const pawnShieldRight int = -5
 const kingAir int = -10
 const notCastled int = -10
 
-const samePieceTwice int = -8
+const samePieceTwice int = -15
 const piecesOnBackRank int = -15
 
 var factor = []int{
@@ -82,9 +83,9 @@ var reversePSQ = [64]int{
 
 var pawnSquareTable = [64]int{
 	0, 0, 0, 0, 0, 0, 0, 0,
-	5, 10, 0, -20, -20, 10, 10, 5,
-	5, 0, 0, 0, 0, -10, 0, 5,
-	0, 0, 0, 20, 20, 0, 0, 0,
+	5, 10, -10, -20, -20, 10, 10, 5,
+	5, 0, 5, 0, 0, -10, 0, 5,
+	0, 0, 20, 20, 20, 0, 0, 0,
 	5, 5, 10, 25, 25, 10, 5, 5,
 	10, 10, 20, 30, 30, 20, 10, 10,
 	50, 50, 50, 50, 50, 50, 50, 50,
@@ -94,7 +95,7 @@ var pawnSquareTable = [64]int{
 var knightSquareTable = [64]int{
 	-50, -30, -30, -30, -30, -30, -30, -50,
 	-40, -20, 0, -5, -5, 0, -20, -40,
-	-30, 0, 10, 15, 15, 10, 0, -30,
+	-35, 0, 10, 15, 15, 10, 0, -35,
 	-50, 5, 15, 20, 20, 15, 5, -50,
 	-45, 0, 15, 20, 20, 15, 0, -45,
 	-50, 5, 10, 15, 15, 10, 5, -50,
@@ -103,7 +104,7 @@ var knightSquareTable = [64]int{
 }
 
 var bishopSquareTable = [64]int{
-	-20, -10, -10, -10, -10, -10, -10, -20,
+	-20, -10, -5, -10, -10, -10, -10, -20,
 	-10, 5, 0, 0, 0, 0, 5, -10,
 	-10, 10, 10, 10, 10, 10, 10, -10,
 	-10, 0, 10, 10, 10, 10, 0, -10,
@@ -136,7 +137,7 @@ var queenSquareTable = [64]int{
 }
 
 var kingSquareTableMiddlegame = [64]int{
-	20, 30, 10, 0, 0, 10, 30, 20,
+	0, 30, 10, 0, 0, 10, 30, 0,
 	-30, -30, -30, -30, -30, -30, -30, -30,
 	-50, -50, -50, -50, -50, -50, -50, -50,
 	-70, -70, -70, -70, -70, -70, -70, -70,
@@ -191,7 +192,7 @@ func evaluate(b *Board) int {
 	evaluateKings(b, &eval, total)
 	evaluatePawns(b, &eval)
 
-	if b.plyCnt <= 30 {
+	if b.plyCnt <= 20 {
 		length := len(b.history)
 		for i := length - 3; i > 0; i-- {
 			if b.history[i + 2].move.from == b.history[i].move.to {
@@ -202,6 +203,9 @@ func evaluate(b *Board) int {
 				}
 			}
 		}
+	}
+
+	if b.plyCnt <= 30 {
 
 		if !b.whiteCastled {
 			eval += notCastled
