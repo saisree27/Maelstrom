@@ -36,15 +36,16 @@ var passedPawnRankBlack = []int {
 }
 
 // Values for other pieces
-const queenEarly int = -7
+const queenEarly int = -6
 const queensNotTradedWhenNotCastled = 15
 const bishopPair int = 30
 const bishopMobility int = 3
 const rookMobility int = 4
+const queenMobility int = 2
 
 // Values for king safety
 const pawnShieldLeft int = -10
-const pawnShieldUpDown int = -25
+const pawnShieldUpDown int = -40
 const pawnShieldRight int = -5
 const kingAir int = -10
 const notCastled int = -10
@@ -84,8 +85,8 @@ var reversePSQ = [64]int{
 var pawnSquareTable = [64]int{
 	0, 0, 0, 0, 0, 0, 0, 0,
 	5, 10, -10, -20, -20, 10, 10, 5,
-	5, 0, 5, 0, 0, -10, 0, 5,
-	0, 0, 20, 20, 20, 0, 0, 0,
+	5, 5, 5, 0, 0, -10, 5, 5,
+	0, 0, 10, 20, 20, 0, 0, 0,
 	5, 5, 10, 25, 25, 10, 5, 5,
 	10, 10, 20, 30, 30, 20, 10, 10,
 	50, 50, 50, 50, 50, 50, 50, 50,
@@ -95,7 +96,7 @@ var pawnSquareTable = [64]int{
 var knightSquareTable = [64]int{
 	-50, -30, -30, -30, -30, -30, -30, -50,
 	-40, -20, 0, -5, -5, 0, -20, -40,
-	-35, 0, 10, 15, 15, 10, 0, -35,
+	-40, 0, 10, 15, 15, 10, 0, -40,
 	-50, 5, 15, 20, 20, 15, 5, -50,
 	-45, 0, 15, 20, 20, 15, 0, -45,
 	-50, 5, 10, 15, 15, 10, 5, -50,
@@ -105,7 +106,7 @@ var knightSquareTable = [64]int{
 
 var bishopSquareTable = [64]int{
 	-20, -10, -5, -10, -10, -10, -10, -20,
-	-10, 5, 0, 0, 0, 0, 5, -10,
+	-10, 10, 0, 0, 0, 0, 10, -10,
 	-10, 10, 10, 10, 10, 10, 10, -10,
 	-10, 0, 10, 10, 10, 10, 0, -10,
 	-10, 5, 5, 10, 10, 5, 5, -10,
@@ -457,6 +458,9 @@ func evaluateQueens(b *Board, eval *int) {
 		if square != d1 && b.plyCnt <= 10 {
 			*eval += queenEarly
 		}
+		attacks := getBishopAttacks(square, b.occupied) | getRookAttacks(square, b.occupied)
+
+		*eval += popCount(attacks) * queenMobility
 		*eval += queenSquareTable[square]
 	}
 	for bQueens != 0 {
@@ -464,6 +468,9 @@ func evaluateQueens(b *Board, eval *int) {
 		if square != d8 && b.plyCnt <= 10 {
 			*eval -= queenEarly
 		}
+		attacks := getBishopAttacks(square, b.occupied) | getRookAttacks(square, b.occupied)
+
+		*eval -= popCount(attacks) * queenMobility
 		*eval -= queenSquareTable[reversePSQ[square]]
 	}
 }

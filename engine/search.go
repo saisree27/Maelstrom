@@ -300,7 +300,7 @@ func searchWithTime(b *Board, movetime int64) Move {
 		fmt.Printf("info depth %d nodes %d time %d score cp %d pv%s\n", i, nodesSearched, timeTaken, signed, strLine)
 
 		if score == winVal || score == -winVal {
-			table.entries[b.zobrist % table.count] = TTEntry{}
+			clearTTable()
 			return line[0]
 		}
 
