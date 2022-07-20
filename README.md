@@ -1,4 +1,6 @@
 # Maelstrom
+![](https://github.com/saisree27/Maelstrom/actions/workflows/go.yml/badge.svg)
+
 UCI-compliant Golang chess engine in development from scratch. This is my first experience coding in Go, and so far it's been awesome!
 
 ## Features
