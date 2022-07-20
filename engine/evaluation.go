@@ -36,12 +36,12 @@ var passedPawnRankBlack = []int {
 }
 
 // Values for other pieces
-const queenEarly int = -6
+const queenEarly int = -20
 const queensNotTradedWhenNotCastled = 15
 const bishopPair int = 30
-const bishopMobility int = 3
+const bishopMobility int = 2
 const rookMobility int = 4
-const queenMobility int = 2
+const queenMobility int = 1
 
 // Values for king safety
 const pawnShieldLeft int = -10
@@ -455,7 +455,7 @@ func evaluateQueens(b *Board, eval *int) {
 	bQueens := b.getColorPieces(queen, BLACK)
 	for wQueens != 0 {
 		square := Square(popLSB(&wQueens))
-		if square != d1 && b.plyCnt <= 10 {
+		if square != d1 && b.plyCnt <= 15 {
 			*eval += queenEarly
 		}
 		attacks := getBishopAttacks(square, b.occupied) | getRookAttacks(square, b.occupied)
@@ -465,7 +465,7 @@ func evaluateQueens(b *Board, eval *int) {
 	}
 	for bQueens != 0 {
 		square := Square(popLSB(&bQueens))
-		if square != d8 && b.plyCnt <= 10 {
+		if square != d8 && b.plyCnt <= 15 {
 			*eval -= queenEarly
 		}
 		attacks := getBishopAttacks(square, b.occupied) | getRookAttacks(square, b.occupied)

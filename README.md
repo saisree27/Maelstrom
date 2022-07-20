@@ -14,7 +14,9 @@ UCI-compliant Golang chess engine in development from scratch. This is my first 
  - UCI protocol implementation, so you can run the engine using a UCI-supported GUI such as [CuteChess](https://github.com/cutechess/cutechess/releases).
 
 ## Releases
-I have included binaries for both Windows and MacOS in the Releases section. This is currently Maelstrom's first release (v1.0.0), and I would welcome any bugs or problems reported through the Issues tab!
+I have included binaries for Windows, MacOS, and Linux in the Releases section. This is currently Maelstrom's first release (v1.0.0), and I would welcome any bugs or problems reported through the Issues tab!
+
+Maelstrom is also playable on Lichess! You can play against it [here](https://lichess.org/@/Maelstrom-Chess). Maelstrom accepts both casual and rated play of all time controls.
 
 ## Building from Source
 Clone the repository, then run `go build maelstrom/main.go`. The engine binary will be built into the project root folder.
