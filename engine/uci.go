@@ -109,6 +109,10 @@ func UciLoop() {
 			b.InitStartPos()
 		}
 
+		if command == "quit" {
+			os.Exit(0)
+		}
+
 		if strings.Contains(command, "position") {
 			b = processPosition(command)
 		}
