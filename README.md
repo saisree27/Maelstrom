@@ -16,7 +16,7 @@ UCI-compliant Golang chess engine in development from scratch. This is my first 
 ## Releases
 I have included binaries for Windows, MacOS, and Linux in the Releases section. This is currently Maelstrom's first release (v1.0.0), and I would welcome any bugs or problems reported through the Issues tab!
 
-Maelstrom is also playable on Lichess! You can play against it [here](https://lichess.org/@/Maelstrom-Chess). Maelstrom accepts both casual and rated play of all time controls.
+Maelstrom is also playable on Lichess! You can play against it [here](https://lichess.org/@/Maelstrom-Chess). Maelstrom accepts both casual and rated play of all time controls. Maelstrom plays with an opening book on Lichess to allow for some more varied positions.
 
 ## Building from Source
 Clone the repository, then run `go build maelstrom/main.go`. The engine binary will be built into the project root folder.
