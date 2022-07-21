@@ -28,5 +28,8 @@ There's definitely a couple more things I plan to work on for the next (and futu
 - Better endgame evaluation
 - Improving transposition table implementation
 
+## Game Selections
+Take a look at this epic of a [game](https://lichess.org/mcJxLCE8) played on Lichess between Maelstrom and another bot (Lynx). This game lasted 250(!) moves, with both sides refusing to draw!
+
 ## References
 Definitely the most helpful reference in developing this engine for me has been the Chess Programming [wiki](https://www.chessprogramming.org/Main_Page)! If you're interested in developing your own chess engine or move library, this website has everything.
