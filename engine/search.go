@@ -113,25 +113,26 @@ func orderMovesPV(b *Board, moves *[]Move, pv Move, c Color, depth int, rd int) 
 	}
 }
 
-func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool, line *[]Move, tR int64, st time.Time) int {
+func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool, line *[]Move, tR int64, st time.Time) (int, bool) {
 	nodesSearched++
 	pv := []Move{}
 
 	if depth <= 0 {
-		return quiesce(b, 4, alpha, beta, c)
+		return quiesce(b, 4, alpha, beta, c), false
 	}
 
 	legalMoves := b.generateLegalMoves()
 
 	if len(legalMoves) == 0 {
-		return evaluate(b) * factor[c]
+		return evaluate(b) * factor[c], false
 	}
 
 	if b.isThreeFoldRep() {
-		return 0
+		return 0, false
 	}
 
 	bestScore := 0
+	timeout := false
 	bestMove := Move{}
 	oldAlpha := alpha
 
@@ -140,7 +141,7 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		*line = []Move{}
 		*line = append(*line, bestMove)
 		*line = append(*line, pv...)
-		return found
+		return found, false
 	}
 
 	if depth > 1 {
@@ -150,8 +151,8 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	if depth == 1 {
 		// futility pruning
 		eval := evaluate(b) * factor[c]
-		if eval + knightVal < alpha {
-			return quiesce(b, 4, alpha, beta, c)
+		if eval+knightVal < alpha {
+			return quiesce(b, 4, alpha, beta, c), false
 		}
 	}
 
@@ -159,26 +160,32 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 
 	if doNull && hasNotJustPawns != 0 && !b.isCheck(c) && b.plyCnt > 0 {
 		b.makeNullMove()
-		bestScore = -pvs(b, depth-R-1, rd, -beta, -beta+1, reverseColor(c), false, &pv, tR, st)
+		bestScore, timeout = pvs(b, depth-R-1, rd, -beta, -beta+1, reverseColor(c), false, &pv, tR, st)
+		bestScore *= -1
 		b.undoNullMove()
 
 		if bestScore >= beta {
-			return beta
+			return beta, timeout
 		}
 	}
 
 	for i, move := range legalMoves {
+		if timeout {
+			break
+		}
+
 		duration := time.Since(st).Milliseconds()
 		if duration > tR {
 			*line = []Move{}
-			return 0
+			return bestScore, true
 		}
 		b.makeMove(move)
 
 		if i == 0 {
-			bestScore = -pvs(b, depth-1, rd, -beta, -alpha, reverseColor(c), true, &pv, tR, st)
+			bestScore, timeout = pvs(b, depth-1, rd, -beta, -alpha, reverseColor(c), true, &pv, tR, st)
+			bestScore *= -1
 			b.undo()
-			if bestScore > alpha {
+			if bestScore > alpha && !timeout {
 				bestMove = move
 				*line = []Move{}
 				*line = append(*line, move)
@@ -199,14 +206,22 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 			check := b.isCheck(b.turn)
 			// Late move reduction
 			if i >= 4 && depth >= 3 && move.movetype != CAPTURE && move.movetype != CAPTUREANDPROMOTION && !check {
-				score = -pvs(b, depth-2, rd, -alpha-1, -alpha, reverseColor(c), true, &pv, tR, st)
+				score, timeout = pvs(b, depth-2, rd, -alpha-1, -alpha, reverseColor(c), true, &pv, tR, st)
+				score *= -1
 			}
 			if score > alpha {
-				score := -pvs(b, depth-1, rd, -alpha-1, -alpha, reverseColor(c), true, &pv, tR, st)
-				if score > alpha && score < beta {
-					score = -pvs(b, depth-1, rd, -beta, -alpha, reverseColor(c), true, &pv, tR, st)
+				score, timeout = pvs(b, depth-1, rd, -alpha-1, -alpha, reverseColor(c), true, &pv, tR, st)
+				score *= -1
+
+				if timeout {
+					break
 				}
-				if score > alpha {
+
+				if score > alpha && score < beta {
+					score, timeout = pvs(b, depth-1, rd, -beta, -alpha, reverseColor(c), true, &pv, tR, st)
+					score *= -1
+				}
+				if score > alpha && !timeout {
 					bestMove = move
 					alpha = score
 					*line = []Move{}
@@ -216,7 +231,7 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 
 				}
 				b.undo()
-				if score > bestScore {
+				if score > bestScore && !timeout {
 					bestScore = score
 					if score >= beta {
 						if killerMoves[depth][0].toUCI() != move.toUCI() {
@@ -233,18 +248,20 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		}
 	}
 
-	var flag bound
-	if bestScore <= oldAlpha {
-		flag = upper
-	} else if bestScore >= beta {
-		flag = lower
-	} else {
-		flag = exact
+	if !timeout {
+		var flag bound
+		if bestScore <= oldAlpha {
+			flag = upper
+		} else if bestScore >= beta {
+			flag = lower
+		} else {
+			flag = exact
+		}
+
+		storeEntry(b, bestScore, flag, bestMove, depth)
 	}
 
-	storeEntry(b, bestScore, flag, bestMove, depth)
-
-	return bestScore
+	return bestScore, timeout
 }
 
 func searchWithTime(b *Board, movetime int64) Move {
@@ -269,26 +286,24 @@ func searchWithTime(b *Board, movetime int64) Move {
 			break
 		}
 		searchStart := time.Now()
-		score := pvs(b, i, i, -winVal-1, winVal+1, b.turn, true, &line, timeRemaining, time.Now())
+		score, timeout := pvs(b, i, i, -winVal-1, winVal+1, b.turn, true, &line, timeRemaining, time.Now())
 		timeTaken := time.Since(searchStart).Milliseconds()
 
-		if len(line) == 0 {
-			break
+		if timeout {
+			return prevBest
 		}
 
-		
 		b.makeMove(line[0])
 
 		if b.isTwoFold() && score > 0 {
-			table.entries[b.zobrist % table.count] = TTEntry{}
+			table.entries[b.zobrist%table.count] = TTEntry{}
 			b.undo()
 			// TT three-fold issue
 			fmt.Println("Two-fold repetition encountered, removing TT entry")
-			table.entries[b.zobrist % table.count] = TTEntry{}
-		} else {		
+			table.entries[b.zobrist%table.count] = TTEntry{}
+		} else {
 			b.undo()
 		}
-
 
 		strLine := ""
 		for _, move := range line {
