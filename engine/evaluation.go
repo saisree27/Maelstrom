@@ -45,9 +45,9 @@ const rookMobility int = 4
 const queenMobility int = 1
 
 // Values for king safety
-const pawnShieldLeft int = -10
-const pawnShieldUpDown int = -40
-const pawnShieldRight int = -5
+const pawnShieldLeft int = -15
+const pawnShieldUpDown int = -50
+const pawnShieldRight int = -15
 const kingAir int = -10
 const notCastled int = -30
 

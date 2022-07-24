@@ -91,6 +91,8 @@ func processGo(command string, b *Board) {
 }
 
 func UciLoop() {
+	ttSize := int64(256)
+
 	b := Board{}
 	scanner := bufio.NewScanner(os.Stdin)
 
@@ -98,13 +100,14 @@ func UciLoop() {
 		command := scanner.Text()
 
 		if command == "uci" {
-			initializeEverything()
+			initializeEverythingExceptTTable()
 			fmt.Println("id name Maelstrom")
 			fmt.Println("id author saisree27")
+			fmt.Println("option name Hash type spin default 256 min 1 max 1024")
 			fmt.Println("uciok")
 		}
-
 		if command == "isready" {
+			initializeTTable(int(ttSize))
 			fmt.Println("readyok")
 		}
 
@@ -125,6 +128,13 @@ func UciLoop() {
 			processGo(command, &b)
 			b.printFromBitBoards()
 		}
+
+	
+		if strings.Contains(command, "setoption") {
+			words := strings.Split(command, " ")
+			ttSize, _ = strconv.ParseInt(words[len(words) - 1], 10, 64)
+		}
+
 	}
 
 }

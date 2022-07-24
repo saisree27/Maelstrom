@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func initializeEverything() {
+func initializeEverythingExceptTTable() {
 	initializeKingAttacks()
 	initializeKnightAttacks()
 	initializePawnAttacks()
@@ -16,12 +16,12 @@ func initializeEverything() {
 	initLine()
 	initializeSQLookup()
 	initZobrist()
-	initializeTTable(512)
 	initNeighborMasks()
 }
 
 func Run(command string, position string, depth int) {
-	initializeEverything()
+	initializeEverythingExceptTTable()
+	initializeTTable(256)
 	if command == "perft" {
 		RunPerfTests(position, depth)
 	}
@@ -85,7 +85,8 @@ func RunSearch(position string, depth int) {
 }
 
 func RunSelfPlay(position string, depth int) {
-	initializeEverything()
+	initializeEverythingExceptTTable()
+	initializeTTable(256)
 	b := Board{}
 	if position == "startpos" {
 		b.InitStartPos()
@@ -118,6 +119,8 @@ func RunSelfPlay(position string, depth int) {
 }
 
 func RunPlay(position string, depth int, player Color) {
+	initializeEverythingExceptTTable()
+	initializeTTable(256)
 	b := Board{}
 	if position == "startpos" {
 		b.InitStartPos()
