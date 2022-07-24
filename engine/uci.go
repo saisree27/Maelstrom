@@ -126,7 +126,6 @@ func UciLoop() {
 
 		if strings.Contains(command, "go") {
 			processGo(command, &b)
-			b.printFromBitBoards()
 		}
 
 	
