@@ -272,43 +272,45 @@ func (b *Board) makeMove(mv Move) {
 	var entry prev = prev{move: mv, OO: b.OO, OOO: b.OOO, oo: b.oo, ooo: b.ooo, enpassant: b.enpassant, hash: b.zobrist, wcastled: b.whiteCastled, bcastled: b.blackCastled}
 	b.history = append(b.history, entry)
 
-	switch mv.movetype {
-	case QUIET:
-		b.movePiece(mv.piece, mv.from, mv.to, mv.colorMoved)
-	case CAPTURE:
-		b.capturePiece(mv.piece, mv.captured, mv.from, mv.to, mv.colorMoved)
-	case PROMOTION:
-		b.movePiece(mv.piece, mv.from, mv.to, mv.colorMoved)
-		b.replacePiece(mv.piece, mv.promote, mv.to)
-	case CAPTUREANDPROMOTION:
-		b.capturePiece(mv.piece, mv.captured, mv.from, mv.to, mv.colorMoved)
-		b.replacePiece(mv.piece, mv.promote, mv.to)
-	case KCASTLE:
-		if mv.colorMoved == WHITE {
-			b.movePiece(wK, e1, g1, WHITE)
-			b.movePiece(wR, h1, f1, WHITE)
-			b.whiteCastled = true
-		} else {
-			b.movePiece(bK, e8, g8, BLACK)
-			b.movePiece(bR, h8, f8, BLACK)
-			b.blackCastled = true
-		}
-	case QCASTLE:
-		if mv.colorMoved == WHITE {
-			b.movePiece(wK, e1, c1, WHITE)
-			b.movePiece(wR, a1, d1, WHITE)
-			b.whiteCastled = true
-		} else {
-			b.movePiece(bK, e8, c8, BLACK)
-			b.movePiece(bR, a8, d8, BLACK)
-			b.blackCastled = true
-		}
-	case ENPASSANT:
-		b.movePiece(mv.piece, mv.from, mv.to, mv.colorMoved)
-		if mv.colorMoved == WHITE {
-			b.removePiece(bP, mv.to.goDirection(SOUTH), BLACK)
-		} else {
-			b.removePiece(wP, mv.to.goDirection(NORTH), WHITE)
+	if !mv.null {
+		switch mv.movetype {
+		case QUIET:
+			b.movePiece(mv.piece, mv.from, mv.to, mv.colorMoved)
+		case CAPTURE:
+			b.capturePiece(mv.piece, mv.captured, mv.from, mv.to, mv.colorMoved)
+		case PROMOTION:
+			b.movePiece(mv.piece, mv.from, mv.to, mv.colorMoved)
+			b.replacePiece(mv.piece, mv.promote, mv.to)
+		case CAPTUREANDPROMOTION:
+			b.capturePiece(mv.piece, mv.captured, mv.from, mv.to, mv.colorMoved)
+			b.replacePiece(mv.piece, mv.promote, mv.to)
+		case KCASTLE:
+			if mv.colorMoved == WHITE {
+				b.movePiece(wK, e1, g1, WHITE)
+				b.movePiece(wR, h1, f1, WHITE)
+				b.whiteCastled = true
+			} else {
+				b.movePiece(bK, e8, g8, BLACK)
+				b.movePiece(bR, h8, f8, BLACK)
+				b.blackCastled = true
+			}
+		case QCASTLE:
+			if mv.colorMoved == WHITE {
+				b.movePiece(wK, e1, c1, WHITE)
+				b.movePiece(wR, a1, d1, WHITE)
+				b.whiteCastled = true
+			} else {
+				b.movePiece(bK, e8, c8, BLACK)
+				b.movePiece(bR, a8, d8, BLACK)
+				b.blackCastled = true
+			}
+		case ENPASSANT:
+			b.movePiece(mv.piece, mv.from, mv.to, mv.colorMoved)
+			if mv.colorMoved == WHITE {
+				b.removePiece(bP, mv.to.goDirection(SOUTH), BLACK)
+			} else {
+				b.removePiece(wP, mv.to.goDirection(NORTH), WHITE)
+			}
 		}
 	}
 
@@ -398,43 +400,46 @@ func (b *Board) undo() {
 	prevEntry := b.history[len(b.history)-1]
 	prevMove := prevEntry.move
 
-	switch prevMove.movetype {
-	case QUIET:
-		b.movePiece(prevMove.piece, prevMove.to, prevMove.from, prevMove.colorMoved)
-	case CAPTURE:
-		b.movePiece(prevMove.piece, prevMove.to, prevMove.from, prevMove.colorMoved)
-		b.putPiece(prevMove.captured, prevMove.to, reverseColor(prevMove.colorMoved))
-	case PROMOTION:
-		b.removePiece(prevMove.promote, prevMove.to, prevMove.colorMoved)
-		b.putPiece(prevMove.piece, prevMove.from, prevMove.colorMoved)
-	case CAPTUREANDPROMOTION:
-		b.removePiece(prevMove.promote, prevMove.to, prevMove.colorMoved)
-		b.putPiece(prevMove.piece, prevMove.from, prevMove.colorMoved)
-		b.putPiece(prevMove.captured, prevMove.to, reverseColor(prevMove.colorMoved))
-	case KCASTLE:
-		if prevMove.colorMoved == WHITE {
-			b.movePiece(wK, g1, e1, WHITE)
-			b.movePiece(wR, f1, h1, WHITE)
-		} else {
-			b.movePiece(bK, g8, e8, BLACK)
-			b.movePiece(bR, f8, h8, BLACK)
-		}
-	case QCASTLE:
-		if prevMove.colorMoved == WHITE {
-			b.movePiece(wK, c1, e1, WHITE)
-			b.movePiece(wR, d1, a1, WHITE)
-		} else {
-			b.movePiece(bK, c8, e8, BLACK)
-			b.movePiece(bR, d8, a8, BLACK)
-		}
-	case ENPASSANT:
-		b.movePiece(prevMove.piece, prevMove.to, prevMove.from, prevMove.colorMoved)
-		if prevMove.colorMoved == WHITE {
-			b.putPiece(bP, prevMove.to.goDirection(SOUTH), BLACK)
-		} else {
-			b.putPiece(wP, prevMove.to.goDirection(NORTH), WHITE)
+	if !prevMove.null {
+		switch prevMove.movetype {
+		case QUIET:
+			b.movePiece(prevMove.piece, prevMove.to, prevMove.from, prevMove.colorMoved)
+		case CAPTURE:
+			b.movePiece(prevMove.piece, prevMove.to, prevMove.from, prevMove.colorMoved)
+			b.putPiece(prevMove.captured, prevMove.to, reverseColor(prevMove.colorMoved))
+		case PROMOTION:
+			b.removePiece(prevMove.promote, prevMove.to, prevMove.colorMoved)
+			b.putPiece(prevMove.piece, prevMove.from, prevMove.colorMoved)
+		case CAPTUREANDPROMOTION:
+			b.removePiece(prevMove.promote, prevMove.to, prevMove.colorMoved)
+			b.putPiece(prevMove.piece, prevMove.from, prevMove.colorMoved)
+			b.putPiece(prevMove.captured, prevMove.to, reverseColor(prevMove.colorMoved))
+		case KCASTLE:
+			if prevMove.colorMoved == WHITE {
+				b.movePiece(wK, g1, e1, WHITE)
+				b.movePiece(wR, f1, h1, WHITE)
+			} else {
+				b.movePiece(bK, g8, e8, BLACK)
+				b.movePiece(bR, f8, h8, BLACK)
+			}
+		case QCASTLE:
+			if prevMove.colorMoved == WHITE {
+				b.movePiece(wK, c1, e1, WHITE)
+				b.movePiece(wR, d1, a1, WHITE)
+			} else {
+				b.movePiece(bK, c8, e8, BLACK)
+				b.movePiece(bR, d8, a8, BLACK)
+			}
+		case ENPASSANT:
+			b.movePiece(prevMove.piece, prevMove.to, prevMove.from, prevMove.colorMoved)
+			if prevMove.colorMoved == WHITE {
+				b.putPiece(bP, prevMove.to.goDirection(SOUTH), BLACK)
+			} else {
+				b.putPiece(wP, prevMove.to.goDirection(NORTH), WHITE)
+			}
 		}
 	}
+
 	b.OO = prevEntry.OO
 	b.OOO = prevEntry.OOO
 	b.oo = prevEntry.oo
@@ -450,27 +455,11 @@ func (b *Board) undo() {
 }
 
 func (b *Board) makeNullMove() {
-	var entry prev = prev{move: Move{null: true}, OO: b.OO, OOO: b.OOO, oo: b.oo, ooo: b.ooo, enpassant: b.enpassant, hash: b.zobrist}
-	b.history = append(b.history, entry)
-
-	b.plyCnt++
-	b.enpassant = EMPTYSQ
-	b.turn = reverseColor(b.turn)
-	b.zobrist ^= turnHash
+	b.makeMove(Move{null: true})
 }
 
 func (b *Board) undoNullMove() {
-	prevEntry := b.history[len(b.history)-1]
-	b.OO = prevEntry.OO
-	b.OOO = prevEntry.OOO
-	b.oo = prevEntry.oo
-	b.ooo = prevEntry.ooo
-	b.enpassant = prevEntry.enpassant
-	b.zobrist = prevEntry.hash
-	b.turn = reverseColor(b.turn)
-
-	b.history = b.history[:len(b.history)-1]
-	b.plyCnt--
+	b.undo()
 }
 
 func (b *Board) isCheck(c Color) bool {

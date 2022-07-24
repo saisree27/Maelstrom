@@ -12,7 +12,7 @@ type moveBonus struct {
 }
 
 // null move pruning constant R
-const R = 2
+const R = 3
 
 var nodesSearched = 0
 var killerMoves = [100][2]Move{}
@@ -156,9 +156,15 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		}
 	}
 
+	check := b.isCheck(c)
+
+	if check {
+		depth++
+	}
+
 	hasNotJustPawns := b.colors[c] ^ b.getColorPieces(pawn, c)
 
-	if doNull && hasNotJustPawns != 0 && !b.isCheck(c) && b.plyCnt > 0 {
+	if doNull && !check && hasNotJustPawns != 0 && b.plyCnt > 0 {
 		b.makeNullMove()
 		bestScore, timeout = pvs(b, depth-R-1, rd, -beta, -beta+1, reverseColor(c), false, &pv, tR, st)
 		bestScore *= -1

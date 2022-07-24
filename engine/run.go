@@ -16,7 +16,7 @@ func initializeEverything() {
 	initLine()
 	initializeSQLookup()
 	initZobrist()
-	initializeTTable(1024)
+	initializeTTable(512)
 	initNeighborMasks()
 }
 
@@ -85,6 +85,7 @@ func RunSearch(position string, depth int) {
 }
 
 func RunSelfPlay(position string, depth int) {
+	initializeEverything()
 	b := Board{}
 	if position == "startpos" {
 		b.InitStartPos()
@@ -96,54 +97,16 @@ func RunSelfPlay(position string, depth int) {
 	movesPlayed := []string{}
 
 	legals := b.generateLegalMoves()
-	newDepth := depth
+
 	for {
 		if len(legals) == 0 {
 			break
 		}
 
 		b.printFromBitBoards()
-
-		line := []Move{}
-
 		score := 0
-
-		if len(b.generateLegalMoves()) > 30 {
-			newDepth--
-		} else {
-			fmt.Println("Increasing depth")
-			newDepth++
-		}
-		if newDepth < 5 {
-			newDepth = 5
-		}
-		if b.plyCnt <= 20 {
-			if newDepth >= 6 {
-				newDepth = 6
-			}
-		}
-
-		for i := 1; i <= newDepth; i++ {
-			line = []Move{}
-
-			fmt.Printf("Depth %d: ", i)
-
-			score, _ = pvs(&b, i, i, -winVal-1, winVal+1, b.turn, true, &line, 100000000, time.Now())
-
-			if score == winVal || score == -winVal {
-				fmt.Println("Found mate.")
-				break
-			}
-
-			fmt.Print(score * factor[b.turn])
-			fmt.Print(" ")
-
-			strLine := []string{}
-			for i, _ := range line {
-				strLine = append(strLine, line[i].toUCI())
-			}
-		}
-		bestMove := line[0]
+		bestMove := searchWithTime(&b, 10000)
+		b.printFromBitBoards()
 
 		fmt.Printf("SCORE: %d\n", score*factor[b.turn])
 

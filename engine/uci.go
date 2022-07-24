@@ -84,6 +84,10 @@ func processGo(command string, b *Board) {
 	}
 
 	fmt.Println("bestmove " + bestMove.toUCI())
+
+	if b.plyCnt % 10 == 0 {
+		clearTTable()
+	}
 }
 
 func UciLoop() {
@@ -119,6 +123,7 @@ func UciLoop() {
 
 		if strings.Contains(command, "go") {
 			processGo(command, &b)
+			b.printFromBitBoards()
 		}
 	}
 
