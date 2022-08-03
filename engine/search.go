@@ -25,6 +25,11 @@ func quiesce(b *Board, limit int, alpha int, beta int, c Color) int {
 		return beta
 	}
 
+	delta := queenVal
+	if eval < alpha-delta {
+		return alpha
+	}
+
 	if alpha < eval {
 		alpha = eval
 	}
