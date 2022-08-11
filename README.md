@@ -1,7 +1,14 @@
 # Maelstrom
 ![](https://github.com/saisree27/Maelstrom/actions/workflows/go.yml/badge.svg)
 
+<p align="center">
+  <img src="maelstrom-logo.png" />
+</p>
+
 UCI-compliant Golang chess engine in development from scratch. This is my first experience coding in Go, and so far it's been awesome!
+
+## Watch games
+Maelstrom often plays on Lichess, and you can watch recent or live games and view ratings [here](https://maelstrom-monitor.netlify.app/)! You can check out the source code of the monitoring website [here](https://github.com/saisree27/maelstrom-website).
 
 ## Features
  - Fast bitboard move generation (magic bitboards for sliding pieces)
