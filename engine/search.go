@@ -153,14 +153,6 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		orderMovesPV(b, &legalMoves, bestMove, c, depth, rd)
 	}
 
-	if depth == 1 {
-		// futility pruning
-		eval := evaluate(b) * factor[c]
-		if eval+knightVal < alpha {
-			return quiesce(b, 4, alpha, beta, c), false
-		}
-	}
-
 	check := b.isCheck(c)
 
 	if check {

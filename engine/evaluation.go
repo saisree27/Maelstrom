@@ -28,11 +28,11 @@ const phalanx int = 30
 const passedPawnBlocked int = -20
 const cdPawnBlockedByPlayer int = -50
 
-var passedPawnRankWhite = []int {
+var passedPawnRankWhite = []int{
 	-5, -5, 5, 5, 25, 45, 150, 0,
 }
 
-var passedPawnRankBlack = []int {
+var passedPawnRankBlack = []int{
 	0, 150, 45, 25, 5, 5, -5, -5,
 }
 
@@ -197,10 +197,10 @@ func evaluate(b *Board) int {
 	if b.plyCnt <= 20 {
 		length := len(b.history)
 		for i := length - 3; i > 0; i-- {
-			if b.history[i + 2].move.from == b.history[i].move.to {
-				if reverseColor(b.turn) == WHITE && b.history[i + 2].move.piece != wP {
+			if b.history[i+2].move.from == b.history[i].move.to {
+				if reverseColor(b.turn) == WHITE && b.history[i+2].move.piece != wP {
 					eval += samePieceTwice
-				} else if b.history[i + 2].move.piece != bP {
+				} else if b.history[i+2].move.piece != bP {
 					eval -= samePieceTwice
 				}
 			}
@@ -266,7 +266,7 @@ func evaluatePawns(b *Board, eval *int) {
 		file := sqToFile(square)
 		filesFoundWhite[file]++
 
-		neighborPlayerPawns := fileNeighbors[file]&wPawnsOrig
+		neighborPlayerPawns := fileNeighbors[file] & wPawnsOrig
 		// Isolated pawns check
 		if neighborPlayerPawns == 0 {
 			if filesFoundWhite[file] >= 2 {
@@ -274,10 +274,10 @@ func evaluatePawns(b *Board, eval *int) {
 			} else {
 				*eval += isolatedPawn
 			}
-			if b.squares[square + Square(NORTH)].getColor() == BLACK {
+			if b.squares[square+Square(NORTH)].getColor() == BLACK {
 				*eval += isolatedPawnBlocked
 			}
-		} else if !gotPhalanx && sqToRank(square) >= R4 && sqToFile(square) >= C && sqToFile(square) <= F  {
+		} else if !gotPhalanx && sqToRank(square) >= R4 && sqToFile(square) >= C && sqToFile(square) <= F {
 			for neighborPlayerPawns != 0 {
 				sq := Square(popLSB(&neighborPlayerPawns))
 				if sqToRank(sq) == sqToRank(square) {
@@ -288,7 +288,7 @@ func evaluatePawns(b *Board, eval *int) {
 		}
 
 		// Passed pawns check
-		neighborPawns := (files[file]|fileNeighbors[file])&bPawnsOrig
+		neighborPawns := (files[file] | fileNeighbors[file]) & bPawnsOrig
 		if neighborPawns == 0 {
 			*eval += passedPawn
 			*eval += passedPawnRankWhite[sqToRank(square)]
@@ -300,7 +300,7 @@ func evaluatePawns(b *Board, eval *int) {
 					passedAhead = false
 				}
 			}
-	
+
 			if passedAhead {
 				*eval += passedPawn
 				*eval += passedPawnRankWhite[sqToRank(square)]
@@ -317,7 +317,7 @@ func evaluatePawns(b *Board, eval *int) {
 		file := sqToFile(square)
 		filesFoundBlack[file]++
 
-		neighborPlayerPawns := fileNeighbors[file]&bPawnsOrig
+		neighborPlayerPawns := fileNeighbors[file] & bPawnsOrig
 		// Isolated pawns check
 		if neighborPlayerPawns == 0 {
 			if filesFoundBlack[file] >= 2 {
@@ -325,10 +325,10 @@ func evaluatePawns(b *Board, eval *int) {
 			} else {
 				*eval -= isolatedPawn
 			}
-			if b.squares[square + Square(SOUTH)].getColor() == WHITE {
+			if b.squares[square+Square(SOUTH)].getColor() == WHITE {
 				*eval -= isolatedPawnBlocked
 			}
-		} else if !gotPhalanx && sqToRank(square) <= R5 && sqToFile(square) >= C && sqToFile(square) <= F  {
+		} else if !gotPhalanx && sqToRank(square) <= R5 && sqToFile(square) >= C && sqToFile(square) <= F {
 			for neighborPlayerPawns != 0 {
 				sq := Square(popLSB(&neighborPlayerPawns))
 				if sqToRank(sq) == sqToRank(square) {
@@ -338,7 +338,7 @@ func evaluatePawns(b *Board, eval *int) {
 			}
 		}
 
-		neighborPawns := (files[file]|fileNeighbors[file])&wPawnsOrig
+		neighborPawns := (files[file] | fileNeighbors[file]) & wPawnsOrig
 		// Passed pawns check
 		if neighborPawns == 0 {
 			*eval -= passedPawn
@@ -351,7 +351,7 @@ func evaluatePawns(b *Board, eval *int) {
 					passedAhead = false
 				}
 			}
-	
+
 			if passedAhead {
 				*eval -= passedPawn
 				*eval -= passedPawnRankBlack[sqToRank(square)]
