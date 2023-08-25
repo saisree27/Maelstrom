@@ -26,7 +26,17 @@ I have included binaries for Windows, MacOS, and Linux in the Releases section. 
 Maelstrom is also playable on Lichess! You can play against it [here](https://lichess.org/@/Maelstrom-Chess). Maelstrom accepts both casual and rated play of all time controls. Maelstrom plays with an opening book on Lichess to allow for some more varied positions.
 
 ## Building from Source
-Clone the repository, then run `go build maelstrom/main.go`. The engine binary will be built into the project root folder.
+Clone the repository, then run `go build maelstrom/main.go`. The engine binary will be built into the project root folder as the binary `main`. Run this executable to start the CLI, which uses the UCI-protocol.
+Enter the following commands to run the engine on starting position from binary:
+
+```
+uci
+...
+isready
+...
+position startpos
+go movetime 100000
+```
 
 ## Upcoming Development
 There's definitely a couple more things I plan to work on for the next (and future) release. Initially I had planned to do all of these before release, but I wanted to share an initial version and take a quick break to work on other things. 
