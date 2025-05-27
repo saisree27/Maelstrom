@@ -31,6 +31,7 @@ func (b *Board) getAllAttacks(o Color, occupied u64, ortho u64, diag u64) u64 {
 
 	// Used to remove king from xray attacks
 	var playerKing = b.getColorPieces(king, reverseColor(o))
+	var occupiedNoKing = occupied ^ playerKing
 
 	// Begin first with king
 	var opponentKing Square = Square(bitScanForward(b.getColorPieces(king, o)))
@@ -41,34 +42,24 @@ func (b *Board) getAllAttacks(o Color, occupied u64, ortho u64, diag u64) u64 {
 	attackedSquares |= allPawnAttacks(opponentPawns, o)
 
 	// Next, add opponent knights
-	// Loop over knight locations and clear them
 	var opponentKnights u64 = b.getColorPieces(knight, o)
 	var lsb int
-	for {
-		if opponentKnights == 0 {
-			break
-		}
+	for opponentKnights != 0 {
 		lsb = popLSB(&opponentKnights)
 		attackedSquares |= knightAttacks(Square(lsb))
 	}
 
 	// Consider queen to be both rook and bishop so don't have to use another call
 	var opponentBishops u64 = diag
-	for {
-		if opponentBishops == 0 {
-			break
-		}
+	for opponentBishops != 0 {
 		lsb = popLSB(&opponentBishops)
-		attackedSquares |= getBishopAttacks(Square(lsb), occupied^playerKing)
+		attackedSquares |= getBishopAttacks(Square(lsb), occupiedNoKing)
 	}
 
 	var opponentRooks u64 = ortho
-	for {
-		if opponentRooks == 0 {
-			break
-		}
+	for opponentRooks != 0 {
 		lsb = popLSB(&opponentRooks)
-		attackedSquares |= getRookAttacks(Square(lsb), occupied^playerKing)
+		attackedSquares |= getRookAttacks(Square(lsb), occupiedNoKing)
 	}
 
 	return attackedSquares
@@ -104,11 +95,7 @@ func (b *Board) generateMovesFromLocs(m *[]Move, sq Square, locs u64, c Color) {
 	var lsb Square
 	var bbLSB u64
 	var piece Piece
-	for {
-		if locs == 0 {
-			break
-		}
-
+	for locs != 0 {
 		lsb = Square(popLSB(&locs))
 		bbLSB = sToBB[lsb]
 		piece = b.squares[sq]
@@ -118,39 +105,41 @@ func (b *Board) generateMovesFromLocs(m *[]Move, sq Square, locs u64, c Color) {
 			if b.squares[lsb] != EMPTY {
 				movet = CAPTUREANDPROMOTION
 			}
-			moves := []Move{
-				Move{from: sq, to: Square(lsb), piece: wP, colorMoved: c, captured: b.squares[lsb], movetype: movet, promote: wN},
-				Move{from: sq, to: Square(lsb), piece: wP, colorMoved: c, captured: b.squares[lsb], movetype: movet, promote: wR},
-				Move{from: sq, to: Square(lsb), piece: wP, colorMoved: c, captured: b.squares[lsb], movetype: movet, promote: wQ},
-				Move{from: sq, to: Square(lsb), piece: wP, colorMoved: c, captured: b.squares[lsb], movetype: movet, promote: wB},
-			}
-			*m = append(*m, moves...)
+			// Add all promotion pieces
+			*m = append(*m,
+				Move{from: sq, to: lsb, piece: wP, colorMoved: c, captured: b.squares[lsb], movetype: movet, promote: wN},
+				Move{from: sq, to: lsb, piece: wP, colorMoved: c, captured: b.squares[lsb], movetype: movet, promote: wR},
+				Move{from: sq, to: lsb, piece: wP, colorMoved: c, captured: b.squares[lsb], movetype: movet, promote: wQ},
+				Move{from: sq, to: lsb, piece: wP, colorMoved: c, captured: b.squares[lsb], movetype: movet, promote: wB},
+			)
 		} else if piece == bP && (bbLSB&ranks[R1] != 0) {
 			movet := PROMOTION
 			if b.squares[lsb] != EMPTY {
 				movet = CAPTUREANDPROMOTION
 			}
-			moves := []Move{
-				Move{from: sq, to: Square(lsb), piece: bP, colorMoved: c, captured: b.squares[lsb], movetype: movet, promote: bN},
-				Move{from: sq, to: Square(lsb), piece: bP, colorMoved: c, captured: b.squares[lsb], movetype: movet, promote: bR},
-				Move{from: sq, to: Square(lsb), piece: bP, colorMoved: c, captured: b.squares[lsb], movetype: movet, promote: bQ},
-				Move{from: sq, to: Square(lsb), piece: bP, colorMoved: c, captured: b.squares[lsb], movetype: movet, promote: bB},
-			}
-			*m = append(*m, moves...)
+			// Add all promotion pieces
+			*m = append(*m,
+				Move{from: sq, to: lsb, piece: bP, colorMoved: c, captured: b.squares[lsb], movetype: movet, promote: bN},
+				Move{from: sq, to: lsb, piece: bP, colorMoved: c, captured: b.squares[lsb], movetype: movet, promote: bR},
+				Move{from: sq, to: lsb, piece: bP, colorMoved: c, captured: b.squares[lsb], movetype: movet, promote: bQ},
+				Move{from: sq, to: lsb, piece: bP, colorMoved: c, captured: b.squares[lsb], movetype: movet, promote: bB},
+			)
 		} else {
-
-			var newMove Move = Move{
-				from: sq, to: Square(lsb), piece: piece,
-				colorMoved: c, captured: b.squares[lsb]}
-			if b.squares[lsb] == EMPTY {
-				newMove.movetype = QUIET
-			} else {
-				newMove.movetype = CAPTURE
-			}
-
-			*m = append(*m, newMove)
+			*m = append(*m, Move{
+				from: sq, to: lsb, piece: piece,
+				colorMoved: c, captured: b.squares[lsb],
+				movetype: ternary(b.squares[lsb] == EMPTY, QUIET, CAPTURE),
+			})
 		}
 	}
+}
+
+// Helper function for ternary operations
+func ternary[T any](condition bool, ifTrue, ifFalse T) T {
+	if condition {
+		return ifTrue
+	}
+	return ifFalse
 }
 
 func (b *Board) getKingMoves(m *[]Move, sq Square, attacks u64, player u64, c Color) {

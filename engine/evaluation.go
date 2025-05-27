@@ -237,11 +237,11 @@ func totalMaterialAndPieces(b *Board) (int, int) {
 	sum := 0
 	total := 0
 
-	for _, piece := range b.squares {
-		sum += material[piece]
-		if piece != EMPTY {
-			total++
-		}
+	// Use bitboard operations for faster material counting
+	for piece := wP; piece <= bK; piece++ {
+		count := popCount(b.pieces[piece])
+		sum += material[piece] * count
+		total += count
 	}
 	return sum, total
 }
@@ -544,17 +544,16 @@ func evaluateKings(b *Board, eval *int, totalPieces int) {
 				*eval -= pawnShieldRight
 			}
 		} else {
-			airW := popCount(kingAttacks(wKing) & b.empty)
-			airB := popCount(kingAttacks(bKing) & b.empty)
+			empty := b.empty // Cache empty squares bitboard
+			airW := popCount(kingAttacks(wKing) & empty)
+			airB := popCount(kingAttacks(bKing) & empty)
 
 			if airW >= 2 {
 				*eval += airW * kingAir
 			}
-
 			if airB >= 2 {
 				*eval -= airB * kingAir
 			}
-
 		}
 	}
 }

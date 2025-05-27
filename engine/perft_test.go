@@ -4,7 +4,7 @@ import "testing"
 
 func TestPerft(t *testing.T) {
 	// Current fastest: 22.031s
-	// RunTests()
+	RunTests()
 }
 
 func TestSearch(t *testing.T) {

@@ -3,35 +3,28 @@ package engine
 import (
 	"fmt"
 	"math/bits"
+	"strings"
 )
 
 func printBitBoard(u u64) {
-	s := "\n"
+	var s strings.Builder
+	s.WriteString("\n")
 	for i := 56; i >= 0; i -= 8 {
 		for j := 0; j < 8; j++ {
 			// lookup bit at square i + j
 			if u&u64(1<<(i+j)) != 0 {
-				s += "1" + " "
+				s.WriteString("1 ")
 			} else {
-				s += "0" + " "
+				s.WriteString("0 ")
 			}
 		}
-		s += "\n"
+		s.WriteString("\n")
 	}
-	fmt.Print(s)
+	fmt.Print(s.String())
 }
 
 func popCount(u u64) int {
-	count := 0
-	for {
-		if u == 0 {
-			break
-		}
-		count++
-		u &= u - 1
-	}
-	return count
-	// return bits.OnesCount64(uint64(u))
+	return bits.OnesCount64(uint64(u))
 }
 
 // Below bitboard operations are for ease of use when generating legal moves
