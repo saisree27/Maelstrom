@@ -143,6 +143,72 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		depth++
 	}
 
+	// Razoring
+	// Only apply razoring at shallow depths and non-PV nodes
+	if depth <= 3 && !check && rd > 1 &&
+		beta < winVal-100 && beta > -winVal+100 &&
+		beta == alpha+1 { // Non-PV node check
+
+		staticEval := evaluate(b) * factor[c]
+
+		// Razoring margins based on depth
+		razorMargin := 300 + depth*75
+
+		if staticEval+razorMargin <= alpha {
+			// Try qsearch to verify if position is really bad
+			qScore := quiesce(b, 4, alpha-razorMargin, alpha-razorMargin+1, c)
+			if qScore <= alpha-razorMargin {
+				return qScore, false
+			}
+		}
+	}
+
+	// Static Null Move Pruning
+	// Only do SNMP if:
+	// 1. Not in check
+	// 2. Not at root
+	// 3. Not searching for mate
+	// 4. Not too deep in the tree
+	if !check && depth >= 1 && depth <= 6 && rd > 1 &&
+		beta < winVal-100 && beta > -winVal+100 {
+
+		// Get static evaluation with some margin
+		staticEval := evaluate(b) * factor[c]
+
+		// Margin increases with depth
+		margin := 120 + 50*depth
+
+		// If static eval is way above beta, likely we can prune
+		if staticEval-margin >= beta {
+			return staticEval - margin, false
+		}
+	}
+
+	// Reverse Futility Pruning
+	// Similar to SNMP but with different margins and depth conditions
+	if !check && depth <= 5 && rd > 1 &&
+		beta < winVal-100 && beta > -winVal+100 {
+
+		staticEval := evaluate(b) * factor[c]
+
+		// More aggressive pruning for very shallow depths
+		// Values tuned based on piece values
+		var rfpMargin int
+		if depth <= 3 {
+			rfpMargin = pawnVal * depth
+		} else {
+			rfpMargin = pawnVal*3 + (depth-3)*175
+		}
+
+		// Check material balance to ensure we're not in a tactical position
+		material, pieces := totalMaterialAndPieces(b)
+		if pieces >= 10 && material*factor[c] > -pawnVal { // Don't prune if down material
+			if staticEval >= beta+rfpMargin {
+				return beta, false
+			}
+		}
+	}
+
 	hasNotJustPawns := b.colors[c] ^ b.getColorPieces(pawn, c)
 
 	if doNull && !check && hasNotJustPawns != 0 && b.plyCnt > 0 {
