@@ -9,23 +9,23 @@ import (
 type u64 uint64
 
 type Board struct {
-	pieces    [14]u64   // Stores bitboards of all white and black pieces
-	squares   [64]Piece // Stores all 64 squares (not used for move generation)
-	colors    [2]u64    // Stores bitboards of both colors
-	occupied  u64       // Bits are set when pieces are there
-	empty     u64       // Bits are clear when pieces are there
-	turn      Color     // Side to move
-	enpassant Square    // En passant square. If not possible, stores EMPTY
-	OO        bool      // If kingside castling available for White
-	OOO       bool      // If queenside castling is available for White
-	oo        bool      // If kingside castling is available for Black
-	ooo       bool      // If queenside castling is available for Black
-	history   []prev    // Stores history for board
-	zobrist   u64       // Zobrist hash (TODO)
-	plyCnt    int       // Stores number of half moves played
-	moveCount int       // Stores which move currently we are at
-	whiteCastled bool   // Stores whether white has previously castled
-	blackCastled bool   // Stores whether black has previously castled
+	pieces       [14]u64   // Stores bitboards of all white and black pieces
+	squares      [64]Piece // Stores all 64 squares (not used for move generation)
+	colors       [2]u64    // Stores bitboards of both colors
+	occupied     u64       // Bits are set when pieces are there
+	empty        u64       // Bits are clear when pieces are there
+	turn         Color     // Side to move
+	enpassant    Square    // En passant square. If not possible, stores EMPTY
+	OO           bool      // If kingside castling available for White
+	OOO          bool      // If queenside castling is available for White
+	oo           bool      // If kingside castling is available for Black
+	ooo          bool      // If queenside castling is available for Black
+	history      []prev    // Stores history for board
+	zobrist      u64       // Zobrist hash (TODO)
+	plyCnt       int       // Stores number of half moves played
+	moveCount    int       // Stores which move currently we are at
+	whiteCastled bool      // Stores whether white has previously castled
+	blackCastled bool      // Stores whether black has previously castled
 }
 
 type prev struct {
@@ -171,38 +171,40 @@ func (b *Board) putPiece(p Piece, s Square, c Color) {
 }
 
 func (b *Board) movePiece(p Piece, mvfrom Square, mvto Square, c Color) {
-	var from u64 = sToBB[mvfrom]
-	var to u64 = sToBB[mvto]
-	var fromTo u64 = from ^ to
+	var fromTo u64 = sToBB[mvfrom] ^ sToBB[mvto]
 
+	// Update all bitboards in one pass
 	b.pieces[p] ^= fromTo
 	b.colors[c] ^= fromTo
 	b.occupied ^= fromTo
 	b.empty ^= fromTo
 
-	// update mailbox representation
-	b.squares[mvfrom] = EMPTY
+	// Update mailbox and zobrist in one pass
 	b.squares[mvto] = p
-
+	b.squares[mvfrom] = EMPTY
 	b.zobrist ^= zobristTable[p][mvfrom] ^ zobristTable[p][mvto] ^ zobristTable[EMPTY][mvto] ^ zobristTable[EMPTY][mvfrom]
 }
 
-func (b *Board) capturePiece(p Piece, q Piece, mvfrom Square, mvto Square, c Color) {
+func (b *Board) capturePiece(p Piece, captured Piece, mvfrom Square, mvto Square, c Color) {
 	var from u64 = sToBB[mvfrom]
 	var to u64 = sToBB[mvto]
-	var fromTo u64 = from ^ to
-	b.pieces[p] ^= fromTo
-	b.colors[c] ^= fromTo
-	b.pieces[q] ^= to
+
+	// Update moving piece
+	b.pieces[p] ^= from ^ to
+	b.colors[c] ^= from ^ to
+
+	// Remove captured piece
+	b.pieces[captured] ^= to
 	b.colors[reverseColor(c)] ^= to
+
+	// Update occupancy
 	b.occupied ^= from
 	b.empty ^= from
 
-	// update mailbox representation
-	b.squares[mvfrom] = EMPTY
+	// Update mailbox and zobrist in one pass
 	b.squares[mvto] = p
-
-	b.zobrist ^= zobristTable[p][mvfrom] ^ zobristTable[p][mvto] ^ zobristTable[q][mvto] ^ zobristTable[EMPTY][mvfrom]
+	b.squares[mvfrom] = EMPTY
+	b.zobrist ^= zobristTable[p][mvfrom] ^ zobristTable[p][mvto] ^ zobristTable[captured][mvto] ^ zobristTable[EMPTY][mvfrom]
 }
 
 func (b *Board) replacePiece(p Piece, q Piece, sq Square) {
