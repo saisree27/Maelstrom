@@ -213,8 +213,30 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 
 			// Late move reduction
 			if i >= 4 && depth >= 3 && move.movetype != CAPTURE && move.movetype != CAPTUREANDPROMOTION && !check {
-				score, timeout = pvs(b, depth-2, rd, -alpha-1, -alpha, reverseColor(c), true, &childPV, tR, st)
-				score *= -1
+				// Calculate reduction depth based on move history and position
+				reduction := 1
+
+				// Increase reduction for moves with low history score
+				historyScore := historyHeuristic[depth][move.from][move.to]
+				if historyScore < 100 {
+					reduction++
+				}
+
+				// Increase reduction for moves that are not in check and not threatening
+				if !b.isCheck(reverseColor(c)) {
+					reduction++
+				}
+
+				// Cap reduction at depth-2
+				if reduction > depth-2 {
+					reduction = depth - 2
+				}
+
+				// Only reduce if we have enough depth
+				if depth > reduction {
+					score, timeout = pvs(b, depth-reduction, rd, -alpha-1, -alpha, reverseColor(c), true, &childPV, tR, st)
+					score *= -1
+				}
 			}
 
 			if score > alpha {
