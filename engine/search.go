@@ -20,6 +20,15 @@ var historyHeuristic = [100][64][64]int{}
 
 func quiesce(b *Board, limit int, alpha int, beta int, c Color) int {
 	nodesSearched++
+
+	// Check for stop signal
+	select {
+	case <-stopChannel:
+		return 0
+	default:
+		// Continue search
+	}
+
 	eval := evaluate(b) * factor[c]
 
 	// Beta cutoff
@@ -52,6 +61,14 @@ func quiesce(b *Board, limit int, alpha int, beta int, c Color) int {
 
 			b.makeMove(move)
 			score := -quiesce(b, limit-1, -beta, -alpha, reverseColor(c))
+			// Check for stop signal after recursive call
+			select {
+			case <-stopChannel:
+				b.undo()
+				return 0
+			default:
+				// Continue
+			}
 			b.undo()
 
 			if score >= beta {
@@ -115,6 +132,14 @@ func orderMovesPV(b *Board, moves *[]Move, pv Move, c Color, depth int, rd int) 
 
 func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool, line *[]Move, tR int64, st time.Time) (int, bool) {
 	nodesSearched++
+
+	// Check for stop signal
+	select {
+	case <-stopChannel:
+		return 0, true
+	default:
+		// Continue search
+	}
 
 	// Pre-allocate PV line to avoid reallocations
 	if cap(*line) < 100 {
@@ -238,10 +263,14 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		b.makeNullMove()
 		bestScore, timeout = pvs(b, depth-R-1, rd, -beta, -beta+1, reverseColor(c), false, line, tR, st)
 		bestScore *= -1
+		if timeout {
+			b.undoNullMove()
+			return 0, true
+		}
 		b.undoNullMove()
 
 		if bestScore >= beta {
-			return beta, timeout
+			return beta, false
 		}
 	}
 
@@ -262,6 +291,10 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		if i == 0 {
 			bestScore, timeout = pvs(b, depth-1, rd, -beta, -alpha, reverseColor(c), true, &childPV, tR, st)
 			bestScore *= -1
+			if timeout {
+				b.undo()
+				return 0, true
+			}
 			b.undo()
 
 			if bestScore > alpha && !timeout {
@@ -325,6 +358,10 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 				if depth > reduction {
 					score, timeout = pvs(b, depth-reduction, rd, -alpha-1, -alpha, reverseColor(c), true, &childPV, tR, st)
 					score *= -1
+					if timeout {
+						b.undo()
+						return 0, true
+					}
 				}
 			}
 
@@ -333,12 +370,17 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 				score *= -1
 
 				if timeout {
-					break
+					b.undo()
+					return 0, true
 				}
 
 				if score > alpha && score < beta {
 					score, timeout = pvs(b, depth-1, rd, -beta, -alpha, reverseColor(c), true, &childPV, tR, st)
 					score *= -1
+					if timeout {
+						b.undo()
+						return 0, true
+					}
 				}
 
 				if score > alpha && !timeout {
@@ -394,6 +436,14 @@ func searchWithTime(b *Board, movetime int64) Move {
 	if len(legalMoves) == 1 {
 		return legalMoves[0]
 	}
+
+	// If no legal moves, return empty move
+	if len(legalMoves) == 0 {
+		return Move{}
+	}
+
+	// Set prevBest to first legal move in case search is stopped immediately
+	prevBest = legalMoves[0]
 
 	for i := 1; i <= 100; i++ {
 		nodesSearched = 0
@@ -470,6 +520,14 @@ func searchWithTime(b *Board, movetime int64) Move {
 		}
 
 		prevBest = line[0]
+
+		// Check for stop signal after completing a depth
+		select {
+		case <-stopChannel:
+			return prevBest
+		default:
+			// Continue to next depth
+		}
 	}
 	return prevBest
 }

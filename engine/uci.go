@@ -6,7 +6,13 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 )
+
+// Global channel to signal search stop
+var stopChannel chan struct{}
+var searchMutex sync.Mutex
+var isSearching bool
 
 func processPosition(command string) Board {
 	b := Board{}
@@ -19,6 +25,9 @@ func processPosition(command string) Board {
 		if length == 2 {
 			return b
 		}
+		if words[2] == "moves" {
+			mvStart = 3
+		}
 	} else {
 		fen := words[2] + " " + words[3] + " " + words[4]
 		fen += " " + words[5] + " " + words[6] + " " + words[7]
@@ -27,9 +36,12 @@ func processPosition(command string) Board {
 			return b
 		}
 		mvStart = 8
+		if length > 8 && words[8] == "moves" {
+			mvStart = 9
+		}
 	}
 
-	for i := mvStart + 1; i < length; i++ {
+	for i := mvStart; i < length; i++ {
 		b.makeMoveFromUCI(words[i])
 	}
 
@@ -37,57 +49,102 @@ func processPosition(command string) Board {
 }
 
 func processGo(command string, b *Board) {
+	searchMutex.Lock()
+	if isSearching {
+		searchMutex.Unlock()
+		return
+	}
+	isSearching = true
+	searchMutex.Unlock()
+
+	// Create a new stop channel for this search
+	stopChannel = make(chan struct{})
+
 	words := strings.Split(command, " ")
 
-	var wtime, btime, winc, binc int64
+	var wtime, btime, winc, binc, depth, movetime int64
+	var infinite bool
+	movetimeSet := false
 
-	// default move time = 30s
-	var movetime = int64(30000)
-	var movetimeSet = false
-
-	for i, word := range words {
-		switch word {
+	for i := 0; i < len(words); i++ {
+		switch words[i] {
+		case "infinite":
+			infinite = true
+		case "depth":
+			if i+1 < len(words) {
+				depth, _ = strconv.ParseInt(words[i+1], 10, 64)
+				i++
+			}
 		case "movetime":
-			movetimeSet = true
-			movetime, _ = strconv.ParseInt(words[i+1], 10, 64)
+			if i+1 < len(words) {
+				movetimeSet = true
+				movetime, _ = strconv.ParseInt(words[i+1], 10, 64)
+				i++
+			}
 		case "wtime":
-			wtime, _ = strconv.ParseInt(words[i+1], 10, 64)
-		case "winc":
-			winc, _ = strconv.ParseInt(words[i+1], 10, 64)
+			if i+1 < len(words) {
+				wtime, _ = strconv.ParseInt(words[i+1], 10, 64)
+				i++
+			}
 		case "btime":
-			btime, _ = strconv.ParseInt(words[i+1], 10, 64)
+			if i+1 < len(words) {
+				btime, _ = strconv.ParseInt(words[i+1], 10, 64)
+				i++
+			}
+		case "winc":
+			if i+1 < len(words) {
+				winc, _ = strconv.ParseInt(words[i+1], 10, 64)
+				i++
+			}
 		case "binc":
-			binc, _ = strconv.ParseInt(words[i+1], 10, 64)
+			if i+1 < len(words) {
+				binc, _ = strconv.ParseInt(words[i+1], 10, 64)
+				i++
+			}
 		}
 	}
 
-	var bestMove Move
+	// Start search in a goroutine
+	go func() {
+		var bestMove Move
 
-	if movetimeSet {
-		bestMove = searchWithTime(b, movetime)
-	} else {
-		if b.turn == WHITE {
-			if winc >= 0 {
-				movetime = wtime/25 + winc - 200
-			} else {
-				movetime = wtime/30
-			}
-			bestMove = searchWithTime(b, movetime)
+		if infinite {
+			movetime = 1000000000 // Use a very large time for infinite search
+		} else if depth > 0 {
+			movetime = 1000000000 // Use a very large time when searching to a specific depth
+		} else if movetimeSet {
+			// Use specified movetime
 		} else {
-			if binc >= 0 {
-				movetime = btime/25 + binc - 200
+			// Calculate time based on remaining time and increment
+			if b.turn == WHITE {
+				if winc >= 0 {
+					movetime = wtime/25 + winc - 200
+				} else {
+					movetime = wtime / 30
+				}
 			} else {
-				movetime = btime/30
+				if binc >= 0 {
+					movetime = btime/25 + binc - 200
+				} else {
+					movetime = btime / 30
+				}
 			}
-			bestMove = searchWithTime(b, movetime)
 		}
-	}
 
-	fmt.Println("bestmove " + bestMove.toUCI())
+		bestMove = searchWithTime(b, movetime)
 
-	if b.plyCnt % 10 == 0 {
-		clearTTable()
-	}
+		// Only output bestmove if we're still searching (i.e., not stopped)
+		searchMutex.Lock()
+		if isSearching {
+			fmt.Println("bestmove " + bestMove.toUCI())
+		}
+		isSearching = false
+		searchMutex.Unlock()
+
+		if b.plyCnt%10 == 0 {
+			clearTTable()
+		}
+	}()
 }
 
 func UciLoop() {
@@ -105,35 +162,37 @@ func UciLoop() {
 			fmt.Println("id author saisree27")
 			fmt.Println("option name Hash type spin default 256 min 1 max 1024")
 			fmt.Println("uciok")
-		}
-		if command == "isready" {
+		} else if command == "isready" {
 			initializeTTable(int(ttSize))
 			fmt.Println("readyok")
-		}
-
-		if command == "ucinewgame" {
+		} else if command == "ucinewgame" {
 			b = Board{}
 			b.InitStartPos()
-		}
-
-		if command == "quit" {
+			clearTTable()
+		} else if command == "quit" {
 			os.Exit(0)
-		}
-
-		if strings.Contains(command, "position") {
+		} else if command == "stop" {
+			searchMutex.Lock()
+			if isSearching && stopChannel != nil {
+				close(stopChannel)
+			}
+			searchMutex.Unlock()
+		} else if command == "ponderhit" {
+			// Currently we don't support pondering, so treat it like a regular move
+			continue
+		} else if strings.Contains(command, "position") {
 			b = processPosition(command)
-		}
-
-		if strings.Contains(command, "go") {
+		} else if strings.Contains(command, "go") {
 			processGo(command, &b)
-		}
-
-	
-		if strings.Contains(command, "setoption") {
+		} else if strings.Contains(command, "setoption") {
 			words := strings.Split(command, " ")
-			ttSize, _ = strconv.ParseInt(words[len(words) - 1], 10, 64)
+			if len(words) >= 5 && words[1] == "name" && words[2] == "Hash" && words[3] == "value" {
+				ttSize, _ = strconv.ParseInt(words[4], 10, 64)
+				initializeTTable(int(ttSize))
+			}
+		} else if command == "d" {
+			// Debug command to print current position
+			b.printFromBitBoards()
 		}
-
 	}
-
 }
