@@ -21,11 +21,14 @@ var historyHeuristic = [100][64][64]int{}
 func quiesce(b *Board, limit int, alpha int, beta int, c Color) int {
 	nodesSearched++
 	eval := evaluate(b) * factor[c]
+
+	// Beta cutoff
 	if eval >= beta {
 		return beta
 	}
 
-	delta := queenVal
+	// Delta pruning before move generation
+	delta := queenVal + 200 // Add some margin for positional compensation
 	if eval < alpha-delta {
 		return alpha
 	}
@@ -42,6 +45,11 @@ func quiesce(b *Board, limit int, alpha int, beta int, c Color) int {
 
 	for _, move := range legalMoves {
 		if move.movetype == CAPTURE || move.movetype == CAPTUREANDPROMOTION || move.movetype == ENPASSANT {
+			// SEE pruning - skip clearly bad captures
+			if !seeGreaterThan(b, move, -50) {
+				continue
+			}
+
 			b.makeMove(move)
 			score := -quiesce(b, limit-1, -beta, -alpha, reverseColor(c))
 			b.undo()
@@ -65,24 +73,29 @@ func orderMovesPV(b *Board, moves *[]Move, pv Move, c Color, depth int, rd int) 
 	for i, mv := range *moves {
 		if mv == pv {
 			(*moves)[i], (*moves)[0] = (*moves)[0], pv
-			bonuses[i] = moveBonus{move: mv, bonus: 30000}
+			bonuses[i] = moveBonus{move: mv, bonus: 2000000} // Highest priority for PV moves
 			continue
 		}
 
 		var bonus int
 		if mv.movetype == CAPTURE || mv.movetype == CAPTUREANDPROMOTION {
-			victim := material[mv.captured]
-			attacker := material[mv.piece]
-			bonus = 100000 + 10*victim - attacker // MVV-LVA
-		} else if mv.movetype == PROMOTION {
-			bonus = 80000 + material[mv.promote]
-		} else {
-			if mv == killerMoves[depth][0] {
-				bonus = 50000
-			} else if mv == killerMoves[depth][1] {
-				bonus = 49000
+			// Use SEE score for captures, scaled up to match bonus range
+			seeScore := seeMove(b, mv)
+			if seeScore > 0 {
+				bonus = 1000000 + seeScore // Good captures
 			} else {
-				// Quiet move: use history heuristic
+				bonus = 500000 + seeScore // Bad captures still above quiet moves
+			}
+		} else if mv.movetype == PROMOTION {
+			bonus = 800000 + material[mv.promote] // Promotions are valuable
+		} else {
+			// Quiet moves
+			if mv == killerMoves[depth][0] {
+				bonus = 600000 // First killer move
+			} else if mv == killerMoves[depth][1] {
+				bonus = 590000 // Second killer move
+			} else {
+				// History heuristic for remaining quiet moves
 				bonus = historyHeuristic[depth][mv.from][mv.to]
 			}
 		}
