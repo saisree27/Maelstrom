@@ -425,7 +425,35 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	return bestScore, timeout
 }
 
+// searchWithTime searches for the best move given a time constraint
 func searchWithTime(b *Board, movetime int64) Move {
+	// Initialize opening book
+	book := NewOpeningBook()
+
+	// Check if we can use a book move
+	if bookMove, variation := book.LookupPosition(b, b.turn); bookMove != "" {
+		// Convert UCI string to Move
+		move := fromUCI(bookMove, b)
+		if variation != "" {
+			fmt.Printf("info string Book move: %s (%s)\n", bookMove, variation)
+		} else {
+			fmt.Printf("info string Book move: %s\n", bookMove)
+		}
+		return move
+	}
+
+	// Check tablebase if we're in an endgame position
+	if isTablebasePosition(b) {
+		if score, bestMove, found := probeTablebase(b.toFEN()); found {
+			if bestMove != "" {
+				move := fromUCI(bestMove, b)
+				fmt.Printf("info score cp %d depth 99 nodes 1 time 1 pv %s\n", score*factor[b.turn], bestMove)
+				fmt.Printf("info string Tablebase position found. Score: %d, Move: %s\n", score, bestMove)
+				return move
+			}
+		}
+	}
+
 	b.printFromBitBoards()
 	startTime := time.Now()
 	line := []Move{}

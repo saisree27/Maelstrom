@@ -637,3 +637,77 @@ func (b *Board) getStringFromBitBoards() string {
 	}
 	return s
 }
+
+// toFEN generates a FEN string from the current board position
+func (b *Board) toFEN() string {
+	var fen strings.Builder
+
+	// Piece placement
+	emptyCount := 0
+	for i := 56; i >= 0; i -= 8 {
+		for j := 0; j < 8; j++ {
+			piece := b.squares[i+j]
+			if piece == EMPTY {
+				emptyCount++
+			} else {
+				if emptyCount > 0 {
+					fen.WriteString(strconv.Itoa(emptyCount))
+					emptyCount = 0
+				}
+				fen.WriteString(piece.toString())
+			}
+		}
+		if emptyCount > 0 {
+			fen.WriteString(strconv.Itoa(emptyCount))
+			emptyCount = 0
+		}
+		if i > 0 {
+			fen.WriteString("/")
+		}
+	}
+
+	// Active color
+	if b.turn == WHITE {
+		fen.WriteString(" w ")
+	} else {
+		fen.WriteString(" b ")
+	}
+
+	// Castling availability
+	hasCastling := false
+	if b.OO {
+		fen.WriteString("K")
+		hasCastling = true
+	}
+	if b.OOO {
+		fen.WriteString("Q")
+		hasCastling = true
+	}
+	if b.oo {
+		fen.WriteString("k")
+		hasCastling = true
+	}
+	if b.ooo {
+		fen.WriteString("q")
+		hasCastling = true
+	}
+	if !hasCastling {
+		fen.WriteString("-")
+	}
+
+	// En passant target square
+	fen.WriteString(" ")
+	if b.enpassant == EMPTYSQ {
+		fen.WriteString("-")
+	} else {
+		fen.WriteString(squareToStringMap[b.enpassant])
+	}
+
+	// Halfmove clock and fullmove number
+	fen.WriteString(" ")
+	fen.WriteString(strconv.Itoa(b.plyCnt))
+	fen.WriteString(" ")
+	fen.WriteString(strconv.Itoa(b.moveCount))
+
+	return fen.String()
+}
