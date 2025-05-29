@@ -376,6 +376,7 @@ func searchWithTime(b *Board, movetime int64) Move {
 	line := []Move{}
 	legalMoves := b.generateLegalMoves()
 	prevBest := Move{}
+	prevScore := 0
 
 	if len(legalMoves) == 1 {
 		return legalMoves[0]
@@ -387,26 +388,54 @@ func searchWithTime(b *Board, movetime int64) Move {
 		timeRemaining := movetime - duration
 
 		if movetime > timeRemaining*2 {
-			// We will probably take twice as much time in the new iteration
-			// than the previous one, so probably wise not to go into the new iteration
 			break
 		}
 		searchStart := time.Now()
-		score, timeout := pvs(b, i, i, -winVal-1, winVal+1, b.turn, true, &line, timeRemaining, time.Now())
+
+		// Aspiration windows
+		alpha := -winVal - 1
+		beta := winVal + 1
+		windowSize := 50 // Default window size
+
+		if i > 5 { // Only use aspiration windows after depth 5
+			if i > 7 {
+				windowSize = 25 // Narrow window for deeper searches
+			}
+			alpha = prevScore - windowSize
+			beta = prevScore + windowSize
+		}
+
+		score := 0
+		timeout := false
+
+		// Aspiration window search with research on fail
+		for {
+			score, timeout = pvs(b, i, i, alpha, beta, b.turn, true, &line, timeRemaining, time.Now())
+			if timeout {
+				return prevBest
+			}
+
+			if score <= alpha {
+				alpha = max(-winVal-1, alpha-windowSize*2)
+				continue
+			}
+			if score >= beta {
+				beta = min(winVal+1, beta+windowSize*2)
+				continue
+			}
+			break
+		}
+
+		prevScore = score
 		timeTaken := time.Since(searchStart).Milliseconds()
 
 		incrementAge()
-
-		if timeout {
-			return prevBest
-		}
 
 		b.makeMove(line[0])
 
 		if b.isTwoFold() && score > 0 {
 			table.entries[b.zobrist%table.count] = TTEntry{}
 			b.undo()
-			// TT three-fold issue
 			fmt.Println("Two-fold repetition encountered, removing TT entry")
 			table.entries[b.zobrist%table.count] = TTEntry{}
 		} else {
@@ -430,4 +459,19 @@ func searchWithTime(b *Board, movetime int64) Move {
 		prevBest = line[0]
 	}
 	return prevBest
+}
+
+// Helper function for aspiration windows
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
