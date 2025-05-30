@@ -158,9 +158,14 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		return evaluate(b) * factor[c], false
 	}
 
+	// Check for threefold repetition
 	if b.isThreeFoldRep() {
+		// Don't store repetition positions in TT since their value depends on game history
 		return 0, false
 	}
+
+	// Check for potential repetition (twofold)
+	potentialRep := b.isTwoFold()
 
 	bestScore := 0
 	timeout := false
@@ -168,10 +173,13 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	oldAlpha := alpha
 	isPv := beta > alpha+1
 
-	res, found := probeTT(b, &bestScore, &alpha, &beta, depth, rd, &bestMove)
-	if res {
-		*line = append(*line, bestMove)
-		return found, false
+	// Only probe TT if this isn't a potential repetition position
+	if !potentialRep {
+		res, found := probeTT(b, &bestScore, &alpha, &beta, depth, rd, &bestMove)
+		if res {
+			*line = append(*line, bestMove)
+			return found, false
+		}
 	}
 
 	// Internal Iterative Deepening
@@ -411,16 +419,19 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	}
 
 	if !timeout {
-		var flag bound
-		if bestScore <= oldAlpha {
-			flag = upper
-		} else if bestScore >= beta {
-			flag = lower
-		} else {
-			flag = exact
-		}
+		// Only store in TT if this isn't a potential repetition position
+		if !potentialRep {
+			var flag bound
+			if bestScore <= oldAlpha {
+				flag = upper
+			} else if bestScore >= beta {
+				flag = lower
+			} else {
+				flag = exact
+			}
 
-		storeEntry(b, bestScore, flag, bestMove, depth)
+			storeEntry(b, bestScore, flag, bestMove, depth)
+		}
 	}
 
 	return bestScore, timeout
