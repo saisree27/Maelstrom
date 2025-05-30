@@ -50,7 +50,7 @@ const pawnShieldUpDown int = -50
 const pawnShieldRight int = -15
 const kingAir int = -10
 const notCastled int = -30
-const cannotCastle int = -80
+const cannotCastle int = -60
 
 const samePieceTwice int = -15
 const piecesOnBackRank int = -15

@@ -35,7 +35,7 @@ func NewOpeningBook() *OpeningBook {
 
 	// White repertoire
 	book.addWhiteLine([]string{"e2e4", "e7e5", "g1f3", "b8c6", "f1b5", "a7a6", "b5a4", "g8f6", "e1g1", "f8e7"}, "Ruy Lopez")
-	book.addWhiteLine([]string{"e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "f8c5", "c2c3", "d7d6", "d2d3"}, "Giuoco Piano")
+	book.addWhiteLine([]string{"e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "f8c5", "c2c3", "g8f6", "d2d3"}, "Giuoco Piano")
 	book.addWhiteLine([]string{"e2e4", "c7c5", "g1f3", "b8c6", "f1b5", "g8f6", "b5c6", "d7c6", "d2d3"}, "Sicilian Rossolimo")
 	book.addWhiteLine([]string{"e2e4", "c7c5", "g1f3", "d7d6", "f1b5"}, "Sicilian Canal")
 	book.addWhiteLine([]string{"d2d4", "d7d5", "c2c4", "e7e6", "g1f3", "g8f6", "b1c3"}, "QGD")
@@ -46,7 +46,7 @@ func NewOpeningBook() *OpeningBook {
 
 	// Black repertoire
 	book.addBlackLine([]string{"e2e4", "e7e5", "g1f3", "b8c6", "f1b5", "a7a6", "b5a4", "g8f6", "e1g1", "f8e7"}, "Ruy Lopez")
-	book.addBlackLine([]string{"e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "f8c5", "c2c3", "d7d6"}, "Giuoco Piano")
+	book.addBlackLine([]string{"e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "f8c5", "c2c3", "g8f6"}, "Giuoco Piano")
 	book.addBlackLine([]string{"e2e4", "c7c5", "g1f3", "b8c6", "f1b5", "g8f6", "b5c6", "d7c6", "d2d3", "c8g4"}, "Sicilian Rossolimo")
 	book.addBlackLine([]string{"e2e4", "c7c5", "g1f3", "b8c6", "d2d4", "c5d4", "f3d4", "g8f6", "d4c6", "b7c6"}, "Sicilian")
 	book.addBlackLine([]string{"e2e4", "c7c5", "g1f3", "b8c6", "d2d4", "c5d4", "f3d4", "g8f6", "b1c3", "e7e6"}, "Sicilian")
