@@ -72,6 +72,8 @@ func probeTablebase(fen string) (int, string, bool) {
 		return 0, "", false
 	}
 
+	fmt.Printf("Tablebase result: %+v\n", result)
+
 	// No moves available
 	if len(result.Moves) == 0 {
 		return 0, "", false
@@ -94,18 +96,17 @@ func probeTablebase(fen string) (int, string, bool) {
 		score = 0
 	}
 
-	// Filter moves to only include those matching the position's category
-	var filteredMoves []TablebaseMove
-	for _, move := range result.Moves {
-		if move.Category == result.Category {
-			filteredMoves = append(filteredMoves, move)
-		}
-	}
-
-	// Update result.Moves to filtered list
-	result.Moves = filteredMoves
-
 	if result.Category == "draw" {
+		// Filter moves to only include those matching the position's category
+		var filteredMoves []TablebaseMove
+		for _, move := range result.Moves {
+			if move.Category == result.Category {
+				filteredMoves = append(filteredMoves, move)
+			}
+		}
+
+		// Update result.Moves to filtered list
+		result.Moves = filteredMoves
 		var drawingMoves []string
 		for _, move := range filteredMoves {
 			drawingMoves = append(drawingMoves, move.Uci)
@@ -113,7 +114,6 @@ func probeTablebase(fen string) (int, string, bool) {
 		return 0, fmt.Sprintf("draw:%s", strings.Join(drawingMoves, ",")), true
 	}
 
-	// Return if no moves left after filtering
 	if len(result.Moves) == 0 {
 		return 0, "", false
 	}
