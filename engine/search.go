@@ -2,7 +2,6 @@ package engine
 
 import (
 	"fmt"
-	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -593,7 +592,14 @@ func searchWithTime(b *Board, movetime int64) Move {
 		}
 
 		// if line[0] is an illegal move, go back one depth and clear TT/killer/history
-		if !slices.Contains(b.generateLegalMoves(), line[0]) {
+		isLegal := false
+		for _, legalMove := range b.generateLegalMoves() {
+			if legalMove == line[0] {
+				isLegal = true
+				break
+			}
+		}
+		if !isLegal {
 			fmt.Println("Illegal move encountered, going back one depth")
 			i--
 			clearTTable()

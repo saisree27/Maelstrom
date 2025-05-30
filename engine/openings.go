@@ -45,7 +45,8 @@ func NewOpeningBook() *OpeningBook {
 	book.addWhiteLine([]string{"d2d4", "d7d5", "c2c4", "d5c4", "g1f3", "c7c5", "e2e4", "c5d4", "d1d4", "d8d4", "f3d4", "g8f6", "d4b5", "b8a6", "f2f3"}, "QGA")
 	book.addWhiteLine([]string{"d2d4", "g8f6", "c2c4", "e7e6", "b1c3", "f8b4"}, "Nimzo-Indian")
 	book.addWhiteLine([]string{"d2d4", "g8f6", "c2c4", "e7e6", "g1f3", "d7d5"}, "QGD")
-	book.addWhiteLine([]string{"d2d4", "c7c6", "e2e4"}, "Caro")
+	book.addWhiteLine([]string{"d2d4", "c7c6", "e2e4", "d7d5", "b1c3"}, "Caro")
+	book.addWhiteLine([]string{"e2e4", "e7e6", "d2d4", "d7d5", "e4d5"}, "Exchange French")
 
 	// Black repertoire
 	book.addBlackLine([]string{"e2e4", "e7e5", "g1f3", "b8c6", "f1b5", "a7a6", "b5a4", "g8f6", "e1g1", "b7b5"}, "Ruy Lopez")
