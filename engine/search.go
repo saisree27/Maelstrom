@@ -2,6 +2,7 @@ package engine
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -153,15 +154,15 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		return quiesce(b, 4, alpha, beta, c), false
 	}
 
-	legalMoves := b.generateLegalMoves()
-	if len(legalMoves) == 0 {
-		return evaluate(b) * factor[c], false
-	}
-
 	// Check for threefold repetition
 	if b.isThreeFoldRep() {
 		// Don't store repetition positions in TT since their value depends on game history
 		return 0, false
+	}
+
+	legalMoves := b.generateLegalMoves()
+	if len(legalMoves) == 0 {
+		return evaluate(b) * factor[c], false
 	}
 
 	// Check for potential repetition (twofold)
@@ -589,6 +590,16 @@ func searchWithTime(b *Board, movetime int64) Move {
 		if score == winVal || score == -winVal {
 			clearTTable()
 			return line[0]
+		}
+
+		// if line[0] is an illegal move, go back one depth and clear TT/killer/history
+		if !slices.Contains(b.generateLegalMoves(), line[0]) {
+			fmt.Println("Illegal move encountered, going back one depth")
+			i--
+			clearTTable()
+			killerMoves[i] = [2]Move{}
+			historyHeuristic[i] = [64][64]int{}
+			continue
 		}
 
 		prevBest = line[0]
