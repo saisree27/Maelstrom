@@ -39,10 +39,12 @@ func NewOpeningBook() *OpeningBook {
 	book.addWhiteLine([]string{"e2e4", "c7c5", "g1f3", "b8c6", "f1b5", "g8f6", "b5c6", "d7c6", "d2d3"}, "Sicilian Rossolimo")
 	book.addWhiteLine([]string{"e2e4", "c7c5", "g1f3", "d7d6", "f1b5"}, "Sicilian Canal")
 	book.addWhiteLine([]string{"d2d4", "d7d5", "c2c4", "e7e6", "g1f3", "g8f6", "b1c3"}, "QGD")
+	book.addWhiteLine([]string{"d2d4", "d7d5", "c2c4", "c7c6", "c4d5"}, "Exchange Slav")
 	book.addWhiteLine([]string{"d2d4", "d7d5", "c2c4", "d5c4", "g1f3", "g8f6", "e2e3", "b7b5", "a2a4", "c7c6", "a4b5", "c6b5", "b2b3"}, "QGA")
 	book.addWhiteLine([]string{"d2d4", "d7d5", "c2c4", "d5c4", "g1f3", "c7c5", "e2e4", "c5d4", "d1d4", "d8d4", "f3d4", "g8f6", "d4b5", "b8a6", "f2f3"}, "QGA")
 	book.addWhiteLine([]string{"d2d4", "g8f6", "c2c4", "e7e6", "b1c3", "f8b4"}, "Nimzo-Indian")
 	book.addWhiteLine([]string{"d2d4", "g8f6", "c2c4", "e7e6", "g1f3", "d7d5"}, "QGD")
+	book.addWhiteLine([]string{"d2d4", "c7c6", "e2e4"}, "Caro")
 
 	// Black repertoire
 	book.addBlackLine([]string{"e2e4", "e7e5", "g1f3", "b8c6", "f1b5", "a7a6", "b5a4", "g8f6", "e1g1", "f8e7"}, "Ruy Lopez")

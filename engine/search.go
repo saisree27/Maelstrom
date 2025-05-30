@@ -494,7 +494,7 @@ func searchWithTime(b *Board, movetime int64) Move {
 
 				// Not a drawing position, use the tablebase move directly
 				move := fromUCI(bestMove, b)
-				fmt.Printf("info depth 99 nodes 1 time 1 score cp %d pv %s\n", score*factor[b.turn], bestMove)
+				fmt.Printf("info depth 99 nodes 1 time 1 score cp %d pv %s\n", score, bestMove)
 				return move
 			}
 		}
@@ -584,9 +584,7 @@ func searchWithTime(b *Board, movetime int64) Move {
 			strLine += " " + move.toUCI()
 		}
 
-		signed := score * factor[b.turn]
-
-		fmt.Printf("info depth %d nodes %d time %d score cp %d pv%s\n", i, nodesSearched, timeTaken, signed, strLine)
+		fmt.Printf("info depth %d nodes %d time %d score cp %d pv%s\n", i, nodesSearched, timeTaken, score, strLine)
 
 		if score == winVal || score == -winVal {
 			clearTTable()
