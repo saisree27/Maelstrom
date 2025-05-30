@@ -10,12 +10,13 @@ import (
 
 // TablebaseMove represents a single move in the tablebase response
 type TablebaseMove struct {
-	Uci     string `json:"uci"`     // Move in UCI format
-	San     string `json:"san"`     // Move in SAN format
-	Dtz     int    `json:"dtz"`     // Distance to zero
-	Dtm     int    `json:"dtm"`     // Distance to mate
-	Wdl     int    `json:"wdl"`     // Win, draw, or loss
-	Zeroing bool   `json:"zeroing"` // Whether this is a zeroing move
+	Uci      string `json:"uci"`      // Move in UCI format
+	San      string `json:"san"`      // Move in SAN format
+	Dtz      int    `json:"dtz"`      // Distance to zero
+	Dtm      int    `json:"dtm"`      // Distance to mate
+	Wdl      int    `json:"wdl"`      // Win, draw, or loss
+	Zeroing  bool   `json:"zeroing"`  // Whether this is a zeroing move
+	Category string `json:"category"` // "win", "loss", "draw", "unknown", "cursed-win", "blessed-loss"
 }
 
 // TablebaseResult represents the response from the lichess tablebase API
@@ -70,6 +71,8 @@ func probeTablebase(fen string) (int, string, bool) {
 		return 0, "", false
 	}
 
+	fmt.Printf("Tablebase result: %+v\n", result)
+
 	// No moves available
 	if len(result.Moves) == 0 {
 		return 0, "", false
@@ -91,25 +94,23 @@ func probeTablebase(fen string) (int, string, bool) {
 	default:
 		score = 0
 	}
-
-	// Select best move based on category
-	var bestMove TablebaseMove
-	if result.Category == "win" || result.Category == "cursed-win" {
-		// In winning positions, choose fastest win
-		bestMove = result.Moves[0] // Moves are already sorted by DTZ
-	} else if result.Category == "loss" || result.Category == "blessed-loss" {
-		// In losing positions, choose slowest loss
-		bestMove = result.Moves[len(result.Moves)-1]
-	} else {
-		// In drawn positions, prefer zeroing moves
-		bestMove = result.Moves[0]
-		for _, move := range result.Moves {
-			if move.Zeroing {
-				bestMove = move
-				break
-			}
+	// Filter moves to only include those matching the position's category
+	var filteredMoves []TablebaseMove
+	for _, move := range result.Moves {
+		if move.Category == result.Category {
+			filteredMoves = append(filteredMoves, move)
 		}
 	}
+
+	// Update result.Moves to filtered list
+	result.Moves = filteredMoves
+
+	// Return if no moves left after filtering
+	if len(result.Moves) == 0 {
+		return 0, "", false
+	}
+
+	var bestMove TablebaseMove = result.Moves[0]
 
 	return score, bestMove.Uci, true
 }

@@ -50,6 +50,7 @@ const pawnShieldUpDown int = -50
 const pawnShieldRight int = -15
 const kingAir int = -10
 const notCastled int = -30
+const cannotCastle int = -80
 
 const samePieceTwice int = -15
 const piecesOnBackRank int = -15
@@ -511,49 +512,64 @@ func evaluateKings(b *Board, eval *int, totalPieces int) {
 		*eval += kingSquareTableMiddlegame[wKing]
 		*eval -= kingSquareTableMiddlegame[reversePSQ[bKing]]
 
-		if !b.OO && !b.OOO {
-			// Pawn shield
-			pawns := b.pieces[wP]
-			nw := shiftBitboard(sToBB[wKing], NW) & pawns
-			n := shiftBitboard(sToBB[wKing], NORTH) & pawns
-			ne := shiftBitboard(sToBB[wKing], NE) & pawns
+		// White king:
+		if wKing != e1 && !b.whiteCastled {
+			*eval += cannotCastle
+		}
 
-			if nw == 0 {
-				*eval += pawnShieldLeft
-			}
-			if n == 0 {
-				*eval += pawnShieldUpDown
-			}
-			if ne == 0 {
-				*eval += pawnShieldRight
-			}
-		} else if !b.oo && !b.ooo {
-			// Pawn shield
-			pawns := b.pieces[bP]
-			sw := shiftBitboard(sToBB[bKing], SW) & pawns
-			s := shiftBitboard(sToBB[bKing], SOUTH) & pawns
-			se := shiftBitboard(sToBB[bKing], SE) & pawns
-
-			if sw == 0 {
-				*eval -= pawnShieldLeft
-			}
-			if s == 0 {
-				*eval -= pawnShieldUpDown
-			}
-			if se == 0 {
-				*eval -= pawnShieldRight
-			}
-		} else {
+		if sToBB[wKing]&ranks[R1] != 0 { // If first rank
+			// Mask out squares in the same rank
 			empty := b.empty // Cache empty squares bitboard
-			airW := popCount(kingAttacks(wKing) & empty)
-			airB := popCount(kingAttacks(bKing) & empty)
+			attacks := kingAttacks(wKing) & empty
+			attacks &= ^ranks[R1]
+			airW := popCount(attacks)
+			*eval += airW * kingAir
+		}
 
-			if airW >= 2 {
-				*eval += airW * kingAir
-			}
-			if airB >= 2 {
-				*eval -= airB * kingAir
-			}
+		// Pawn shield
+		pawns := b.pieces[wP]
+		nw := shiftBitboard(sToBB[wKing], NW) & pawns
+		n := shiftBitboard(sToBB[wKing], NORTH) & pawns
+		ne := shiftBitboard(sToBB[wKing], NE) & pawns
+
+		if nw == 0 {
+			*eval += pawnShieldLeft
+		}
+		if n == 0 {
+			*eval += pawnShieldUpDown
+		}
+		if ne == 0 {
+			*eval += pawnShieldRight
+		}
+
+		// Black king:
+		if bKing != e8 && !b.blackCastled {
+			*eval -= cannotCastle
+		}
+
+		if sToBB[bKing]&ranks[R8] != 0 { // If first rank
+			// Mask out squares in the same rank
+			empty := b.empty // Cache empty squares bitboard
+			attacks := kingAttacks(bKing) & empty
+			attacks &= ^ranks[R8]
+			airB := popCount(attacks)
+			*eval -= airB * kingAir
+		}
+
+		// Pawn shield
+		pawns = b.pieces[bP]
+		sw := shiftBitboard(sToBB[bKing], SW) & pawns
+		s := shiftBitboard(sToBB[bKing], SOUTH) & pawns
+		se := shiftBitboard(sToBB[bKing], SE) & pawns
+
+		if sw == 0 {
+			*eval -= pawnShieldLeft
+		}
+		if s == 0 {
+			*eval -= pawnShieldUpDown
+		}
+		if se == 0 {
+			*eval -= pawnShieldRight
 		}
 	}
 }
