@@ -3,6 +3,7 @@ package engine
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -446,9 +447,43 @@ func searchWithTime(b *Board, movetime int64) Move {
 	if isTablebasePosition(b) {
 		if score, bestMove, found := probeTablebase(b.toFEN()); found {
 			if bestMove != "" {
+				// Check if this is a drawing position with multiple moves
+				if strings.HasPrefix(bestMove, "draw:") {
+					// Get the list of drawing moves
+					drawingMoves := strings.Split(strings.TrimPrefix(bestMove, "draw:"), ",")
+
+					// Search these moves to find the best one
+					bestScore := -winVal - 1
+					var bestDrawingMove Move
+					line := []Move{}
+					strLine := ""
+
+					searchStart := time.Now()
+					// Try each drawing move
+					for _, moveStr := range drawingMoves {
+						move := fromUCI(moveStr, b)
+						b.makeMove(move)
+						score, _ := pvs(b, 6, 6, -winVal-1, winVal+1, b.turn, true, &line, movetime/2, time.Now())
+						score *= -1 // Negate score since we evaluated from opponent's perspective
+						b.undo()
+
+						if score > bestScore {
+							bestScore = score
+							bestDrawingMove = move
+							strLine = bestDrawingMove.toUCI()
+							for _, m := range line {
+								strLine += " " + m.toUCI()
+							}
+						}
+					}
+
+					fmt.Printf("info depth 6 nodes %d time %d score cp %d pv %s\n", nodesSearched, time.Since(searchStart).Milliseconds(), bestScore*factor[b.turn], strLine)
+					return bestDrawingMove
+				}
+
+				// Not a drawing position, use the tablebase move directly
 				move := fromUCI(bestMove, b)
-				fmt.Printf("info score cp %d depth 99 nodes 1 time 1 pv %s\n", score*factor[b.turn], bestMove)
-				fmt.Printf("info string Tablebase position found. Score: %d, Move: %s\n", score, bestMove)
+				fmt.Printf("info depth 99 nodes 1 time 1 score cp %d pv %s\n", score*factor[b.turn], bestMove)
 				return move
 			}
 		}

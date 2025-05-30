@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 // TablebaseMove represents a single move in the tablebase response
@@ -35,7 +36,7 @@ type TablebaseResult struct {
 // probeTablebase queries the lichess tablebase API for a position
 // Returns (score, bestMove, found)
 // score: tablebase score (mate score if DTM available, otherwise uses DTZ)
-// bestMove: best move in UCI format
+// bestMove: best move in UCI format (or comma-separated list of drawing moves if position is a draw)
 // found: whether the position was found in the tablebase
 func probeTablebase(fen string) (int, string, bool) {
 	// Encode FEN for URL
@@ -71,8 +72,6 @@ func probeTablebase(fen string) (int, string, bool) {
 		return 0, "", false
 	}
 
-	fmt.Printf("Tablebase result: %+v\n", result)
-
 	// No moves available
 	if len(result.Moves) == 0 {
 		return 0, "", false
@@ -94,6 +93,7 @@ func probeTablebase(fen string) (int, string, bool) {
 	default:
 		score = 0
 	}
+
 	// Filter moves to only include those matching the position's category
 	var filteredMoves []TablebaseMove
 	for _, move := range result.Moves {
@@ -104,6 +104,14 @@ func probeTablebase(fen string) (int, string, bool) {
 
 	// Update result.Moves to filtered list
 	result.Moves = filteredMoves
+
+	if result.Category == "draw" {
+		var drawingMoves []string
+		for _, move := range filteredMoves {
+			drawingMoves = append(drawingMoves, move.Uci)
+		}
+		return 0, fmt.Sprintf("draw:%s", strings.Join(drawingMoves, ",")), true
+	}
 
 	// Return if no moves left after filtering
 	if len(result.Moves) == 0 {
