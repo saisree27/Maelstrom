@@ -103,7 +103,7 @@ func probeTT(b *Board, score *int, alpha *int, beta *int, depth int, rd int, m *
 	return false, 0
 }
 
-// Increment age counter periodically (call this at the start of each search)
+// Increment age counter periodically 
 func incrementAge() {
 	table.age++
 }

@@ -19,7 +19,7 @@ var nodesSearched = 0
 var killerMoves = [100][2]Move{}
 var historyHeuristic = [100][64][64]int{}
 
-func quiesce(b *Board, limit int, alpha int, beta int, c Color) int {
+func quiesce(b *Board, limit int, alpha int, beta int, c Color, rd int) int {
 	nodesSearched++
 
 	// Check for stop signal
@@ -31,16 +31,11 @@ func quiesce(b *Board, limit int, alpha int, beta int, c Color) int {
 	}
 
 	eval := evaluate(b) * factor[c]
+	inCheck := rd <= 2 && b.isCheck(c)
 
 	// Beta cutoff
-	if eval >= beta {
+	if eval >= beta && !inCheck {
 		return beta
-	}
-
-	// Delta pruning before move generation
-	delta := queenVal + 200 // Add some margin for positional compensation
-	if eval < alpha-delta {
-		return alpha
 	}
 
 	if alpha < eval {
@@ -55,13 +50,8 @@ func quiesce(b *Board, limit int, alpha int, beta int, c Color) int {
 
 	for _, move := range legalMoves {
 		if move.movetype == CAPTURE || move.movetype == CAPTUREANDPROMOTION || move.movetype == ENPASSANT {
-			// SEE pruning - skip clearly bad captures
-			if !seeGreaterThan(b, move, -50) {
-				continue
-			}
-
 			b.makeMove(move)
-			score := -quiesce(b, limit-1, -beta, -alpha, reverseColor(c))
+			score := -quiesce(b, limit-1, -beta, -alpha, reverseColor(c), rd+1)
 			// Check for stop signal after recursive call
 			select {
 			case <-stopChannel:
@@ -150,7 +140,7 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	}
 
 	if depth <= 0 {
-		return quiesce(b, 4, alpha, beta, c), false
+		return quiesce(b, 4, alpha, beta, c, rd-depth), false
 	}
 
 	// Check for threefold repetition
@@ -213,7 +203,7 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 
 		if staticEval+razorMargin <= alpha {
 			// Try qsearch to verify if position is really bad
-			qScore := quiesce(b, 4, alpha-razorMargin, alpha-razorMargin+1, c)
+			qScore := quiesce(b, 4, alpha-razorMargin, alpha-razorMargin+1, c, 4)
 			if qScore <= alpha-razorMargin {
 				return qScore, false
 			}
@@ -268,23 +258,25 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 
 	hasNotJustPawns := b.colors[c] ^ b.getColorPieces(pawn, c)
 
-	if doNull && !check && hasNotJustPawns != 0 && b.plyCnt > 0 {
+	// Pre-allocate PV line for child nodes
+	childPV := make([]Move, 0, 100)
+
+	if doNull && !check && !isPv && hasNotJustPawns != 0 && b.plyCnt > 0 {
 		b.makeNullMove()
-		bestScore, timeout = pvs(b, depth-R-1, rd, -beta, -beta+1, reverseColor(c), false, line, tR, st)
+		bestScore, timeout = pvs(b, depth-1-R, rd, -beta, -beta+1, reverseColor(c), false, &childPV, tR, st)
 		bestScore *= -1
 		if timeout {
 			b.undoNullMove()
 			return 0, true
 		}
+
+		childPV = make([]Move, 0, 100)
 		b.undoNullMove()
 
 		if bestScore >= beta {
-			return beta, false
+			return bestScore, false
 		}
 	}
-
-	// Pre-allocate PV line for child nodes
-	childPV := make([]Move, 0, 100)
 
 	for i, move := range legalMoves {
 		if timeout {
