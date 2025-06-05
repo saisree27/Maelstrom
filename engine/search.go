@@ -432,19 +432,19 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 // searchWithTime searches for the best move given a time constraint
 func searchWithTime(b *Board, movetime int64) Move {
 	// Initialize opening book
-	book := NewOpeningBook()
+	// book := NewOpeningBook()
 
-	// Check if we can use a book move
-	if bookMove, variation := book.LookupPosition(b, b.turn); bookMove != "" {
-		// Convert UCI string to Move
-		move := fromUCI(bookMove, b)
-		if variation != "" {
-			fmt.Printf("info string Book move: %s (%s)\n", bookMove, variation)
-		} else {
-			fmt.Printf("info string Book move: %s\n", bookMove)
-		}
-		return move
-	}
+	// // Check if we can use a book move
+	// if bookMove, variation := book.LookupPosition(b, b.turn); bookMove != "" {
+	// 	// Convert UCI string to Move
+	// 	move := fromUCI(bookMove, b)
+	// 	if variation != "" {
+	// 		fmt.Printf("info string Book move: %s (%s)\n", bookMove, variation)
+	// 	} else {
+	// 		fmt.Printf("info string Book move: %s\n", bookMove)
+	// 	}
+	// 	return move
+	// }
 
 	// Check tablebase if we're in an endgame position
 	if isTablebasePosition(b) {
@@ -557,6 +557,7 @@ func searchWithTime(b *Board, movetime int64) Move {
 
 		prevScore = score
 		timeTaken := time.Since(searchStart).Milliseconds()
+		timeTakenNanoSeconds := time.Since(searchStart).Nanoseconds()
 
 		incrementAge()
 
@@ -576,7 +577,8 @@ func searchWithTime(b *Board, movetime int64) Move {
 			strLine += " " + move.toUCI()
 		}
 
-		fmt.Printf("info depth %d nodes %d time %d score cp %d pv%s\n", i, nodesSearched, timeTaken, score, strLine)
+		nps := nodesSearched * 1000000000 / max(int(timeTakenNanoSeconds), 1)
+		fmt.Printf("info depth %d nodes %d time %d score cp %d nps %d pv%s\n", i, nodesSearched, timeTaken, score, nps, strLine)
 
 		if score == winVal || score == -winVal {
 			clearTTable()
@@ -613,7 +615,6 @@ func searchWithTime(b *Board, movetime int64) Move {
 	return prevBest
 }
 
-// Helper function for aspiration windows
 func max(a, b int) int {
 	if a > b {
 		return a
