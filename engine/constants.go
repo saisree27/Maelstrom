@@ -217,7 +217,7 @@ var almostPromotion = []Rank{WHITE: R7, BLACK: R2}
 var startingRank = []Rank{WHITE: R2, BLACK: R7}
 var pawnPushDirection = []Direction{WHITE: NORTH, BLACK: SOUTH}
 
-type Square uint8
+type Square int8
 
 // LERM ordering
 const (

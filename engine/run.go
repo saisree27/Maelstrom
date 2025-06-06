@@ -22,9 +22,6 @@ func initializeEverythingExceptTTable() {
 func Run(command string, position string, depth int) {
 	initializeEverythingExceptTTable()
 	initializeTTable(256)
-	if command == "perft" {
-		RunPerfTests(position, depth)
-	}
 	if command == "search" {
 		RunSearch(position, depth)
 	}
