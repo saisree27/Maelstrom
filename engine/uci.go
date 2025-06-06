@@ -13,6 +13,7 @@ import (
 var stopChannel chan struct{}
 var searchMutex sync.Mutex
 var isSearching bool
+var useOpeningBook bool = false
 
 func processPosition(command string) Board {
 	b := Board{}
@@ -189,6 +190,10 @@ func UciLoop() {
 			if len(words) >= 5 && words[1] == "name" && words[2] == "Hash" && words[3] == "value" {
 				ttSize, _ = strconv.ParseInt(words[4], 10, 64)
 				initializeTTable(int(ttSize))
+			}
+
+			if words[1] == "name" && words[2] == "UseBook" && words[3] == "value" {
+				useOpeningBook, _ = strconv.ParseBool(words[4])
 			}
 		} else if command == "d" {
 			// Debug command to print current position

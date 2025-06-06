@@ -49,10 +49,10 @@ const lightSquares = 0x55AA55AA55AA55AA
 const darkSquares = 0xAA55AA55AA55AA55
 
 const queenside = 0xf0f0f0f0f0f0f0f
-const kingside  = 0xf0f0f0f0f0f0f0f0
+const kingside = 0xf0f0f0f0f0f0f0f0
 
 // Defining color (white = 0, black = 1)
-type Color int
+type Color uint8
 
 const (
 	WHITE Color = iota
@@ -64,7 +64,7 @@ func reverseColor(c Color) Color {
 	return Color(c ^ 1)
 }
 
-type Piece int
+type Piece uint8
 
 const (
 	wP Piece = iota
@@ -130,7 +130,7 @@ func (p Piece) getColor() Color {
 	}
 }
 
-type PieceType int
+type PieceType uint8
 
 const (
 	pawn PieceType = iota
@@ -148,7 +148,7 @@ func getCP(c Color, pt PieceType) Piece {
 // access bitboard of correct color (e.g. pieces[wP + colorIndexOffset * color])
 const colorIndexOffset = 6
 
-type MoveType int
+type MoveType uint8
 
 const (
 	QUIET MoveType = iota
@@ -173,7 +173,7 @@ const (
 	SE    Direction = -7
 )
 
-type File int
+type File uint8
 
 const (
 	A File = iota
@@ -188,19 +188,19 @@ const (
 
 var fileNeighbors [8]u64
 
-func initNeighborMasks()  {
-	for f := A; f <= H; f++{
+func initNeighborMasks() {
+	for f := A; f <= H; f++ {
 		if f == A {
 			fileNeighbors[f] = files[B]
 		} else if f == H {
 			fileNeighbors[f] = files[G]
 		} else {
-			fileNeighbors[f] = files[f - 1] | files[f + 1]
+			fileNeighbors[f] = files[f-1] | files[f+1]
 		}
 	}
 }
 
-type Rank int
+type Rank uint8
 
 const (
 	R1 Rank = iota
@@ -217,7 +217,7 @@ var almostPromotion = []Rank{WHITE: R7, BLACK: R2}
 var startingRank = []Rank{WHITE: R2, BLACK: R7}
 var pawnPushDirection = []Direction{WHITE: NORTH, BLACK: SOUTH}
 
-type Square int
+type Square uint8
 
 // LERM ordering
 const (

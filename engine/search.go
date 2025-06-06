@@ -165,7 +165,7 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 
 	// Only probe TT if this isn't a potential repetition position
 	if !potentialRep {
-		res, found := probeTT(b, &bestScore, &alpha, &beta, depth, rd, &bestMove)
+		res, found := probeTT(b, &bestScore, &alpha, &beta, uint8(depth), uint8(rd), &bestMove)
 		if res {
 			*line = append(*line, bestMove)
 			return found, false
@@ -422,7 +422,7 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 				flag = exact
 			}
 
-			storeEntry(b, bestScore, flag, bestMove, depth)
+			storeEntry(b, bestScore, flag, bestMove, uint8(depth))
 		}
 	}
 
@@ -431,20 +431,22 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 
 // searchWithTime searches for the best move given a time constraint
 func searchWithTime(b *Board, movetime int64) Move {
-	// Initialize opening book
-	// book := NewOpeningBook()
+	if useOpeningBook {
+		// Initialize opening book
+		book := NewOpeningBook()
 
-	// // Check if we can use a book move
-	// if bookMove, variation := book.LookupPosition(b, b.turn); bookMove != "" {
-	// 	// Convert UCI string to Move
-	// 	move := fromUCI(bookMove, b)
-	// 	if variation != "" {
-	// 		fmt.Printf("info string Book move: %s (%s)\n", bookMove, variation)
-	// 	} else {
-	// 		fmt.Printf("info string Book move: %s\n", bookMove)
-	// 	}
-	// 	return move
-	// }
+		// Check if we can use a book move
+		if bookMove, variation := book.LookupPosition(b, b.turn); bookMove != "" {
+			// Convert UCI string to Move
+			move := fromUCI(bookMove, b)
+			if variation != "" {
+				fmt.Printf("info string Book move: %s (%s)\n", bookMove, variation)
+			} else {
+				fmt.Printf("info string Book move: %s\n", bookMove)
+			}
+			return move
+		}
+	}
 
 	// Check tablebase if we're in an endgame position
 	if isTablebasePosition(b) {

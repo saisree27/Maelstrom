@@ -5,7 +5,7 @@ import (
 	"unsafe"
 )
 
-type bound int
+type bound uint8
 
 const (
 	upper bound = iota
@@ -15,11 +15,12 @@ const (
 
 type TTEntry struct {
 	hash     u64
+	score    int32
 	bestMove Move
-	score    int
-	depth    int
+	depth    uint8
 	bd       bound
-	age      uint8 // Age of the entry for replacement strategy
+	age      uint8
+	_        [1]byte
 }
 
 type TTable struct {
@@ -31,19 +32,32 @@ type TTable struct {
 var table TTable
 
 func initializeTTable(megabytes int) {
-	// Round down to nearest power of 2 for better cache utilization
-	size := u64(megabytes) * 1024 * 1024 / u64(unsafe.Sizeof(TTEntry{}))
-	table.count = 1 << bits.Len64(uint64(size-1))
+	// Total bytes available
+	totalBytes := uint64(megabytes) * 1024 * 1024
+
+	// Max number of entries that fit
+	entrySize := uint64(unsafe.Sizeof(TTEntry{}))
+	numEntries := totalBytes / entrySize
+
+	// Round down to nearest power of two for better cache utilization
+	if numEntries == 0 {
+		numEntries = 1 // avoid zero-sized allocation
+	}
+	table.count = 1 << (bits.Len64(numEntries) - 1)
+
+	// Allocate entries
 	table.entries = make([]TTEntry, table.count)
 	table.age = 0
 }
 
 func clearTTable() {
-	table.entries = make([]TTEntry, table.count)
+	for i := range table.entries {
+		table.entries[i] = TTEntry{}
+	}
 	table.age = 0
 }
 
-func storeEntry(b *Board, score int, bd bound, mv Move, depth int) {
+func storeEntry(b *Board, score int, bd bound, mv Move, depth uint8) {
 	entryIndex := b.zobrist % table.count
 	entry := &table.entries[entryIndex]
 
@@ -62,7 +76,7 @@ func storeEntry(b *Board, score int, bd bound, mv Move, depth int) {
 				bestMove: mv,
 				hash:     b.zobrist,
 				bd:       bd,
-				score:    score,
+				score:    int32(score),
 				depth:    depth,
 				age:      table.age,
 			}
@@ -71,7 +85,7 @@ func storeEntry(b *Board, score int, bd bound, mv Move, depth int) {
 	}
 }
 
-func probeTT(b *Board, score *int, alpha *int, beta *int, depth int, rd int, m *Move) (bool, int) {
+func probeTT(b *Board, score *int, alpha *int, beta *int, depth uint8, rd uint8, m *Move) (bool, int) {
 	entryIndex := b.zobrist % table.count
 	entry := &table.entries[entryIndex]
 
@@ -82,7 +96,7 @@ func probeTT(b *Board, score *int, alpha *int, beta *int, depth int, rd int, m *
 		// Get the PV-move
 		*m = entry.bestMove
 		if entry.depth >= depth {
-			*score = entry.score
+			*score = int(entry.score)
 			switch entry.bd {
 			case upper:
 				if *score < *beta && depth != rd {

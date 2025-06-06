@@ -89,13 +89,14 @@ func (b *Board) generateMovesFromLocs(m *[]Move, sq Square, locs u64, c Color) {
 	var lsb Square
 	var bbLSB u64
 	var piece Piece
+	var movet MoveType
 	for locs != 0 {
 		lsb = Square(popLSB(&locs))
 		bbLSB = sToBB[lsb]
 		piece = b.squares[sq]
 
 		if piece == wP && (bbLSB&ranks[R8] != 0) {
-			movet := PROMOTION
+			movet = PROMOTION
 			if b.squares[lsb] != EMPTY {
 				movet = CAPTUREANDPROMOTION
 			}
@@ -107,7 +108,7 @@ func (b *Board) generateMovesFromLocs(m *[]Move, sq Square, locs u64, c Color) {
 				Move{from: sq, to: lsb, piece: wP, colorMoved: c, captured: b.squares[lsb], movetype: movet, promote: wB},
 			)
 		} else if piece == bP && (bbLSB&ranks[R1] != 0) {
-			movet := PROMOTION
+			movet = PROMOTION
 			if b.squares[lsb] != EMPTY {
 				movet = CAPTUREANDPROMOTION
 			}

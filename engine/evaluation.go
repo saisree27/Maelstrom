@@ -326,7 +326,7 @@ func evaluatePawns(b *Board, eval *int) {
 			} else {
 				*eval -= isolatedPawn
 			}
-			if b.squares[square+Square(SOUTH)].getColor() == WHITE {
+			if b.squares[Square(int32(square)+int32(SOUTH))].getColor() == WHITE {
 				*eval -= isolatedPawnBlocked
 			}
 		} else if !gotPhalanx && sqToRank(square) <= R5 && sqToFile(square) >= C && sqToFile(square) <= F {

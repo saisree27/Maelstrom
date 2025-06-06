@@ -349,7 +349,7 @@ func (b *Board) makeMove(mv Move) {
 	if dist == 2*NORTH && mv.piece == wP {
 		b.enpassant = mv.from + Square(NORTH)
 	} else if dist == 2*SOUTH && mv.piece == bP {
-		b.enpassant = mv.from + Square(SOUTH)
+		b.enpassant = Square(int32(mv.from) + int32(SOUTH))
 	} else {
 		b.enpassant = EMPTYSQ
 	}
