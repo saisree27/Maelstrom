@@ -150,8 +150,8 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		return quiesce(b, 4, alpha, beta, c, rd-depth), false
 	}
 
-	// Check for threefold repetition
-	if b.isThreeFoldRep() {
+	// Check for two-fold repetition
+	if b.isTwoFold() {
 		// Don't store repetition positions in TT since their value depends on game history
 		return 0, false
 	}
@@ -160,8 +160,6 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	if len(legalMoves) == 0 {
 		return evaluate(b) * factor[c], false
 	}
-
-	// Check for potential repetition (twofold)
 
 	bestScore := 0
 	timeout := false
