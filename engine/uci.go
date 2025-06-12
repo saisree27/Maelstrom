@@ -159,12 +159,13 @@ func UciLoop() {
 
 		if command == "uci" {
 			initializeEverythingExceptTTable()
+			initializeTTable(int(ttSize))
 			fmt.Println("id name Maelstrom")
 			fmt.Println("id author saisree27")
 			fmt.Println("option name Hash type spin default 256 min 1 max 1024")
 			fmt.Println("uciok")
 		} else if command == "isready" {
-			initializeTTable(int(ttSize))
+			clearTTable()
 			fmt.Println("readyok")
 		} else if command == "ucinewgame" {
 			b = Board{}
