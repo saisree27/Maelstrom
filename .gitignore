@@ -4,3 +4,5 @@
 builds/
 main
 *.exe
+.DS_Store
+maelstrom_engine

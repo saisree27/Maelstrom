@@ -141,10 +141,6 @@ func processGo(command string, b *Board) {
 		}
 		isSearching = false
 		searchMutex.Unlock()
-
-		if b.plyCnt%10 == 0 {
-			clearTTable()
-		}
 	}()
 }
 
@@ -165,7 +161,6 @@ func UciLoop() {
 			fmt.Println("option name Hash type spin default 256 min 1 max 1024")
 			fmt.Println("uciok")
 		} else if command == "isready" {
-			clearTTable()
 			fmt.Println("readyok")
 		} else if command == "ucinewgame" {
 			b = Board{}

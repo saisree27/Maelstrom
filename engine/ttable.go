@@ -62,30 +62,21 @@ func storeEntry(b *Board, score int, bd bound, mv Move, depth uint8) {
 	entry := &table.entries[entryIndex]
 
 	// Replace if:
-	// 1. Empty slot
-	// 2. Different position
-	// 3. Same position but deeper search
-	// 4. Same position, same depth but older entry
-	if entry.hash == 0 ||
-		entry.hash != b.zobrist ||
-		entry.depth <= depth ||
-		entry.age != table.age {
-
-		if !(mv.from == a1 && mv.to == a1) {
-			*entry = TTEntry{
-				bestMove: mv,
-				hash:     b.zobrist,
-				bd:       bd,
-				score:    int32(score),
-				depth:    depth,
-				age:      table.age,
-			}
+	// 1. We have a deeper search
+	// 2. Newer entry
+	if entry.depth <= depth || entry.depth != table.age {
+		*entry = TTEntry{
+			bestMove: mv,
+			hash:     b.zobrist,
+			bd:       bd,
+			score:    int32(score),
+			depth:    depth,
+			age:      table.age,
 		}
-
 	}
 }
 
-func probeTT(b *Board, score *int, alpha *int, beta *int, depth uint8, rd uint8, m *Move) (bool, int) {
+func probeTT(b *Board, alpha int, beta int, depth uint8, m *Move) (bool, int) {
 	entryIndex := b.zobrist % table.count
 	entry := &table.entries[entryIndex]
 
@@ -96,21 +87,17 @@ func probeTT(b *Board, score *int, alpha *int, beta *int, depth uint8, rd uint8,
 		// Get the PV-move
 		*m = entry.bestMove
 		if entry.depth >= depth {
-			*score = int(entry.score)
-			switch entry.bd {
-			case upper:
-				if *score < *beta && depth != rd {
-					*beta = *score
-				}
-			case lower:
-				if *score > *alpha && depth != rd {
-					*alpha = *score
-				}
-			case exact:
-				return true, *score
+			score := int(entry.score)
+			if entry.bd == lower && score >= beta {
+				return true, beta
 			}
-			if *alpha >= *beta {
-				return true, *score
+
+			if entry.bd == upper && score <= alpha {
+				return true, alpha
+			}
+
+			if entry.bd == exact {
+				return true, score
 			}
 		}
 	}

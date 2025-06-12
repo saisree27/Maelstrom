@@ -139,6 +139,13 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		*line = (*line)[:0]
 	}
 
+	isPv := beta > alpha+1
+	isRoot := depth == rd
+	check := b.isCheck(c)
+	if check {
+		depth++
+	}
+
 	if depth <= 0 {
 		return quiesce(b, 4, alpha, beta, c, rd-depth), false
 	}
@@ -155,59 +162,16 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	}
 
 	// Check for potential repetition (twofold)
-	potentialRep := b.isTwoFold()
 
 	bestScore := 0
 	timeout := false
 	bestMove := Move{}
 	oldAlpha := alpha
-	isPv := beta > alpha+1
 
-	// Only probe TT if this isn't a potential repetition position
-	if !potentialRep {
-		res, found := probeTT(b, &bestScore, &alpha, &beta, uint8(depth), uint8(rd), &bestMove)
-		if res {
-			*line = append(*line, bestMove)
-			return found, false
-		}
-	}
-
-	// Internal Iterative Deepening
-	if depth >= 4 && isPv && bestMove.from == 0 {
-		_, _ = pvs(b, depth-2, rd+1, alpha, beta, c, false, line, tR, st)
-		if len(*line) > 0 {
-			bestMove = (*line)[0]
-		}
-		*line = (*line)[:0]
-	}
-
-	if depth > 1 {
-		orderMovesPV(b, &legalMoves, bestMove, c, depth, rd)
-	}
-
-	check := b.isCheck(c)
-	if check {
-		depth++
-	}
-
-	// Razoring
-	// Only apply razoring at shallow depths and non-PV nodes
-	if depth <= 3 && !check && rd > 1 &&
-		beta < winVal-100 && beta > -winVal+100 &&
-		beta == alpha+1 { // Non-PV node check
-
-		staticEval := evaluate(b) * factor[c]
-
-		// Razoring margins based on depth
-		razorMargin := 300 + depth*75
-
-		if staticEval+razorMargin <= alpha {
-			// Try qsearch to verify if position is really bad
-			qScore := quiesce(b, 4, alpha-razorMargin, alpha-razorMargin+1, c, 4)
-			if qScore <= alpha-razorMargin {
-				return qScore, false
-			}
-		}
+	res, score := probeTT(b, alpha, beta, uint8(depth), &bestMove)
+	if res && !isRoot {
+		*line = append(*line, bestMove)
+		return score, false
 	}
 
 	// Static Null Move Pruning
@@ -228,6 +192,48 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		// If static eval is way above beta, likely we can prune
 		if staticEval-margin >= beta {
 			return staticEval - margin, false
+		}
+	}
+
+	hasNotJustPawns := b.colors[c] ^ b.getColorPieces(pawn, c)
+
+	// Pre-allocate PV line for child nodes
+	childPV := make([]Move, 0, 100)
+
+	if doNull && !check && !isPv && hasNotJustPawns != 0 && b.plyCnt > 0 {
+		b.makeNullMove()
+		bestScore, timeout = pvs(b, depth-1-R, rd, -beta, -beta+1, reverseColor(c), false, &childPV, tR, st)
+		bestScore *= -1
+		if timeout {
+			b.undoNullMove()
+			return 0, true
+		}
+
+		childPV = make([]Move, 0, 100)
+		b.undoNullMove()
+
+		if bestScore >= beta {
+			return bestScore, false
+		}
+	}
+
+	// Razoring
+	// Only apply razoring at shallow depths and non-PV nodes
+	if depth <= 3 && !check && rd > 1 &&
+		beta < winVal-100 && beta > -winVal+100 &&
+		beta == alpha+1 { // Non-PV node check
+
+		staticEval := evaluate(b) * factor[c]
+
+		// Razoring margins based on depth
+		razorMargin := 300 + depth*75
+
+		if staticEval+razorMargin <= alpha {
+			// Try qsearch to verify if position is really bad
+			qScore := quiesce(b, 4, alpha-razorMargin, alpha-razorMargin+1, c, 4)
+			if qScore <= alpha-razorMargin {
+				return qScore, false
+			}
 		}
 	}
 
@@ -256,26 +262,17 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		}
 	}
 
-	hasNotJustPawns := b.colors[c] ^ b.getColorPieces(pawn, c)
-
-	// Pre-allocate PV line for child nodes
-	childPV := make([]Move, 0, 100)
-
-	if doNull && !check && !isPv && hasNotJustPawns != 0 && b.plyCnt > 0 {
-		b.makeNullMove()
-		bestScore, timeout = pvs(b, depth-1-R, rd, -beta, -beta+1, reverseColor(c), false, &childPV, tR, st)
-		bestScore *= -1
-		if timeout {
-			b.undoNullMove()
-			return 0, true
+	// Internal Iterative Deepening
+	if depth >= 4 && isPv && bestMove.from == 0 {
+		_, _ = pvs(b, depth-2, rd+1, alpha, beta, c, false, line, tR, st)
+		if len(*line) > 0 {
+			bestMove = (*line)[0]
 		}
+		*line = (*line)[:0]
+	}
 
-		childPV = make([]Move, 0, 100)
-		b.undoNullMove()
-
-		if bestScore >= beta {
-			return bestScore, false
-		}
+	if depth > 1 {
+		orderMovesPV(b, &legalMoves, bestMove, c, depth, rd)
 	}
 
 	for i, move := range legalMoves {
@@ -412,18 +409,16 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 
 	if !timeout {
 		// Only store in TT if this isn't a potential repetition position
-		if !potentialRep {
-			var flag bound
-			if bestScore <= oldAlpha {
-				flag = upper
-			} else if bestScore >= beta {
-				flag = lower
-			} else {
-				flag = exact
-			}
-
-			storeEntry(b, bestScore, flag, bestMove, uint8(depth))
+		var flag bound
+		if bestScore <= oldAlpha {
+			flag = upper
+		} else if bestScore >= beta {
+			flag = lower
+		} else {
+			flag = exact
 		}
+
+		storeEntry(b, bestScore, flag, bestMove, uint8(depth))
 	}
 
 	return bestScore, timeout
