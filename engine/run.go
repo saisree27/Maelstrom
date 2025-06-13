@@ -79,6 +79,8 @@ func RunSearch(position string, depth int) {
 		}
 
 	}
+
+	fmt.Println("Done")
 }
 
 func RunSelfPlay(position string, depth int) {

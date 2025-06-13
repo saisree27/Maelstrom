@@ -12,9 +12,6 @@ type moveBonus struct {
 	bonus int
 }
 
-// null move pruning constant R
-const R = 3
-
 var nodesSearched = 0
 var killerMoves = [100][2]Move{}
 var historyHeuristic = [100][64][64]int{}
@@ -175,17 +172,15 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	// Static Null Move Pruning
 	// Only do SNMP if:
 	// 1. Not in check
-	// 2. Not at root
+	// 2. Not in PV node
 	// 3. Not searching for mate
-	// 4. Not too deep in the tree
-	if !check && depth >= 1 && depth <= 6 && rd > 1 &&
-		beta < winVal-100 && beta > -winVal+100 {
+	if !check && !isPv && beta < winVal-100 && beta > -winVal+100 {
 
 		// Get static evaluation with some margin
 		staticEval := evaluate(b) * factor[c]
 
 		// Margin increases with depth
-		margin := 120 + 50*depth
+		margin := 85 * depth
 
 		// If static eval is way above beta, likely we can prune
 		if staticEval-margin >= beta {
@@ -198,8 +193,9 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	// Pre-allocate PV line for child nodes
 	childPV := make([]Move, 0, 100)
 
-	if doNull && !check && !isPv && hasNotJustPawns != 0 && b.plyCnt > 0 {
+	if doNull && !check && !isPv && hasNotJustPawns != 0 {
 		b.makeNullMove()
+		R := 3 + depth/6
 		bestScore, timeout = pvs(b, depth-1-R, rd, -beta, -beta+1, reverseColor(c), false, &childPV, tR, st)
 		bestScore *= -1
 		if timeout {
@@ -217,52 +213,24 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 
 	// Razoring
 	// Only apply razoring at shallow depths and non-PV nodes
-	if depth <= 3 && !check && rd > 1 &&
-		beta < winVal-100 && beta > -winVal+100 &&
-		beta == alpha+1 { // Non-PV node check
-
+	if depth <= 2 && !check && !isPv { // Non-PV node check
 		staticEval := evaluate(b) * factor[c]
 
 		// Razoring margins based on depth
-		razorMargin := 300 + depth*75
+		razorMargin := 300 + depth*60
 
 		if staticEval+razorMargin <= alpha {
 			// Try qsearch to verify if position is really bad
-			qScore := quiesce(b, 4, alpha-razorMargin, alpha-razorMargin+1, c, 4)
-			if qScore <= alpha-razorMargin {
+			qScore := quiesce(b, 4, alpha, beta, c, 4)
+			if qScore < alpha {
 				return qScore, false
-			}
-		}
-	}
-
-	// Reverse Futility Pruning
-	// Similar to SNMP but with different margins and depth conditions
-	if !check && depth <= 5 && rd > 1 &&
-		beta < winVal-100 && beta > -winVal+100 {
-
-		staticEval := evaluate(b) * factor[c]
-
-		// More aggressive pruning for very shallow depths
-		// Values tuned based on piece values
-		var rfpMargin int
-		if depth <= 3 {
-			rfpMargin = pawnVal * depth
-		} else {
-			rfpMargin = pawnVal*3 + (depth-3)*175
-		}
-
-		// Check material balance to ensure we're not in a tactical position
-		material, pieces := totalMaterialAndPieces(b)
-		if pieces >= 10 && material*factor[c] > -pawnVal { // Don't prune if down material
-			if staticEval >= beta+rfpMargin {
-				return beta, false
 			}
 		}
 	}
 
 	// Internal Iterative Deepening
 	if depth >= 4 && isPv && bestMove.from == 0 {
-		_, _ = pvs(b, depth-2, rd+1, alpha, beta, c, false, line, tR, st)
+		_, _ = pvs(b, depth-3, rd+1, -beta, -alpha, c, false, line, tR, st)
 		if len(*line) > 0 {
 			bestMove = (*line)[0]
 		}
@@ -487,7 +455,7 @@ func searchWithTime(b *Board, movetime int64) Move {
 		}
 	}
 
-	b.printFromBitBoards()
+	fmt.Printf("Searching for movetime %d\n", movetime)
 	startTime := time.Now()
 	line := []Move{}
 	legalMoves := b.generateLegalMoves()
