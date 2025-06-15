@@ -166,15 +166,6 @@ var kingSquareTableEndgame = [64]int{
 // Evaluations are returned in White's perspective
 
 func evaluate(b *Board) int {
-	moves := b.generateLegalMoves()
-	if len(moves) == 0 {
-		if b.isCheck(b.turn) {
-			return winVal * factor[reverseColor(b.turn)]
-		} else {
-			return 0
-		}
-	}
-
 	if b.isThreeFoldRep() {
 		return 0
 	}

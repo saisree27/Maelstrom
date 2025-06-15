@@ -161,7 +161,11 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 
 	legalMoves := b.generateLegalMoves()
 	if len(legalMoves) == 0 {
-		return evaluate(b) * factor[c], false
+		if b.isCheck(b.turn) {
+			return -winVal, false
+		} else {
+			return 0, false
+		}
 	}
 
 	bestScore := 0
