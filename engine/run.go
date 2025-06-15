@@ -3,7 +3,6 @@ package engine
 import (
 	"fmt"
 	"strings"
-	"time"
 )
 
 func initializeEverythingExceptTTable() {
@@ -55,7 +54,7 @@ func RunSearch(position string, depth int) {
 
 		fmt.Printf("Depth %d: ", i)
 
-		score, timeout := pvs(&b, i, i, -winVal-1, winVal+1, b.turn, true, &line, 100000000, time.Now())
+		score, timeout := pvs(&b, i, i, -winVal-1, winVal+1, b.turn, true, &line)
 		score *= factor[b.turn]
 
 		if timeout {
@@ -155,7 +154,7 @@ func RunPlay(position string, depth int, player Color) {
 
 				fmt.Printf("Depth %d: ", i)
 
-				score, _ = pvs(&b, i, i, -winVal-1, winVal+1, b.turn, true, &line, 100000, time.Now())
+				score, _ = pvs(&b, i, i, -winVal-1, winVal+1, b.turn, true, &line)
 
 				if score == winVal || score == -winVal {
 					fmt.Println("Found mate.")

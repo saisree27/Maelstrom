@@ -17,6 +17,11 @@ var killerMoves = [100][2]Move{}
 var historyHeuristic = [100][64][64]int{}
 var flagStop = false
 
+// Global variables for PVS to keep track of search time
+// Defaults to 10 sec/search but these values are changed in searchWithTime
+var startTime time.Time = time.Now()
+var allowedTime int64 = 10000
+
 func quiesce(b *Board, limit int, alpha int, beta int, c Color, rd int) int {
 	nodesSearched++
 
@@ -26,6 +31,10 @@ func quiesce(b *Board, limit int, alpha int, beta int, c Color, rd int) int {
 		return 0
 	default:
 		// Continue search
+	}
+
+	if flagStop {
+		return 0
 	}
 
 	eval := evaluate(b) * factor[c]
@@ -50,15 +59,19 @@ func quiesce(b *Board, limit int, alpha int, beta int, c Color, rd int) int {
 		if move.movetype == CAPTURE || move.movetype == CAPTUREANDPROMOTION || move.movetype == ENPASSANT {
 			b.makeMove(move)
 			score := -quiesce(b, limit-1, -beta, -alpha, reverseColor(c), rd+1)
+			b.undo()
+
 			// Check for stop signal after recursive call
 			select {
 			case <-stopChannel:
-				b.undo()
 				return 0
 			default:
 				// Continue
 			}
-			b.undo()
+
+			if flagStop {
+				return 0
+			}
 
 			if score >= beta {
 				return beta
@@ -119,7 +132,7 @@ func orderMovesPV(b *Board, moves *[]Move, pv Move, c Color, depth int, rd int) 
 	}
 }
 
-func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool, line *[]Move, tR int64, st time.Time) (int, bool) {
+func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool, line *[]Move) (int, bool) {
 	nodesSearched++
 
 	// Check for stop signal
@@ -131,11 +144,14 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		// Continue search
 	}
 
-	if flagStop || nodesSearched%2047 == 0 {
-		if time.Since(st).Milliseconds() > tR {
-			flagStop = true
-			return 0, true
-		}
+	if flagStop {
+		return 0, true
+	}
+
+	if nodesSearched%2047 == 0 && time.Since(startTime).Milliseconds() > allowedTime {
+		flagStop = true
+		fmt.Printf("stopping search after %d\n", time.Since(startTime).Milliseconds())
+		return 0, true
 	}
 
 	// Pre-allocate PV line to avoid reallocations
@@ -209,7 +225,7 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	if doNull && !check && !isPv && hasNotJustPawns != 0 {
 		b.makeNullMove()
 		R := 3 + depth/6
-		bestScore, timeout = pvs(b, depth-1-R, rd, -beta, -beta+1, reverseColor(c), false, &childPV, tR, st)
+		bestScore, timeout = pvs(b, depth-1-R, rd, -beta, -beta+1, reverseColor(c), false, &childPV)
 		bestScore *= -1
 		if timeout {
 			b.undoNullMove()
@@ -218,6 +234,10 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 
 		childPV = make([]Move, 0, 100)
 		b.undoNullMove()
+
+		if flagStop {
+			return 0, true
+		}
 
 		if bestScore >= beta {
 			return bestScore, false
@@ -243,11 +263,14 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 
 	// Internal Iterative Deepening
 	if depth >= 4 && isPv && bestMove.from == 0 {
-		_, _ = pvs(b, depth-3, rd+1, -beta, -alpha, c, false, line, tR, st)
+		_, _ = pvs(b, depth-3, rd+1, -beta, -alpha, c, false, line)
 		if len(*line) > 0 {
 			bestMove = (*line)[0]
 		}
 		*line = (*line)[:0]
+		if flagStop {
+			return 0, true
+		}
 	}
 
 	if depth > 1 {
@@ -258,9 +281,9 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		b.makeMove(move)
 
 		if i == 0 {
-			bestScore, timeout = pvs(b, depth-1, rd, -beta, -alpha, reverseColor(c), true, &childPV, tR, st)
+			bestScore, timeout = pvs(b, depth-1, rd, -beta, -alpha, reverseColor(c), true, &childPV)
 			bestScore *= -1
-			if timeout {
+			if timeout || flagStop {
 				b.undo()
 				return 0, true
 			}
@@ -325,9 +348,9 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 
 				// Only reduce if we have enough depth
 				if depth > reduction {
-					score, timeout = pvs(b, depth-reduction, rd, -alpha-1, -alpha, reverseColor(c), true, &childPV, tR, st)
+					score, timeout = pvs(b, depth-reduction, rd, -alpha-1, -alpha, reverseColor(c), true, &childPV)
 					score *= -1
-					if timeout {
+					if timeout || flagStop {
 						b.undo()
 						return 0, true
 					}
@@ -335,24 +358,24 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 			}
 
 			if score > alpha {
-				score, timeout = pvs(b, depth-1, rd, -alpha-1, -alpha, reverseColor(c), true, &childPV, tR, st)
+				score, timeout = pvs(b, depth-1, rd, -alpha-1, -alpha, reverseColor(c), true, &childPV)
 				score *= -1
 
-				if timeout {
+				if timeout || flagStop {
 					b.undo()
 					return 0, true
 				}
 
 				if score > alpha && score < beta {
-					score, timeout = pvs(b, depth-1, rd, -beta, -alpha, reverseColor(c), true, &childPV, tR, st)
+					score, timeout = pvs(b, depth-1, rd, -beta, -alpha, reverseColor(c), true, &childPV)
 					score *= -1
-					if timeout {
+					if timeout || flagStop {
 						b.undo()
 						return 0, true
 					}
 				}
 
-				if score > alpha && !timeout {
+				if score > alpha {
 					bestMove = move
 					alpha = score
 					*line = (*line)[:0]
@@ -361,7 +384,7 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 				}
 
 				b.undo()
-				if score > bestScore && !timeout {
+				if score > bestScore {
 					bestScore = score
 					if score >= beta {
 						if killerMoves[depth][0].toUCI() != move.toUCI() {
@@ -378,8 +401,7 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		}
 	}
 
-	if !timeout {
-		// Only store in TT if this isn't a potential repetition position
+	if !timeout && !flagStop {
 		var flag bound
 		if bestScore <= oldAlpha {
 			flag = upper
@@ -434,7 +456,7 @@ func searchWithTime(b *Board, movetime int64) Move {
 					for _, moveStr := range drawingMoves {
 						move := fromUCI(moveStr, b)
 						b.makeMove(move)
-						score, _ := pvs(b, 6, 6, -winVal-1, winVal+1, b.turn, true, &line, movetime/2, time.Now())
+						score, _ := pvs(b, 6, 6, -winVal-1, winVal+1, b.turn, true, &line)
 						score *= -1 // Negate score since we evaluated from opponent's perspective
 						b.undo()
 
@@ -460,9 +482,9 @@ func searchWithTime(b *Board, movetime int64) Move {
 		}
 	}
 
-	fmt.Printf("Searching for movetime %d\n", movetime)
-	b.printFromBitBoards()
-	startTime := time.Now()
+	fmt.Printf("searching for movetime %d\n", movetime)
+	startTime = time.Now()
+	allowedTime = movetime
 	line := []Move{}
 	legalMoves := b.generateLegalMoves()
 	prevScore := 0
@@ -482,9 +504,6 @@ func searchWithTime(b *Board, movetime int64) Move {
 
 	for i := 1; i <= 100; i++ {
 		nodesSearched = 0
-		duration := time.Since(startTime).Milliseconds()
-		timeRemaining := movetime - duration
-
 		searchStart := time.Now()
 
 		// Aspiration windows
@@ -505,7 +524,7 @@ func searchWithTime(b *Board, movetime int64) Move {
 
 		// Aspiration window search with research on fail
 		for {
-			score, timeout = pvs(b, i, i, alpha, beta, b.turn, true, &line, timeRemaining, time.Now())
+			score, timeout = pvs(b, i, i, alpha, beta, b.turn, true, &line)
 			if timeout {
 				return prevBest
 			}
