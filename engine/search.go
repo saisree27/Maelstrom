@@ -129,6 +129,12 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		// Continue search
 	}
 
+	if nodesSearched%2047 == 0 {
+		if time.Since(st).Milliseconds() > tR {
+			return 0, true
+		}
+	}
+
 	// Pre-allocate PV line to avoid reallocations
 	if cap(*line) < 100 {
 		*line = make([]Move, 0, 100)
@@ -242,14 +248,6 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	}
 
 	for i, move := range legalMoves {
-		if timeout {
-			break
-		}
-
-		if time.Since(st).Milliseconds() > tR {
-			return bestScore, true
-		}
-
 		b.makeMove(move)
 
 		if i == 0 {
