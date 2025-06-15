@@ -38,6 +38,11 @@ func quiesce(b *Board, limit int, alpha int, beta int, c Color, rd int) int {
 	}
 
 	eval := evaluate(b) * factor[c]
+
+	if limit == 0 {
+		return eval
+	}
+
 	inCheck := rd <= 2 && b.isCheck(c)
 
 	// Beta cutoff
@@ -49,13 +54,9 @@ func quiesce(b *Board, limit int, alpha int, beta int, c Color, rd int) int {
 		alpha = eval
 	}
 
-	if limit == 0 {
-		return eval
-	}
+	allLegalMoves := b.generateLegalMoves()
 
-	legalMoves := b.generateCaptures()
-
-	for _, move := range legalMoves {
+	for _, move := range allLegalMoves {
 		if move.movetype == CAPTURE || move.movetype == CAPTUREANDPROMOTION || move.movetype == ENPASSANT {
 			b.makeMove(move)
 			score := -quiesce(b, limit-1, -beta, -alpha, reverseColor(c), rd+1)
