@@ -15,6 +15,7 @@ type moveBonus struct {
 var nodesSearched = 0
 var killerMoves = [100][2]Move{}
 var historyHeuristic = [100][64][64]int{}
+var flagStop = false
 
 func quiesce(b *Board, limit int, alpha int, beta int, c Color, rd int) int {
 	nodesSearched++
@@ -124,13 +125,15 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	// Check for stop signal
 	select {
 	case <-stopChannel:
+		flagStop = true
 		return 0, true
 	default:
 		// Continue search
 	}
 
-	if nodesSearched%2047 == 0 {
+	if flagStop || nodesSearched%2047 == 0 {
 		if time.Since(st).Milliseconds() > tR {
+			flagStop = true
 			return 0, true
 		}
 	}
@@ -463,6 +466,7 @@ func searchWithTime(b *Board, movetime int64) Move {
 	line := []Move{}
 	legalMoves := b.generateLegalMoves()
 	prevScore := 0
+	flagStop = false
 
 	if len(legalMoves) == 1 {
 		return legalMoves[0]
