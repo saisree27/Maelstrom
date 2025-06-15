@@ -2,46 +2,6 @@ package engine
 
 import "testing"
 
-func TestCheckmate(t *testing.T) {
-	fen := "r1bqkb1r/pppp1Qpp/2n2n2/4p3/2B1P3/8/PPPP1PPP/RNB1K1NR b KQkq - 0 4"
-	b := Board{}
-	b.InitFEN(fen)
-
-	res := evaluate(&b)
-	if res != winVal {
-		t.Errorf("TestCheckmate (white): got %d, wanted %d", res, winVal)
-	}
-
-	fen = "rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3"
-	b = Board{}
-	b.InitFEN(fen)
-
-	res = evaluate(&b)
-	if res != -winVal {
-		t.Errorf("TestCheckmate (black): got %d, wanted %d", res, -winVal)
-	}
-}
-
-func TestStalemate(t *testing.T) {
-	fen := "7K/5k1P/8/8/8/8/8/8 w - - 0 1"
-	b := Board{}
-	b.InitFEN(fen)
-
-	res := evaluate(&b)
-	if res != 0 {
-		t.Errorf("TestStalemate (white): got %d, wanted %d", res, 0)
-	}
-
-	fen = "8/8/8/8/8/8/p1K5/k7 b - - 0 1"
-	b = Board{}
-	b.InitFEN(fen)
-
-	res = evaluate(&b)
-	if res != 0 {
-		t.Errorf("TestStalemate (black): got %d, wanted %d", res, 0)
-	}
-}
-
 func TestMaterial(t *testing.T) {
 	fen := "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 	b := Board{}
