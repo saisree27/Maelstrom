@@ -154,7 +154,7 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	}
 
 	// Check for two-fold repetition
-	if b.isTwoFold() {
+	if !isRoot && b.isTwoFold() {
 		// Don't store repetition positions in TT since their value depends on game history
 		return 0, false
 	}
@@ -458,10 +458,10 @@ func searchWithTime(b *Board, movetime int64) Move {
 	}
 
 	fmt.Printf("Searching for movetime %d\n", movetime)
+	b.printFromBitBoards()
 	startTime := time.Now()
 	line := []Move{}
 	legalMoves := b.generateLegalMoves()
-	prevBest := Move{}
 	prevScore := 0
 
 	if len(legalMoves) == 1 {
@@ -474,16 +474,13 @@ func searchWithTime(b *Board, movetime int64) Move {
 	}
 
 	// Set prevBest to first legal move in case search is stopped immediately
-	prevBest = legalMoves[0]
+	prevBest := legalMoves[0]
 
 	for i := 1; i <= 100; i++ {
 		nodesSearched = 0
 		duration := time.Since(startTime).Milliseconds()
 		timeRemaining := movetime - duration
 
-		if movetime > timeRemaining*2 {
-			break
-		}
 		searchStart := time.Now()
 
 		// Aspiration windows
@@ -526,17 +523,6 @@ func searchWithTime(b *Board, movetime int64) Move {
 
 		incrementAge()
 
-		b.makeMove(line[0])
-
-		if b.isTwoFold() && score > 0 {
-			table.entries[b.zobrist%table.count] = TTEntry{}
-			b.undo()
-			fmt.Println("Two-fold repetition encountered, removing TT entry")
-			table.entries[b.zobrist%table.count] = TTEntry{}
-		} else {
-			b.undo()
-		}
-
 		strLine := ""
 		for _, move := range line {
 			strLine += " " + move.toUCI()
@@ -548,23 +534,6 @@ func searchWithTime(b *Board, movetime int64) Move {
 		if score == winVal || score == -winVal {
 			clearTTable()
 			return line[0]
-		}
-
-		// if line[0] is an illegal move, go back one depth and clear TT/killer/history
-		isLegal := false
-		for _, legalMove := range b.generateLegalMoves() {
-			if legalMove == line[0] {
-				isLegal = true
-				break
-			}
-		}
-		if !isLegal {
-			fmt.Println("Illegal move encountered, going back one depth")
-			i--
-			clearTTable()
-			killerMoves[i] = [2]Move{}
-			historyHeuristic[i] = [64][64]int{}
-			continue
 		}
 
 		prevBest = line[0]
