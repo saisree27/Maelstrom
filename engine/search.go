@@ -107,7 +107,7 @@ func orderMovesPV(b *Board, moves *[]Move, pv Move, c Color, depth int, rd int) 
 				bonus = 500000 + seeScore // Bad captures still above quiet moves
 			}
 		} else if mv.movetype == PROMOTION {
-			bonus = 800000 + material[mv.promote] // Promotions are valuable
+			bonus = 800000 // Promotions are valuable
 		} else {
 			// Quiet moves
 			if mv == killerMoves[depth][0] {
@@ -484,6 +484,7 @@ func searchWithTime(b *Board, movetime int64) Move {
 	}
 
 	fmt.Printf("searching for movetime %d\n", movetime)
+	b.printFromBitBoards()
 	startTime = time.Now()
 	allowedTime = movetime
 	line := []Move{}

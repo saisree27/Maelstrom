@@ -2,75 +2,21 @@ package engine
 
 // Values for material and checkmate
 const winVal int = 1000000
-const pawnVal int = 100
-const knightVal int = 350
-const bishopVal int = 350
-const rookVal int = 525
-const queenVal int = 1000
-const kingVal int = 100000
-
-// Values for rook open/semi-open file
-const rookOpenFile int = 15
-const rookSemiOpenFile int = 7
-const twoRooksOnSeventh int = 15
-
-// Values for pawn structure
-var doubledPawnByFile = []int{
-	A: -25, B: -5, C: -30, D: -20, E: -20, F: -20, G: -5, H: -20,
-}
-
-const tripledPawn int = -50
-const isolatedPawn int = -15
-const doubledAndIsolated int = -35
-const isolatedPawnBlocked int = -15
-const passedPawn int = 15
-const phalanx int = 30
-const passedPawnBlocked int = -20
-const cdPawnBlockedByPlayer int = -50
-
-var passedPawnRankWhite = []int{
-	-5, -5, 5, 5, 25, 45, 150, 0,
-}
-
-var passedPawnRankBlack = []int{
-	0, 150, 45, 25, 5, 5, -5, -5,
-}
-
-// Values for other pieces
-const queenEarly int = -20
-const queensNotTradedWhenNotCastled = 15
-const bishopPair int = 45
-const bishopMobility int = 2
-const rookMobility int = 4
-const queenMobility int = 1
-
-// Values for king safety
-const pawnShieldLeft int = -15
-const pawnShieldUpDown int = -50
-const pawnShieldRight int = -15
-const kingAir int = -7
-const notCastled int = -30
-const cannotCastle int = -30
-
-const samePieceTwice int = -15
-const piecesOnBackRank int = -15
 
 var factor = []int{
 	WHITE: 1, BLACK: -1,
 }
 
-var material = map[Piece]int{
-	wP: pawnVal, bP: -pawnVal,
-	wN: knightVal, bN: -knightVal,
-	wB: bishopVal, bB: -bishopVal,
-	wR: rookVal, bR: -rookVal,
-	wQ: queenVal, bQ: -queenVal,
-	wK: kingVal, bK: -kingVal,
-	EMPTY: 0,
-}
+var mgValues = []int{82, 365, 337, 477, 1025, 0} // pawn, bishop, knight, rook, queen, king
+var egValues = []int{94, 297, 281, 512, 936, 0}
+var phaseSlice = []int{0, 1, 1, 2, 4, 0}
 
-var center = map[Square]bool{
-	e4: true, d4: true, e5: true, d5: true,
+var phaseValues = map[PieceType]int{
+	pawn:   0,
+	knight: 1,
+	bishop: 1,
+	rook:   2,
+	queen:  4,
 }
 
 var reversePSQ = [64]int{
@@ -84,81 +30,150 @@ var reversePSQ = [64]int{
 	0, 1, 2, 3, 4, 5, 6, 7,
 }
 
-var pawnSquareTable = [64]int{
+var pawnSTMG = [64]int{
 	0, 0, 0, 0, 0, 0, 0, 0,
-	5, 10, -10, -20, -20, 10, 10, 5,
-	5, 5, 5, 0, 0, -10, 5, 5,
-	0, 0, 10, 20, 20, 0, 0, 0,
-	5, 5, 10, 25, 25, 10, 5, 5,
-	10, 10, 20, 30, 30, 20, 10, 10,
-	50, 50, 50, 50, 50, 50, 50, 50,
-	0, 0, 0, 0, 0, 0, 0, 0,
-}
-
-var knightSquareTable = [64]int{
-	-50, -30, -30, -30, -30, -30, -30, -50,
-	-40, -20, 0, -5, -5, 0, -20, -40,
-	-40, 0, 10, 15, 15, 10, 0, -40,
-	-50, 5, 15, 20, 20, 15, 5, -50,
-	-45, 0, 15, 20, 20, 15, 0, -45,
-	-50, 5, 10, 15, 15, 10, 5, -50,
-	-40, -20, 0, 5, 5, 0, -20, -40,
-	-50, -40, -30, -30, -30, -30, -40, -50,
-}
-
-var bishopSquareTable = [64]int{
-	-20, -10, -5, -10, -10, -10, -10, -20,
-	-10, 10, 0, 0, 0, 0, 10, -10,
-	-10, 10, 10, 10, 10, 10, 10, -10,
-	-10, 0, 10, 10, 10, 10, 0, -10,
-	-10, 5, 5, 10, 10, 5, 5, -10,
-	-10, 0, 5, 10, 10, 5, 0, -10,
-	-10, 0, 0, 0, 0, 0, 0, -10,
-	-20, -10, -10, -10, -10, -10, -10, -20,
-}
-
-var rookSquareTable = [64]int{
-	-5, 0, 0, 5, 5, 0, 0, -5,
-	-5, 0, 0, 0, 0, 0, 0, -5,
-	-5, 0, 0, 0, 0, 0, 0, -5,
-	-5, 0, 0, 0, 0, 0, 0, -5,
-	-5, 0, 0, 0, 0, 0, 0, -5,
-	-5, 0, 0, 0, 0, 0, 0, -5,
-	5, 10, 10, 10, 10, 10, 10, 5,
+	-35, -1, -20, -23, -15, 24, 38, -22,
+	-26, -4, -4, -10, 3, 3, 33, -12,
+	-27, -2, -5, 12, 17, 6, 10, -25,
+	-14, 13, 6, 21, 23, 12, 17, -23,
+	-6, 7, 26, 31, 65, 56, 25, -20,
+	98, 134, 61, 95, 68, 126, 34, -11,
 	0, 0, 0, 0, 0, 0, 0, 0,
 }
 
-var queenSquareTable = [64]int{
-	-20, -10, -10, 5, -5, -10, -10, -20,
-	-10, 0, 0, 0, 0, 0, 0, -10,
-	-10, -5, -5, -5, -5, -5, 0, -10,
-	0, 0, 5, 5, 5, 5, 0, -5,
-	-5, 0, 5, 5, 5, 5, 0, -5,
-	-10, 0, 5, 5, 5, 5, 0, -10,
-	-10, 0, 0, 0, 0, 0, 0, -10,
-	-20, -10, -10, -5, -5, -10, -10, -20,
+var pawnSTEG = [64]int{
+	0, 0, 0, 0, 0, 0, 0, 0,
+	13, 8, 8, 10, 13, 0, 2, -7,
+	4, 7, -6, 1, 0, -5, -1, -8,
+	13, 9, -3, -7, -7, -8, 3, -1,
+	32, 24, 13, 5, -2, 4, 17, 17,
+	94, 100, 85, 67, 56, 53, 82, 84,
+	178, 173, 158, 134, 147, 132, 165, 187,
+	0, 0, 0, 0, 0, 0, 0, 0,
 }
 
-var kingSquareTableMiddlegame = [64]int{
-	0, 30, 10, 0, 0, 10, 30, 0,
-	-30, -30, -30, -30, -30, -30, -30, -30,
-	-50, -50, -50, -50, -50, -50, -50, -50,
-	-70, -70, -70, -70, -70, -70, -70, -70,
-	-70, -70, -70, -70, -70, -70, -70, -70,
-	-70, -70, -70, -70, -70, -70, -70, -70,
-	-70, -70, -70, -70, -70, -70, -70, -70,
-	-70, -70, -70, -70, -70, -70, -70, -70,
+var knightSTMG = [64]int{
+	-105, -21, -58, -33, -17, -28, -19, -23,
+	-29, -53, -12, -3, -1, 18, -14, -19,
+	-23, -9, 12, 10, 19, 17, 25, -16,
+	-13, 4, 16, 13, 28, 19, 21, -8,
+	-9, 17, 19, 53, 37, 69, 18, 22,
+	-47, 60, 37, 65, 84, 129, 73, 44,
+	-73, -41, 72, 36, 23, 62, 7, -17,
+	-167, -89, -34, -49, 61, -97, -15, -107,
 }
 
-var kingSquareTableEndgame = [64]int{
-	-50, -10, 0, 0, 0, 0, -10, -50,
-	-10, 0, 10, 10, 10, 10, 0, -10,
-	0, 10, 15, 15, 15, 15, 10, 0,
-	0, 10, 15, 20, 20, 15, 10, 0,
-	0, 10, 15, 20, 20, 15, 10, 0,
-	0, 10, 15, 15, 15, 15, 10, 0,
-	-10, 0, 10, 10, 10, 10, 0, -10,
-	-50, -10, 0, 0, 0, 0, -10, -50,
+var knightSTEG = [64]int{
+	-29, -51, -23, -15, -22, -18, -50, -64,
+	-42, -20, -10, -5, -2, -20, -23, -44,
+	-23, -3, -1, 15, 10, -3, -20, -22,
+	-18, -6, 16, 25, 16, 17, 4, -18,
+	-17, 3, 22, 22, 22, 11, 8, -18,
+	-24, -20, 10, 9, -1, -9, -19, -41,
+	-25, -8, -25, -2, -9, -25, -24, -52,
+	-58, -38, -13, -28, -31, -27, -63, -99,
+}
+
+var bishopSTMG = [64]int{
+	-33, -3, -14, -21, -13, -12, -39, -21,
+	4, 15, 16, 0, 7, 21, 33, 1,
+	0, 15, 15, 15, 14, 27, 18, 10,
+	-6, 13, 13, 26, 34, 12, 10, 4,
+	-4, 5, 19, 50, 37, 37, 7, -2,
+	-16, 37, 43, 40, 35, 50, 37, -2,
+	-26, 16, -18, -13, 30, 59, 18, -47,
+	-29, 4, -82, -37, -25, -42, 7, -8,
+}
+
+var bishopSTEG = [64]int{
+	-23, -9, -23, -5, -9, -16, -5, -17,
+	-14, -18, -7, -1, 4, -9, -15, -27,
+	-12, -3, 8, 10, 13, 3, -7, -15,
+	-6, 3, 13, 19, 7, 10, -3, -9,
+	-3, 9, 12, 9, 14, 10, 3, 2,
+	2, -8, 0, -1, -2, 6, 0, 4,
+	-8, -4, 7, -12, -3, -13, -4, -14,
+	-14, -21, -11, -8, -7, -9, -17, -24,
+}
+
+var rookSTMG = [64]int{
+	-19, -13, 1, 17, 16, 7, -37, -26,
+	-44, -16, -20, -9, -1, 11, -6, -71,
+	-45, -25, -16, -17, 3, 0, -5, -33,
+	-36, -26, -12, -1, 9, -7, 6, -23,
+	-24, -11, 7, 26, 24, 35, -8, -20,
+	-5, 19, 26, 36, 17, 45, 61, 16,
+	27, 32, 58, 62, 80, 67, 26, 44,
+	32, 42, 32, 51, 63, 9, 31, 43,
+}
+
+var rookSTEG = [64]int{
+	-9, 2, 3, -1, -5, -13, 4, -20,
+	-6, -6, 0, 2, -9, -9, -11, -3,
+	-4, 0, -5, -1, -7, -12, -8, -16,
+	3, 5, 8, 4, -5, -6, -8, -11,
+	4, 3, 13, 1, 2, 1, -1, 2,
+	7, 7, 7, 5, 4, -3, -5, -3,
+	11, 13, 13, 11, -3, 3, 8, 3,
+	13, 10, 18, 15, 12, 12, 8, 5,
+}
+
+var queenSTMG = [64]int{
+	-1, -18, -9, 10, -15, -25, -31, -50,
+	-35, -8, 11, 2, 8, 15, -3, 1,
+	-14, 2, -11, -2, -5, 2, 14, 5,
+	-9, -26, -9, -10, -2, -4, 3, -3,
+	-27, -27, -16, -16, -1, 17, -2, 1,
+	-13, -17, 7, 8, 29, 56, 47, 57,
+	-24, -39, -5, 1, -16, 57, 28, 54,
+	-28, 0, 29, 12, 59, 44, 43, 45,
+}
+
+var queenSTEG = [64]int{
+	-33, -28, -22, -43, -5, -32, -20, -41,
+	-22, -23, -30, -16, -16, -23, -36, -32,
+	-16, -27, 15, 6, 9, 17, 10, 5,
+	-18, 28, 19, 47, 31, 34, 39, 23,
+	3, 22, 24, 45, 57, 40, 57, 36,
+	-20, 6, 9, 49, 47, 35, 19, 9,
+	-17, 20, 32, 41, 58, 25, 30, 0,
+	-9, 22, 22, 27, 27, 19, 10, 20,
+}
+
+var kingSTMG = [64]int{
+	-15, 36, 12, -54, 8, -28, 24, 14,
+	1, 7, -8, -64, -43, -16, 9, 8,
+	-14, -14, -22, -46, -44, -30, -15, -27,
+	-49, -1, -27, -39, -46, -44, -33, -51,
+	-17, -20, -12, -27, -30, -25, -14, -36,
+	-9, 24, 2, -16, -20, 6, 22, -22,
+	29, -1, -20, -7, -8, -4, -38, -29,
+	-65, 23, 16, -15, -56, -34, 2, 13,
+}
+
+var kingSTEG = [64]int{
+	-53, -34, -21, -11, -28, -14, -24, -43,
+	-27, -11, 4, 13, 14, 4, -5, -17,
+	-19, -3, 11, 21, 23, 16, 7, -9,
+	-18, -4, 21, 24, 27, 23, 9, -11,
+	-8, 22, 24, 27, 26, 33, 26, 3,
+	10, 17, 23, 15, 20, 45, 44, 13,
+	-12, 17, 14, 17, 17, 38, 23, 11,
+	-74, -35, -18, -18, -11, 15, 4, -17,
+}
+
+type PieceTables struct {
+	MG [64]int
+	EG [64]int
+}
+
+var pieceTables = []PieceTables{
+	{MG: pawnSTMG, EG: pawnSTEG},     // index 0: pawn
+	{MG: bishopSTMG, EG: bishopSTEG}, // index 1: bishop
+	{MG: knightSTMG, EG: knightSTEG}, // index 2: knight
+	{MG: rookSTMG, EG: rookSTEG},     // index 3: rook
+	{MG: queenSTMG, EG: queenSTEG},   // index 4: queen
+	{MG: kingSTMG, EG: kingSTEG},     // index 5: king
 }
 
 // Returns an evaluation of the position in cp
@@ -166,401 +181,44 @@ var kingSquareTableEndgame = [64]int{
 // Evaluations are returned in White's perspective
 
 func evaluate(b *Board) int {
-	if b.isThreeFoldRep() {
+	if b.isThreeFoldRep() || b.isInsufficientMaterial() {
 		return 0
 	}
 
-	if b.isInsufficientMaterial() {
-		return 0
-	}
+	mgEval := 0
+	egEval := 0
+	totalPhase := 0
 
-	eval := 0
+	for piece := pawn; piece <= king; piece++ {
+		idx := piece
+		tbls := pieceTables[idx]
+		mgVal := mgValues[idx]
+		egVal := egValues[idx]
+		phase := phaseSlice[idx]
 
-	material, total := totalMaterialAndPieces(b)
-	eval += material
+		wpieces := b.getColorPieces(piece, WHITE)
+		bpieces := b.getColorPieces(piece, BLACK)
 
-	evaluateKnights(b, &eval)
-	evaluateBishops(b, &eval)
-	evaluateRooks(b, &eval)
-	evaluateQueens(b, &eval)
-	evaluateKings(b, &eval, total)
-	evaluatePawns(b, &eval)
-
-	if b.plyCnt <= 20 {
-		length := len(b.history)
-		for i := length - 3; i > 0; i-- {
-			if b.history[i+2].move.from == b.history[i].move.to {
-				if reverseColor(b.turn) == WHITE && b.history[i+2].move.piece != wP {
-					eval += samePieceTwice
-				} else if b.history[i+2].move.piece != bP {
-					eval -= samePieceTwice
-				}
-			}
+		for wpieces != 0 {
+			totalPhase += phase
+			sq := Square(popLSB(&wpieces))
+			mgEval += mgVal + tbls.MG[sq]
+			egEval += egVal + tbls.EG[sq]
+		}
+		for bpieces != 0 {
+			totalPhase += phase
+			sq := Square(popLSB(&bpieces))
+			rsq := reversePSQ[sq]
+			mgEval -= mgVal + tbls.MG[rsq]
+			egEval -= egVal + tbls.EG[rsq]
 		}
 	}
 
-	if b.plyCnt <= 25 {
-		wPiecesOnBackRank := (b.colors[WHITE] ^ b.pieces[wR]) & ranks[R1]
-		bPiecesOnBackRank := (b.colors[BLACK] ^ b.pieces[bR]) & ranks[R8]
-
-		eval += (popCount(wPiecesOnBackRank) - popCount(bPiecesOnBackRank)) * piecesOnBackRank
+	mgPhase := totalPhase
+	if mgPhase > 24 {
+		mgPhase = 24
 	}
+	egPhase := 24 - mgPhase
 
-	if b.plyCnt >= 25 {
-		if !b.whiteCastled {
-			eval += notCastled
-		}
-		if !b.blackCastled {
-			eval -= notCastled
-		}
-	}
-
-	if !b.whiteCastled && b.pieces[bQ] != 0 {
-		eval -= queensNotTradedWhenNotCastled
-	}
-	if !b.blackCastled && b.pieces[wQ] != 0 {
-		eval += queensNotTradedWhenNotCastled
-	}
-
-	return eval
-}
-
-func totalMaterialAndPieces(b *Board) (int, int) {
-	sum := 0
-	total := 0
-
-	// Use bitboard operations for faster material counting
-	for piece := wP; piece <= bK; piece++ {
-		count := popCount(b.pieces[piece])
-		sum += material[piece] * count
-		total += count
-	}
-	return sum, total
-}
-
-func evaluatePawns(b *Board, eval *int) {
-	// TODO: Add pawn hash table to reduce cost of doing this entire method
-	wPawnsOrig := b.getColorPieces(pawn, WHITE)
-	bPawnsOrig := b.getColorPieces(pawn, BLACK)
-
-	wPawns := wPawnsOrig
-	bPawns := bPawnsOrig
-
-	filesFoundWhite := [8]int{}
-	filesFoundBlack := [8]int{}
-
-	gotPhalanx := false
-	for wPawns != 0 {
-		square := Square(popLSB(&wPawns))
-		*eval += pawnSquareTable[square]
-
-		// Doubled pawns check
-		file := sqToFile(square)
-		filesFoundWhite[file]++
-
-		neighborPlayerPawns := fileNeighbors[file] & wPawnsOrig
-		// Isolated pawns check
-		if neighborPlayerPawns == 0 {
-			if filesFoundWhite[file] >= 2 {
-				*eval += doubledAndIsolated
-			} else {
-				*eval += isolatedPawn
-			}
-			if b.squares[square+Square(NORTH)].getColor() == BLACK {
-				*eval += isolatedPawnBlocked
-			}
-		} else if !gotPhalanx && sqToRank(square) >= R4 && sqToFile(square) >= C && sqToFile(square) <= F {
-			for neighborPlayerPawns != 0 {
-				sq := Square(popLSB(&neighborPlayerPawns))
-				if sqToRank(sq) == sqToRank(square) {
-					gotPhalanx = true
-					*eval += phalanx
-				}
-			}
-		}
-
-		// Passed pawns check
-		neighborPawns := (files[file] | fileNeighbors[file]) & bPawnsOrig
-		if neighborPawns == 0 {
-			*eval += passedPawn
-			*eval += passedPawnRankWhite[sqToRank(square)]
-		} else {
-			passedAhead := true
-			for neighborPawns != 0 {
-				p := Square(popLSB(&neighborPawns))
-				if sqToRank(p) > sqToRank(square) {
-					passedAhead = false
-				}
-			}
-
-			if passedAhead {
-				*eval += passedPawn
-				*eval += passedPawnRankWhite[sqToRank(square)]
-			}
-		}
-	}
-
-	gotPhalanx = false
-	for bPawns != 0 {
-		square := Square(popLSB(&bPawns))
-		*eval -= pawnSquareTable[reversePSQ[square]]
-
-		// Doubled pawns check
-		file := sqToFile(square)
-		filesFoundBlack[file]++
-
-		neighborPlayerPawns := fileNeighbors[file] & bPawnsOrig
-		// Isolated pawns check
-		if neighborPlayerPawns == 0 {
-			if filesFoundBlack[file] >= 2 {
-				*eval -= doubledAndIsolated
-			} else {
-				*eval -= isolatedPawn
-			}
-			if b.squares[Square(int32(square)+int32(SOUTH))].getColor() == WHITE {
-				*eval -= isolatedPawnBlocked
-			}
-		} else if !gotPhalanx && sqToRank(square) <= R5 && sqToFile(square) >= C && sqToFile(square) <= F {
-			for neighborPlayerPawns != 0 {
-				sq := Square(popLSB(&neighborPlayerPawns))
-				if sqToRank(sq) == sqToRank(square) {
-					gotPhalanx = true
-					*eval -= phalanx
-				}
-			}
-		}
-
-		neighborPawns := (files[file] | fileNeighbors[file]) & wPawnsOrig
-		// Passed pawns check
-		if neighborPawns == 0 {
-			*eval -= passedPawn
-			*eval -= passedPawnRankBlack[sqToRank(square)]
-		} else {
-			passedAhead := true
-			for neighborPawns != 0 {
-				p := Square(popLSB(&neighborPawns))
-				if sqToRank(p) < sqToRank(square) {
-					passedAhead = false
-				}
-			}
-
-			if passedAhead {
-				*eval -= passedPawn
-				*eval -= passedPawnRankBlack[sqToRank(square)]
-			}
-		}
-	}
-
-	// Assign penalties for doubled and tripled pawns
-	for i := A; i <= H; i++ {
-		if filesFoundWhite[i] == 2 {
-			*eval += doubledPawnByFile[i]
-		}
-		if filesFoundWhite[i] == 3 {
-			*eval += tripledPawn
-		}
-		if filesFoundBlack[i] == 2 {
-			*eval -= doubledPawnByFile[i]
-		}
-		if filesFoundBlack[i] == 3 {
-			*eval -= tripledPawn
-		}
-	}
-}
-
-func evaluateKnights(b *Board, eval *int) {
-	wKnights := b.getColorPieces(knight, WHITE)
-	bKnights := b.getColorPieces(knight, BLACK)
-	for wKnights != 0 {
-		square := Square(popLSB(&wKnights))
-
-		if square == c3 && b.squares[c2] == wP {
-			*eval += cdPawnBlockedByPlayer
-		}
-
-		*eval += knightSquareTable[square]
-	}
-	for bKnights != 0 {
-		square := Square(popLSB(&bKnights))
-
-		if square == c6 && b.squares[c7] == bP {
-			*eval -= cdPawnBlockedByPlayer
-		}
-
-		*eval -= knightSquareTable[reversePSQ[square]]
-	}
-}
-
-func evaluateBishops(b *Board, eval *int) {
-	// TODO: Add specific evaluation for bishops
-	wBishops := b.getColorPieces(bishop, WHITE)
-	wNum := 0
-	bBishops := b.getColorPieces(bishop, BLACK)
-	bNum := 0
-	for wBishops != 0 {
-		square := Square(popLSB(&wBishops))
-
-		if square == d3 && b.squares[d2] == wP {
-			*eval += cdPawnBlockedByPlayer
-		}
-
-		attacks := getBishopAttacks(square, b.occupied)
-
-		*eval += popCount(attacks) * bishopMobility
-		*eval += bishopSquareTable[square]
-		wNum++
-	}
-
-	if wNum >= 2 {
-		*eval += bishopPair
-	}
-
-	for bBishops != 0 {
-		square := Square(popLSB(&bBishops))
-
-		if square == d6 && b.squares[d7] == bP {
-			*eval -= cdPawnBlockedByPlayer
-		}
-
-		attacks := getBishopAttacks(square, b.occupied)
-
-		*eval -= popCount(attacks) * bishopMobility
-		*eval -= bishopSquareTable[reversePSQ[square]]
-		bNum++
-	}
-
-	if bNum >= 2 {
-		*eval -= bishopPair
-	}
-}
-
-func evaluateRooks(b *Board, eval *int) {
-	wRooks := b.getColorPieces(rook, WHITE)
-	bRooks := b.getColorPieces(rook, BLACK)
-	pawns := b.pieces[wP] | b.pieces[bP]
-	for wRooks != 0 {
-		square := Square(popLSB(&wRooks))
-		attacks := getRookAttacks(square, b.occupied)
-		piecesOnFile := files[sqToFile(square)] & pawns
-		if piecesOnFile == 0 {
-			*eval += rookOpenFile
-		} else if piecesOnFile == 1 {
-			*eval += rookSemiOpenFile
-		}
-		*eval += popCount(attacks) * rookMobility
-		*eval += rookSquareTable[square]
-	}
-	for bRooks != 0 {
-		square := Square(popLSB(&bRooks))
-		attacks := getRookAttacks(square, b.occupied)
-		piecesOnFile := files[sqToFile(square)] & pawns
-		if piecesOnFile == 0 {
-			*eval -= rookOpenFile
-		} else if piecesOnFile == 1 {
-			*eval -= rookSemiOpenFile
-		}
-		*eval -= popCount(attacks) * rookMobility
-		*eval -= rookSquareTable[reversePSQ[square]]
-	}
-}
-
-func evaluateQueens(b *Board, eval *int) {
-	wQueens := b.getColorPieces(queen, WHITE)
-	bQueens := b.getColorPieces(queen, BLACK)
-	for wQueens != 0 {
-		square := Square(popLSB(&wQueens))
-		if square != d1 && b.plyCnt <= 15 {
-			*eval += queenEarly
-		}
-		attacks := getBishopAttacks(square, b.occupied) | getRookAttacks(square, b.occupied)
-
-		*eval += popCount(attacks) * queenMobility
-		*eval += queenSquareTable[square]
-	}
-	for bQueens != 0 {
-		square := Square(popLSB(&bQueens))
-		if square != d8 && b.plyCnt <= 15 {
-			*eval -= queenEarly
-		}
-		attacks := getBishopAttacks(square, b.occupied) | getRookAttacks(square, b.occupied)
-
-		*eval -= popCount(attacks) * queenMobility
-		*eval -= queenSquareTable[reversePSQ[square]]
-	}
-}
-
-func evaluateKings(b *Board, eval *int, totalPieces int) {
-	noQueensLeft := b.pieces[wQ]|b.pieces[bQ] == 0
-	switchEndgame := totalPieces <= 25 && noQueensLeft
-
-	wKing := Square(bitScanForward(b.getColorPieces(king, WHITE)))
-	bKing := Square(bitScanForward(b.getColorPieces(king, BLACK)))
-
-	if switchEndgame {
-		*eval += kingSquareTableEndgame[wKing]
-		*eval -= kingSquareTableEndgame[reversePSQ[bKing]]
-	} else {
-		*eval += kingSquareTableMiddlegame[wKing]
-		*eval -= kingSquareTableMiddlegame[reversePSQ[bKing]]
-
-		// White king:
-		if wKing != e1 && !b.whiteCastled {
-			*eval += cannotCastle
-		}
-
-		if sToBB[wKing]&ranks[R1] != 0 { // If first rank
-			// Mask out squares in the same rank
-			empty := b.empty // Cache empty squares bitboard
-			attacks := kingAttacks(wKing) & empty
-			attacks &= ^ranks[R1]
-			airW := popCount(attacks)
-			*eval += airW * kingAir
-		}
-
-		// Pawn shield
-		pawns := b.pieces[wP]
-		nw := shiftBitboard(sToBB[wKing], NW) & pawns
-		n := shiftBitboard(sToBB[wKing], NORTH) & pawns
-		ne := shiftBitboard(sToBB[wKing], NE) & pawns
-
-		if nw == 0 {
-			*eval += pawnShieldLeft
-		}
-		if n == 0 {
-			*eval += pawnShieldUpDown
-		}
-		if ne == 0 {
-			*eval += pawnShieldRight
-		}
-
-		// Black king:
-		if bKing != e8 && !b.blackCastled {
-			*eval -= cannotCastle
-		}
-
-		if sToBB[bKing]&ranks[R8] != 0 { // If first rank
-			// Mask out squares in the same rank
-			empty := b.empty // Cache empty squares bitboard
-			attacks := kingAttacks(bKing) & empty
-			attacks &= ^ranks[R8]
-			airB := popCount(attacks)
-			*eval -= airB * kingAir
-		}
-
-		// Pawn shield
-		pawns = b.pieces[bP]
-		sw := shiftBitboard(sToBB[bKing], SW) & pawns
-		s := shiftBitboard(sToBB[bKing], SOUTH) & pawns
-		se := shiftBitboard(sToBB[bKing], SE) & pawns
-
-		if sw == 0 {
-			*eval -= pawnShieldLeft
-		}
-		if s == 0 {
-			*eval -= pawnShieldUpDown
-		}
-		if se == 0 {
-			*eval -= pawnShieldRight
-		}
-	}
+	return (mgEval*mgPhase + egEval*egPhase) / 24
 }
