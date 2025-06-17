@@ -22,11 +22,13 @@ Maelstrom often plays on Lichess [here](https://lichess.org/@/Maelstrom-Chess). 
  - Razoring
  - Quiescence search with delta pruning
  - Evaluation utilizing PeSTO tapered evaluation, mobility, and pawn structure
- - Time management
  - UCI protocol implementation, so you can run the engine using a UCI-supported GUI such as [CuteChess](https://github.com/cutechess/cutechess/releases).
+ - Time management
+ - Custom opening book (by default opening book is off, but can be enabled with `setoption name UseBook value true`)
+ - Integration with lichess 7-man tablebase (by default tablebase is off, but can be enabled with `setoption name UseLichessTB value true`) 
 
 ## Releases
-Release v1.0.0 is downloadable in the "Releases" tab. v2.0.0 will be posted shortly as there have been several improvements and fixes since v1! 
+Release v1.0.1 is downloadable in the "Releases" tab. v2.0.0 will be posted shortly as there have been several improvements and fixes since v1! 
 
 ## Building from Source
 Clone the repository, then run `go build maelstrom/main.go`. The engine binary will be built into the project root folder as the binary `main`. Run this executable to start the CLI, which uses the [UCI-protocol](https://official-stockfish.github.io/docs/stockfish-wiki/UCI-&-Commands.html).

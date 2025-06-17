@@ -163,7 +163,6 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 
 	if nodesSearched%2047 == 0 && time.Since(startTime).Milliseconds() > allowedTime {
 		flagStop = true
-		fmt.Printf("stopping search after %d\n", time.Since(startTime).Milliseconds())
 		return 0, true
 	}
 
@@ -450,7 +449,7 @@ func searchWithTime(b *Board, movetime int64) Move {
 	}
 
 	// Check tablebase if we're in an endgame position
-	if isTablebasePosition(b) {
+	if useTablebase && isTablebasePosition(b) {
 		if score, bestMove, found := probeTablebase(b.toFEN()); found {
 			if bestMove != "" {
 				// Check if this is a drawing position with multiple moves
@@ -496,7 +495,6 @@ func searchWithTime(b *Board, movetime int64) Move {
 	}
 
 	fmt.Printf("searching for movetime %d\n", movetime)
-	b.printFromBitBoards()
 	startTime = time.Now()
 	allowedTime = movetime
 	line := []Move{}

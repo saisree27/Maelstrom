@@ -14,6 +14,7 @@ var stopChannel chan struct{}
 var searchMutex sync.Mutex
 var isSearching bool
 var useOpeningBook bool = false
+var useTablebase bool = false
 
 func processPosition(command string) Board {
 	b := Board{}
@@ -146,6 +147,8 @@ func processGo(command string, b *Board) {
 
 func UciLoop() {
 	ttSize := int64(256)
+	initializeEverythingExceptTTable()
+	initializeTTable(int(ttSize))
 
 	b := Board{}
 	scanner := bufio.NewScanner(os.Stdin)
@@ -154,11 +157,11 @@ func UciLoop() {
 		command := scanner.Text()
 
 		if command == "uci" {
-			initializeEverythingExceptTTable()
-			initializeTTable(int(ttSize))
 			fmt.Println("id name Maelstrom")
 			fmt.Println("id author saisree27")
-			fmt.Println("option name Hash type spin default 256 min 1 max 1024")
+			fmt.Println("option name Hash type spin default 256 min 1 max 4096")
+			fmt.Println("option name UseBook type check default false")
+			fmt.Println("option name UseLichessTB type check default false")
 			fmt.Println("uciok")
 		} else if command == "isready" {
 			fmt.Println("readyok")
@@ -190,6 +193,10 @@ func UciLoop() {
 
 			if words[1] == "name" && words[2] == "UseBook" && words[3] == "value" {
 				useOpeningBook, _ = strconv.ParseBool(words[4])
+			}
+
+			if words[1] == "name" && words[2] == "UseLichessTB" && words[3] == "value" {
+				useTablebase, _ = strconv.ParseBool(words[4])
 			}
 		} else if command == "d" {
 			// Debug command to print current position
