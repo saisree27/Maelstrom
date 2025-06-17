@@ -16,6 +16,7 @@ func initializeEverythingExceptTTable() {
 	initializeSQLookup()
 	initZobrist()
 	initNeighborMasks()
+	initializePawnMasks()
 }
 
 func Run(command string, position string, depth int) {
