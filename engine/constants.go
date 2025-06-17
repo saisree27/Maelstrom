@@ -141,8 +141,15 @@ const (
 	king
 )
 
-func getCP(c Color, pt PieceType) Piece {
+func pieceTypeToPiece(c Color, pt PieceType) Piece {
 	return Piece(int(pt) + colorIndexOffset*int(c))
+}
+
+func pieceToPieceType(p Piece) PieceType {
+	if p == EMPTY {
+		panic("cannot convert EMPTY to PieceType")
+	}
+	return PieceType(p % colorIndexOffset)
 }
 
 // access bitboard of correct color (e.g. pieces[wP + colorIndexOffset * color])

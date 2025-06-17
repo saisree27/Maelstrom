@@ -207,6 +207,8 @@ var passedPawnSTEG = [64]int{
 }
 
 // TODO: Add king safety evaluation
+// TODO: Add open file/semi-open file bonus
+// TODO: Add bishop pair bonus
 
 // Returns an evaluation of the position in cp
 // 1000000 or -1000000 is designated as checkmate
@@ -249,8 +251,6 @@ func evaluate(b *Board) int {
 				moves = popCount(getRookAttacks(sq, b.occupied))
 			} else if piece == queen {
 				moves = popCount(getBishopAttacks(sq, b.occupied) | getRookAttacks(sq, b.occupied))
-			} else if piece == king {
-				moves = popCount(kingAttacks(sq))
 			} else if piece == pawn {
 				m, e := evaluatePawn(b, sq, WHITE)
 				mgEval += m

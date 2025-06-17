@@ -5,28 +5,31 @@
   <img src="maelstrom-logo.png" />
 </p>
 
-UCI-compliant Golang chess engine in development from scratch. This is my first experience coding in Go, and so far it's been awesome!
+UCI-compliant Golang chess engine in development from scratch.
 
-## Watch games
-Maelstrom often plays on Lichess, and you can watch recent or live games and view ratings [here](https://maelstrom-monitor.netlify.app/)! You can check out the source code of the monitoring website [here](https://github.com/saisree27/maelstrom-website).
+## Play/watch games
+Maelstrom often plays on Lichess [here](https://lichess.org/@/Maelstrom-Chess). Please feel free to challenge the engine on lichess whenever it is online.
 
 ## Features
  - Fast bitboard move generation (magic bitboards for sliding pieces)
- - Iterative deepening principal variation search
- - Null move pruning and transposition table
- - Move ordering with captures, history, and killer heuristic
+ - Iterative deepening principal variation search with aspiration windows
+ - Move ordering with MVV-LVA, history, and killer heuristic
+ - Transposition table
+ - Null move pruning
+ - Static null move pruning
  - Late move reductions
- - Quiescence search
- - Evaluation utilizing material, piece square tables, pawn structure, and more 
+ - Check extensions
+ - Razoring
+ - Quiescence search with delta pruning
+ - Evaluation utilizing PeSTO tapered evaluation, mobility, and pawn structure
+ - Time management
  - UCI protocol implementation, so you can run the engine using a UCI-supported GUI such as [CuteChess](https://github.com/cutechess/cutechess/releases).
 
 ## Releases
-I have included binaries for Windows, MacOS, and Linux in the Releases section. This is currently Maelstrom's first release (v1.0.0), and I would welcome any bugs or problems reported through the Issues tab!
-
-Maelstrom is also playable on Lichess! You can play against it [here](https://lichess.org/@/Maelstrom-Chess). Maelstrom accepts both casual and rated play of all time controls. Maelstrom plays with an opening book on Lichess to allow for some more varied positions.
+Release v1.0.0 is downloadable in the "Releases" tab. v2.0.0 will be posted shortly as there have been several improvements and fixes since v1! 
 
 ## Building from Source
-Clone the repository, then run `go build maelstrom/main.go`. The engine binary will be built into the project root folder as the binary `main`. Run this executable to start the CLI, which uses the UCI-protocol.
+Clone the repository, then run `go build maelstrom/main.go`. The engine binary will be built into the project root folder as the binary `main`. Run this executable to start the CLI, which uses the [UCI-protocol](https://official-stockfish.github.io/docs/stockfish-wiki/UCI-&-Commands.html).
 Enter the following commands to run the engine on starting position from binary:
 
 ```
@@ -35,18 +38,14 @@ uci
 isready
 ...
 position startpos
-go movetime 100000
+go infinite
 ```
 
 ## Upcoming Development
-There's definitely a couple more things I plan to work on for the next (and future) release. Initially I had planned to do all of these before release, but I wanted to share an initial version and take a quick break to work on other things. 
-- Optimizations (most important!)
-- Multithreading
-- Better endgame evaluation
-- Improving transposition table implementation
-
-## Game Selections
-Take a look at this epic of a [game](https://lichess.org/mcJxLCE8) played on Lichess between Maelstrom and another bot (Lynx). This game lasted 250(!) moves, with both sides refusing to draw!
+- King safety and additional evaluation considerations
+- Texel tuning evaluation weights
+- Add SEE
+- Once I'm bored of optimizing HCE and search, switch to NNUE!
 
 ## References
-Definitely the most helpful reference in developing this engine for me has been the Chess Programming [wiki](https://www.chessprogramming.org/Main_Page)! If you're interested in developing your own chess engine or move library, this website has everything.
+Definitely the most helpful reference in developing this engine for me has been the Chess Programming [wiki](https://www.chessprogramming.org/Main_Page)! If you're interested in developing your own chess engine or move library, this website has everything. Also want to shoutout [Blunder](https://github.com/deanmchris/blunder) as a great and readable reference for helping me improve the engine!

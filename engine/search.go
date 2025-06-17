@@ -17,6 +17,16 @@ var killerMoves = [100][2]Move{}
 var historyHeuristic = [100][64][64]int{}
 var flagStop = false
 
+var MVVLVA = [7][7]int{
+	{15, 13, 14, 12, 11, 10, 0}, // victim P, attacker P, B, N, R, Q, K, Empty
+	{35, 33, 34, 32, 31, 30, 0}, // victim B, attacker P, B, N, R, Q, K, Empty
+	{25, 23, 24, 22, 21, 20, 0}, // victim N, attacker P, B, N, R, Q, K, Empty
+	{45, 43, 44, 42, 41, 40, 0}, // victim R, attacker P, B, N, R, Q, K, Empty
+	{55, 53, 54, 52, 51, 50, 0}, // victim Q, attacker P, B, N, R, Q, K, Empty
+	{0, 0, 0, 0, 0, 0, 0},       // victim K, attacker P, B, N, R, Q, K, Empty
+	{0, 0, 0, 0, 0, 0, 0},       // victim Empty, attacker P, B, N, R, Q, K, Empty
+}
+
 // Global variables for PVS to keep track of search time
 // Defaults to 10 sec/search but these values are changed in searchWithTime
 var startTime time.Time = time.Now()
@@ -39,15 +49,21 @@ func quiesce(b *Board, limit int, alpha int, beta int, c Color, rd int) int {
 
 	eval := evaluate(b) * factor[c]
 
-	if limit == 0 {
+	inCheck := rd <= 2 && b.isCheck(c)
+
+	if limit <= 0 && !inCheck {
 		return eval
 	}
-
-	inCheck := rd <= 2 && b.isCheck(c)
 
 	// Beta cutoff
 	if eval >= beta && !inCheck {
 		return beta
+	}
+
+	// Delta pruning
+	delta := mgValues[queen]
+	if eval < alpha-delta {
+		return alpha
 	}
 
 	if alpha < eval {
@@ -57,7 +73,7 @@ func quiesce(b *Board, limit int, alpha int, beta int, c Color, rd int) int {
 	allLegalMoves := b.generateLegalMoves()
 
 	for _, move := range allLegalMoves {
-		if move.movetype == CAPTURE || move.movetype == CAPTUREANDPROMOTION || move.movetype == ENPASSANT {
+		if inCheck || move.movetype == CAPTURE || move.movetype == CAPTUREANDPROMOTION || move.movetype == ENPASSANT {
 			b.makeMove(move)
 			score := -quiesce(b, limit-1, -beta, -alpha, reverseColor(c), rd+1)
 			b.undo()
@@ -82,10 +98,11 @@ func quiesce(b *Board, limit int, alpha int, beta int, c Color, rd int) int {
 			}
 		}
 	}
+
 	return alpha
 }
 
-func orderMovesPV(b *Board, moves *[]Move, pv Move, c Color, depth int, rd int) {
+func orderMovesPV(b *Board, moves *[]Move, pv Move, c Color, depth int) {
 	// Pre-allocate bonuses slice to avoid reallocations
 	bonuses := make([]moveBonus, len(*moves))
 
@@ -99,13 +116,8 @@ func orderMovesPV(b *Board, moves *[]Move, pv Move, c Color, depth int, rd int) 
 
 		var bonus int
 		if mv.movetype == CAPTURE || mv.movetype == CAPTUREANDPROMOTION {
-			// Use SEE score for captures, scaled up to match bonus range
-			seeScore := seeMove(b, mv)
-			if seeScore > 0 {
-				bonus = 1000000 + seeScore // Good captures
-			} else {
-				bonus = 500000 + seeScore // Bad captures still above quiet moves
-			}
+			score := MVVLVA[pieceToPieceType(mv.captured)][pieceToPieceType(mv.piece)]
+			bonus = 1000000 + score
 		} else if mv.movetype == PROMOTION {
 			bonus = 800000 // Promotions are valuable
 		} else {
@@ -275,7 +287,7 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	}
 
 	if depth > 1 {
-		orderMovesPV(b, &legalMoves, bestMove, c, depth, rd)
+		orderMovesPV(b, &legalMoves, bestMove, c, depth)
 	}
 
 	for i, move := range legalMoves {
