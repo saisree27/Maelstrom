@@ -3,7 +3,7 @@ package engine
 // Values for material and checkmate
 const winVal int = 1000000
 
-var factor = []int{
+var factor = [2]int{
 	WHITE: 1, BLACK: -1,
 }
 
@@ -178,10 +178,10 @@ var isolatedPawnMasks [8]u64
 var doubledPawnMasks [2][64]u64
 var passedPawnMasks [2][64]u64
 
-var isolatedPawnPenaltyMG = 14
-var isolatedPawnPenaltyEG = 3
-var doubledPawnPenaltyMG = 1
-var doubledPawnPenaltyEG = 20
+const isolatedPawnPenaltyMG = 14
+const isolatedPawnPenaltyEG = 3
+const doubledPawnPenaltyMG = 1
+const doubledPawnPenaltyEG = 20
 
 // Passed pawn bonus tables (values from Blunder)
 var passedPawnSTMG = [64]int{
@@ -206,9 +206,15 @@ var passedPawnSTEG = [64]int{
 	0, 0, 0, 0, 0, 0, 0, 0,
 }
 
-// TODO: Add king safety evaluation
-// TODO: Add open file/semi-open file bonus
-// TODO: Add bishop pair bonus
+// King safety evaluation penalties
+const pawnShieldLeftPenalty = 5
+const pawnShieldRightPenalty = 10
+const pawnShieldMiddlePenalty = 12
+const notCastledPenalty = 15
+
+// Bishop pair bonus
+const bishopPairBonusMG = 20
+const bishopPairBonusEG = 30
 
 // Returns an evaluation of the position in cp
 // 1000000 or -1000000 is designated as checkmate
@@ -236,6 +242,7 @@ func evaluate(b *Board) int {
 		mobilityMG := mobilityBonusMG[piece]
 		mobilityEG := mobilityBonusEG[piece]
 
+		bishopCounter := 0
 		for wpieces != 0 {
 			totalPhase += phase
 			sq := Square(popLSB(&wpieces))
@@ -244,6 +251,7 @@ func evaluate(b *Board) int {
 
 			moves := 0
 			if piece == bishop {
+				bishopCounter += 1
 				moves = popCount(getBishopAttacks(sq, b.occupied))
 			} else if piece == knight {
 				moves = popCount(knightAttacks(sq))
@@ -255,12 +263,21 @@ func evaluate(b *Board) int {
 				m, e := evaluatePawn(b, sq, WHITE)
 				mgEval += m
 				egEval += e
+			} else if piece == king {
+				m := evaluateKingSafetyWhite(b, sq)
+				mgEval += m
 			}
 
 			mgEval += moves * mobilityMG
 			egEval += moves * mobilityEG
 		}
 
+		if bishopCounter >= 2 {
+			mgEval += bishopPairBonusMG
+			egEval += bishopPairBonusEG
+		}
+
+		bishopCounter = 0
 		for bpieces != 0 {
 			totalPhase += phase
 			sq := Square(popLSB(&bpieces))
@@ -270,6 +287,7 @@ func evaluate(b *Board) int {
 
 			moves := 0
 			if piece == bishop {
+				bishopCounter += 1
 				moves = popCount(getBishopAttacks(sq, b.occupied))
 			} else if piece == knight {
 				moves = popCount(knightAttacks(sq))
@@ -281,10 +299,18 @@ func evaluate(b *Board) int {
 				m, e := evaluatePawn(b, sq, BLACK)
 				mgEval -= m
 				egEval -= e
+			} else if piece == king {
+				m := evaluateKingSafetyBlack(b, sq)
+				mgEval -= m
 			}
 
 			mgEval -= moves * mobilityMG
 			egEval -= moves * mobilityEG
+		}
+
+		if bishopCounter >= 2 {
+			mgEval -= bishopPairBonusMG
+			egEval -= bishopPairBonusEG
 		}
 	}
 
@@ -319,6 +345,77 @@ func evaluatePawn(b *Board, sq Square, color Color) (int, int) {
 	}
 
 	return mg, eg
+}
+
+func evaluateKingSafetyWhite(b *Board, sq Square) int {
+	if sq == e1 {
+		return -notCastledPenalty
+	}
+
+	score := 0
+	pawns := b.pieces[wP] | b.pieces[wB] // include bishops in the case of fianchetto
+	bb := sToBB[sq]
+
+	nw := shiftBitboard(bb, NW) & pawns
+	n := shiftBitboard(bb, NORTH) & pawns
+	ne := shiftBitboard(bb, NE) & pawns
+
+	onKingside := (b.pieces[wK] & kingside) != 0
+
+	if nw == 0 {
+		if onKingside {
+			score -= pawnShieldLeftPenalty
+		} else {
+			score -= pawnShieldRightPenalty
+		}
+	}
+	if ne == 0 {
+		if onKingside {
+			score -= pawnShieldRightPenalty
+		} else {
+			score -= pawnShieldLeftPenalty
+		}
+	}
+	if n == 0 {
+		score -= pawnShieldMiddlePenalty
+	}
+
+	return score
+}
+
+func evaluateKingSafetyBlack(b *Board, sq Square) int {
+	if sq == e8 {
+		return -notCastledPenalty
+	}
+
+	score := 0
+	pawns := b.pieces[bP] | b.pieces[bB] // include bishops for the case of fianchetto
+	bb := sToBB[sq]
+	sw := shiftBitboard(bb, SW) & pawns
+	s := shiftBitboard(bb, SOUTH) & pawns
+	se := shiftBitboard(bb, SE) & pawns
+
+	onKingside := (b.pieces[bK] & kingside) != 0
+
+	if se == 0 {
+		if onKingside {
+			score -= pawnShieldLeftPenalty
+		} else {
+			score -= pawnShieldRightPenalty
+		}
+	}
+	if sw == 0 {
+		if onKingside {
+			score -= pawnShieldLeftPenalty
+		} else {
+			score -= pawnShieldRightPenalty
+		}
+	}
+	if s == 0 {
+		score -= pawnShieldMiddlePenalty
+	}
+
+	return score
 }
 
 func initializePawnMasks() {

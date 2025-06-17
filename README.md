@@ -21,7 +21,7 @@ Maelstrom often plays on Lichess [here](https://lichess.org/@/Maelstrom-Chess). 
  - Check extensions
  - Razoring
  - Quiescence search with delta pruning
- - Evaluation utilizing PeSTO tapered evaluation, mobility, and pawn structure
+ - Hand-crafted evaluation (HCE) utilizing PeSTO tapered evaluation, mobility, pawn structure, bishop pair, and pawn shield king safety
  - UCI protocol implementation, so you can run the engine using a UCI-supported GUI such as [CuteChess](https://github.com/cutechess/cutechess/releases).
  - Time management
  - Custom opening book (by default opening book is off, but can be enabled with `setoption name UseBook value true`)
@@ -44,10 +44,10 @@ go infinite
 ```
 
 ## Upcoming Development
-- King safety and additional evaluation considerations
 - Texel tuning evaluation weights
 - Add SEE
-- Once I'm bored of optimizing HCE and search, switch to NNUE!
+- Search improvements and optimizations
+- Once I'm bored of improving the HCE and search, switch to NNUE!
 
 ## References
 Definitely the most helpful reference in developing this engine for me has been the Chess Programming [wiki](https://www.chessprogramming.org/Main_Page)! If you're interested in developing your own chess engine or move library, this website has everything. Also want to shoutout [Blunder](https://github.com/deanmchris/blunder) as a great and readable reference for helping me improve the engine!
