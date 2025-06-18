@@ -124,9 +124,9 @@ func processGo(command string, b *Board) {
 			// Use specified movetime
 		} else if movesToGo > 0 {
 			if b.turn == WHITE {
-				movetime = wtime/movesToGo - 400 + winc - 400
+				movetime = wtime/movesToGo - 400
 			} else {
-				movetime = btime/movesToGo - 400 + binc - 400
+				movetime = btime/movesToGo - 400
 			}
 		} else {
 			// Calculate time based on remaining time and increment
