@@ -28,7 +28,7 @@ Maelstrom often plays on Lichess [here](https://lichess.org/@/Maelstrom-Chess). 
  - Integration with lichess 7-man tablebase (by default tablebase is off, but can be enabled with `setoption name UseLichessTB value true`) 
 
 ## Releases
-Release v1.0.1 is downloadable in the "Releases" tab. v2.0.0 will be posted shortly as there have been several improvements and fixes since v1! 
+Checkout and download binaries and source code from the Releases page.
 
 ## Building from Source
 Clone the repository, then run `go build maelstrom/main.go`. The engine binary will be built into the project root folder as the binary `main`. Run this executable to start the CLI, which uses the [UCI-protocol](https://official-stockfish.github.io/docs/stockfish-wiki/UCI-&-Commands.html).
