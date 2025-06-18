@@ -67,6 +67,7 @@ func processGo(command string, b *Board) {
 	var wtime, btime, winc, binc, depth, movetime int64
 	var infinite bool
 	movetimeSet := false
+	movesToGo := int64(-1)
 
 	for i := 0; i < len(words); i++ {
 		switch words[i] {
@@ -103,6 +104,11 @@ func processGo(command string, b *Board) {
 				binc, _ = strconv.ParseInt(words[i+1], 10, 64)
 				i++
 			}
+		case "movestogo":
+			if i+1 < len(words) {
+				movesToGo, _ = strconv.ParseInt(words[i+1], 10, 64)
+				i++
+			}
 		}
 	}
 
@@ -116,6 +122,12 @@ func processGo(command string, b *Board) {
 			movetime = 1000000000 // Use a very large time when searching to a specific depth
 		} else if movetimeSet {
 			// Use specified movetime
+		} else if movesToGo > 0 {
+			if b.turn == WHITE {
+				movetime = wtime/movesToGo - 400 + winc - 400
+			} else {
+				movetime = btime/movesToGo - 400 + binc - 400
+			}
 		} else {
 			// Calculate time based on remaining time and increment
 			if b.turn == WHITE {
