@@ -2,6 +2,7 @@ package engine
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -12,9 +13,15 @@ type moveBonus struct {
 	bonus int
 }
 
+const PVMoveBonus = 2000000
+const MVVLVABonus = 1000000
+const promotionBonus = 800000
+const firstKillerMoveBonus = 600000
+const secondKillerMoveBonus = 590000
+
 var nodesSearched = 0
 var killerMoves = [100][2]Move{}
-var historyHeuristic = [100][64][64]int{}
+var historyHeuristic = [2][64][64]int{}
 var flagStop = false
 
 var MVVLVA = [7][7]int{
@@ -26,6 +33,21 @@ var MVVLVA = [7][7]int{
 	{0, 0, 0, 0, 0, 0, 0},       // victim K, attacker P, B, N, R, Q, K, Empty
 	{0, 0, 0, 0, 0, 0, 0},       // victim Empty, attacker P, B, N, R, Q, K, Empty
 }
+
+// Futility margins from Blunder
+var futilityMargins = [9]int{
+	0,
+	100, // depth 1
+	160, // depth 2
+	220, // depth 3
+	280, // depth 4
+	340, // depth 5
+	400, // depth 6
+	460, // depth 7
+	520, // depth 8
+}
+
+var lmrTable = [101][101]int{}
 
 // Global variables for PVS to keep track of search time
 // Defaults to 10 sec/search but these values are changed in searchWithTime
@@ -110,25 +132,25 @@ func orderMovesPV(b *Board, moves *[]Move, pv Move, c Color, depth int) {
 	for i, mv := range *moves {
 		if mv == pv {
 			(*moves)[i], (*moves)[0] = (*moves)[0], pv
-			bonuses[i] = moveBonus{move: mv, bonus: 2000000} // Highest priority for PV moves
+			bonuses[i] = moveBonus{move: mv, bonus: PVMoveBonus} // Highest priority for PV moves
 			continue
 		}
 
 		var bonus int
 		if mv.movetype == CAPTURE || mv.movetype == CAPTUREANDPROMOTION {
 			score := MVVLVA[pieceToPieceType(mv.captured)][pieceToPieceType(mv.piece)]
-			bonus = 1000000 + score
+			bonus = MVVLVABonus + score
 		} else if mv.movetype == PROMOTION {
-			bonus = 800000 // Promotions are valuable
+			bonus = promotionBonus // Promotions are valuable
 		} else {
 			// Quiet moves
 			if mv == killerMoves[depth][0] {
-				bonus = 600000 // First killer move
+				bonus = firstKillerMoveBonus // First killer move
 			} else if mv == killerMoves[depth][1] {
-				bonus = 590000 // Second killer move
+				bonus = secondKillerMoveBonus // Second killer move
 			} else {
 				// History heuristic for remaining quiet moves
-				bonus = historyHeuristic[depth][mv.from][mv.to]
+				bonus = historyHeuristic[b.turn][mv.from][mv.to]
 			}
 		}
 		bonuses[i] = moveBonus{move: mv, bonus: bonus}
@@ -199,10 +221,8 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		}
 	}
 
-	bestScore := 0
 	timeout := false
 	bestMove := Move{}
-	oldAlpha := alpha
 
 	res, score := probeTT(b, alpha, beta, uint8(depth), &bestMove)
 	if res && !isRoot {
@@ -229,16 +249,16 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		}
 	}
 
-	hasNotJustPawns := b.colors[c] ^ b.getColorPieces(pawn, c)
-
 	// Pre-allocate PV line for child nodes
 	childPV := make([]Move, 0, 100)
 
+	// Null Move Pruning
+	hasNotJustPawns := b.colors[c] ^ b.getColorPieces(pawn, c)
 	if doNull && !check && !isPv && hasNotJustPawns != 0 {
 		b.makeNullMove()
 		R := 3 + depth/6
-		bestScore, timeout = pvs(b, depth-1-R, rd, -beta, -beta+1, reverseColor(c), false, &childPV)
-		bestScore *= -1
+		score, timeout = pvs(b, depth-1-R, rd, -beta, -beta+1, reverseColor(c), false, &childPV)
+		score *= -1
 		if timeout {
 			b.undoNullMove()
 			return 0, true
@@ -251,14 +271,14 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 			return 0, true
 		}
 
-		if bestScore >= beta {
-			return bestScore, false
+		if score >= beta {
+			return score, false
 		}
 	}
 
 	// Razoring
 	// Only apply razoring at shallow depths and non-PV nodes
-	if depth <= 2 && !check && !isPv { // Non-PV node check
+	if depth <= 2 && !check && !isPv {
 		staticEval := evaluate(b) * factor[c]
 
 		// Razoring margins based on depth
@@ -285,148 +305,129 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		}
 	}
 
+	// Order moves
 	if depth > 1 {
 		orderMovesPV(b, &legalMoves, bestMove, c, depth)
 	}
 
-	for i, move := range legalMoves {
+	bestScore := -winVal - 1
+	bestMove = Move{}
+	ttFlag := upper
+	staticEval := evaluate(b) * factor[c]
+
+	for mvCnt, move := range legalMoves {
 		b.makeMove(move)
 
-		if i == 0 {
-			bestScore, timeout = pvs(b, depth-1, rd, -beta, -alpha, reverseColor(c), true, &childPV)
-			bestScore *= -1
-			if timeout || flagStop {
-				b.undo()
-				return 0, true
-			}
-			b.undo()
-
-			if bestScore > alpha && !timeout {
-				bestMove = move
-				*line = (*line)[:0]
-				*line = append(*line, move)
-				*line = append(*line, childPV...)
-
-				if bestScore >= beta {
-					if killerMoves[depth][0].toUCI() != move.toUCI() {
-						killerMoves[depth][1] = killerMoves[depth][0]
-						killerMoves[depth][0] = move
-					}
-					historyHeuristic[depth][move.from][move.to]++
-					break
-				}
-				alpha = bestScore
-			}
+		score := 0
+		if mvCnt == 0 {
+			score, timeout = pvs(b, depth-1, rd, -beta, -alpha, reverseColor(c), true, &childPV)
+			score *= -1
 		} else {
-			score := alpha + 1
-			check := b.isCheck(b.turn)
-
-			// FUTILITY PRUNING
-			if depth == 1 && !check &&
-				move.movetype != CAPTURE &&
-				move.movetype != CAPTUREANDPROMOTION &&
-				move.movetype != PROMOTION {
-
-				staticEval := evaluate(b) * factor[c]
-				b.undo()
-
-				if staticEval+30*depth <= alpha {
-					continue // prune this move
-				}
-
-				b.makeMove(move) // re-do the move for actual search
-			}
-
 			// Late move reduction
-			if i >= 4 && depth >= 3 && move.movetype != CAPTURE && move.movetype != CAPTUREANDPROMOTION && !check {
-				// Calculate reduction depth based on move history and position
-				reduction := 1
+			shouldReduce := !isPv && move.movetype != CAPTURE && move.movetype != PROMOTION
+			R := 0
 
-				// Increase reduction for moves with low history score
-				historyScore := historyHeuristic[depth][move.from][move.to]
-				if historyScore < 100 {
-					reduction++
-				}
-
-				// Increase reduction for moves that are not in check and not threatening
-				if !b.isCheck(reverseColor(c)) {
-					reduction++
-				}
-
-				// Cap reduction at depth-2
-				if reduction > depth-2 {
-					reduction = depth - 2
-				}
-
-				// Only reduce if we have enough depth
-				if depth > reduction {
-					score, timeout = pvs(b, depth-reduction, rd, -alpha-1, -alpha, reverseColor(c), true, &childPV)
-					score *= -1
-					if timeout || flagStop {
-						b.undo()
-						return 0, true
-					}
-				}
+			if depth >= 3 && shouldReduce && !check {
+				R = lmrTable[depth][mvCnt+1]
 			}
 
-			if score > alpha {
+			checkAfterMove := b.isCheck(b.turn)
+			if shouldReduce && !checkAfterMove && depth-R-1 < len(futilityMargins) && futilityMargins[depth-R-1]+staticEval < alpha {
+				b.undo()
+				continue
+			}
+
+			score, timeout = pvs(b, depth-1-R, rd, -alpha-1, -alpha, reverseColor(c), true, &childPV)
+			score *= -1
+
+			if score > alpha && R > 0 {
 				score, timeout = pvs(b, depth-1, rd, -alpha-1, -alpha, reverseColor(c), true, &childPV)
 				score *= -1
-
-				if timeout || flagStop {
-					b.undo()
-					return 0, true
-				}
-
-				if score > alpha && score < beta {
+				if score > alpha {
 					score, timeout = pvs(b, depth-1, rd, -beta, -alpha, reverseColor(c), true, &childPV)
 					score *= -1
-					if timeout || flagStop {
-						b.undo()
-						return 0, true
-					}
 				}
+			} else if score > alpha && score < beta {
+				score, timeout = pvs(b, depth-1, rd, -beta, -alpha, reverseColor(c), true, &childPV)
+				score *= -1
+			}
+		}
 
-				if score > alpha {
-					bestMove = move
-					alpha = score
-					*line = (*line)[:0]
-					*line = append(*line, move)
-					*line = append(*line, childPV...)
-				}
+		b.undo()
 
-				b.undo()
-				if score > bestScore {
-					bestScore = score
-					if score >= beta {
-						if killerMoves[depth][0].toUCI() != move.toUCI() {
-							killerMoves[depth][1] = killerMoves[depth][0]
-							killerMoves[depth][0] = move
-						}
-						historyHeuristic[depth][move.from][move.to]++
-						break
-					}
+		if score > bestScore {
+			bestScore = score
+			bestMove = move
+		}
+
+		if score >= beta {
+			ttFlag = lower
+
+			// Store killer moves
+			if move.movetype == QUIET && killerMoves[depth][0].toUCI() != move.toUCI() {
+				killerMoves[depth][1] = killerMoves[depth][0]
+				killerMoves[depth][0] = move
+			}
+
+			// Increment history table
+			if move.movetype == QUIET {
+				historyHeuristic[b.turn][move.from][move.to] += depth * depth
+			}
+
+			if historyHeuristic[b.turn][move.from][move.to] > secondKillerMoveBonus {
+				historyHeuristic[b.turn][move.from][move.to] /= 2
+			}
+
+			break
+		} else {
+			// Decrement history table
+			if move.movetype == QUIET {
+				if historyHeuristic[b.turn][move.from][move.to] > 0 {
+					historyHeuristic[b.turn][move.from][move.to]--
 				}
-			} else {
-				b.undo()
+			}
+		}
+
+		if score > alpha {
+			alpha = score
+			ttFlag = exact
+
+			*line = (*line)[:0]
+			*line = append(*line, move)
+			*line = append(*line, childPV...)
+
+			// Increment history table
+			if move.movetype == QUIET {
+				historyHeuristic[b.turn][move.from][move.to] += depth * depth
+			}
+
+			if historyHeuristic[b.turn][move.from][move.to] > secondKillerMoveBonus {
+				historyHeuristic[b.turn][move.from][move.to] /= 2
+			}
+		} else {
+			// Decrement history table
+			if move.movetype == QUIET {
+				if historyHeuristic[b.turn][move.from][move.to] > 0 {
+					historyHeuristic[b.turn][move.from][move.to]--
+				}
 			}
 		}
 	}
 
 	if !timeout && !flagStop {
-		var flag bound
-		if bestScore <= oldAlpha {
-			flag = upper
-		} else if bestScore >= beta {
-			flag = lower
-		} else {
-			flag = exact
-		}
-
-		storeEntry(b, bestScore, flag, bestMove, uint8(depth))
+		storeEntry(b, bestScore, ttFlag, bestMove, uint8(depth))
 	}
 
 	return bestScore, timeout
+}
+
+func initializeLMRTable() {
+	for depth := 1; depth <= 100; depth++ {
+		for moveCnt := 1; moveCnt <= 100; moveCnt++ {
+			// Formula from Ethereal
+			lmrTable[depth][moveCnt] = int(0.7844 + math.Log(float64(depth))*math.Log(float64(moveCnt))/2.4696)
+		}
+	}
 }
 
 // searchWithTime searches for the best move given a time constraint

@@ -17,6 +17,7 @@ func initializeEverythingExceptTTable() {
 	initZobrist()
 	initNeighborMasks()
 	initializePawnMasks()
+	initializeLMRTable()
 }
 
 func Run(command string, position string, depth int) {

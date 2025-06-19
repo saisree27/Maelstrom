@@ -169,7 +169,7 @@ func UciLoop() {
 		command := scanner.Text()
 
 		if command == "uci" {
-			fmt.Println("id name Maelstrom")
+			fmt.Println("id name Maelstrom v2.0.1")
 			fmt.Println("id author saisree27")
 			fmt.Println("option name Hash type spin default 256 min 1 max 4096")
 			fmt.Println("option name UseBook type check default false")
