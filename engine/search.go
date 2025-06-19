@@ -196,7 +196,7 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	isPv := beta > alpha+1
 	isRoot := depth == rd
 	check := b.IsCheck(c)
-	if check {
+	if check && depth < 100 {
 		depth++
 	}
 
