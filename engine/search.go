@@ -3,7 +3,6 @@ package engine
 import (
 	"fmt"
 	"math"
-	"sort"
 	"strings"
 	"time"
 )
@@ -48,7 +47,7 @@ var MVV_LVA_TABLE = [7][7]int{
 
 var LMR_TABLE = [101][101]int{}
 
-var KillerMovesTable = [100][2]Move{}
+var KillerMovesTable = [101][2]Move{}
 var HistoryTable = [2][64][64]int{}
 
 var NodesSearched = 0
@@ -134,47 +133,43 @@ func QuiescenceSearch(b *Board, limit int, alpha int, beta int, c Color, rd int)
 	return alpha
 }
 
-func orderMovesPV(b *Board, moves *[]Move, pv Move, c Color, depth int) {
-	// Pre-allocate bonuses slice to avoid reallocations
-	bonuses := make([]moveBonus, len(*moves))
+func moveScore(b *Board, mv Move, pv Move, depth int) int {
+	if mv == pv {
+		return PV_MOVE_BONUS
+	}
 
-	// First pass: handle PV move and calculate bonuses
-	for i, mv := range *moves {
-		if mv == pv {
-			(*moves)[i], (*moves)[0] = (*moves)[0], pv
-			bonuses[i] = moveBonus{move: mv, bonus: PV_MOVE_BONUS} // Highest priority for PV moves
-			continue
-		}
-
-		var bonus int
-		if mv.movetype == CAPTURE || mv.movetype == CAPTURE_AND_PROMOTION {
-			score := MVV_LVA_TABLE[PieceToPieceType(mv.captured)][PieceToPieceType(mv.piece)]
-			bonus = MVV_LVA_BONUS + score
-		} else if mv.movetype == PROMOTION {
-			bonus = PROMOTION_BONUS // Promotions are valuable
+	if mv.movetype == CAPTURE || mv.movetype == CAPTURE_AND_PROMOTION {
+		score := MVV_LVA_TABLE[PieceToPieceType(mv.captured)][PieceToPieceType(mv.piece)]
+		return MVV_LVA_BONUS + score
+	} else if mv.movetype == PROMOTION {
+		return PROMOTION_BONUS // Promotions are valuable
+	} else {
+		// Quiet moves
+		if mv == KillerMovesTable[depth][0] {
+			return FIRST_KILLER_MOVE_BONUS // First killer move
+		} else if mv == KillerMovesTable[depth][1] {
+			return SECOND_KILLER_MOVE_BONUS // Second killer move
 		} else {
-			// Quiet moves
-			if mv == KillerMovesTable[depth][0] {
-				bonus = FIRST_KILLER_MOVE_BONUS // First killer move
-			} else if mv == KillerMovesTable[depth][1] {
-				bonus = SECOND_KILLER_MOVE_BONUS // Second killer move
-			} else {
-				// History heuristic for remaining quiet moves
-				bonus = HistoryTable[b.turn][mv.from][mv.to]
-			}
+			return HistoryTable[b.turn][mv.from][mv.to]
 		}
-		bonuses[i] = moveBonus{move: mv, bonus: bonus}
+	}
+}
+
+// Selection-based move ordering. This is more efficient than sorting
+// all moves by score since we will likely have cutoffs early in the mvoe list.
+func selectMove(idx int, moves []Move, b *Board, pv Move, depth int) Move {
+	bestScore := moveScore(b, moves[idx], pv, depth)
+	bestIndex := idx
+	for j := idx + 1; j < len(moves); j++ {
+		score := moveScore(b, moves[j], pv, depth)
+		if score > bestScore {
+			bestScore = score
+			bestIndex = j
+		}
 	}
 
-	// Sort moves in-place using the bonuses
-	sort.Slice(bonuses, func(i, j int) bool {
-		return bonuses[i].bonus > bonuses[j].bonus
-	})
-
-	// Update moves slice in-place
-	for i := range bonuses {
-		(*moves)[i] = bonuses[i].move
-	}
+	moves[idx], moves[bestIndex] = moves[bestIndex], moves[idx]
+	return moves[idx]
 }
 
 func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool, line *[]Move) (int, bool) {
@@ -308,17 +303,15 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		}
 	}
 
-	// Order moves
-	if depth > 1 {
-		orderMovesPV(b, &legalMoves, bestMove, c, depth)
-	}
-
+	pvMove := bestMove
 	bestScore := -WIN_VAL - 1
 	bestMove = Move{}
 	ttFlag := UPPER
 	staticEval := Evaluate(b) * COLOR_SIGN[c]
 
-	for mvCnt, move := range legalMoves {
+	for mvCnt := 0; mvCnt < len(legalMoves); mvCnt++ {
+		// Move ordering
+		move := selectMove(mvCnt, legalMoves, b, pvMove, depth)
 		b.MakeMove(move)
 
 		score := 0
