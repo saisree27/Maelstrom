@@ -64,7 +64,7 @@ func QuiescenceSearch(b *Board, limit int, alpha int, beta int, c Color, rd int)
 
 	// Check for stop signal
 	select {
-	case <-stopChannel:
+	case <-StopChannel:
 		return 0
 	default:
 		// Continue search
@@ -97,9 +97,14 @@ func QuiescenceSearch(b *Board, limit int, alpha int, beta int, c Color, rd int)
 		alpha = eval
 	}
 
-	allLegalMoves := b.GenerateLegalMoves()
+	var moves []Move
+	if inCheck {
+		moves = b.GenerateLegalMoves()
+	} else {
+		moves = b.GenerateCaptures()
+	}
 
-	for _, move := range allLegalMoves {
+	for _, move := range moves {
 		if inCheck || move.movetype == CAPTURE || move.movetype == CAPTURE_AND_PROMOTION || move.movetype == EN_PASSANT {
 			b.MakeMove(move)
 			score := -QuiescenceSearch(b, limit-1, -beta, -alpha, ReverseColor(c), rd+1)
@@ -107,7 +112,7 @@ func QuiescenceSearch(b *Board, limit int, alpha int, beta int, c Color, rd int)
 
 			// Check for stop signal after recursive call
 			select {
-			case <-stopChannel:
+			case <-StopChannel:
 				return 0
 			default:
 				// Continue
@@ -177,7 +182,7 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 
 	// Check for stop signal
 	select {
-	case <-stopChannel:
+	case <-StopChannel:
 		SearchStop = true
 		return 0, true
 	default:
@@ -248,7 +253,7 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	}
 
 	// Pre-allocate PV line for child nodes
-	childPV := make([]Move, 0, 100)
+	childPV := []Move{}
 
 	// Null Move Pruning
 	hasNotJustPawns := b.colors[c] ^ b.GetColorPieces(PAWN, c)
@@ -262,7 +267,7 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 			return 0, true
 		}
 
-		childPV = make([]Move, 0, 100)
+		childPV = []Move{}
 		b.UndoNullMove()
 
 		if SearchStop {
@@ -383,6 +388,8 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		} else {
 			decrementHistoryTable(move, b.turn)
 		}
+
+		childPV = []Move{}
 	}
 
 	if !timeout && !SearchStop {
@@ -429,7 +436,7 @@ func InitializeLMRTable() {
 
 // SearchWithTime searches for the best move given a time constraint
 func SearchWithTime(b *Board, movetime int64) Move {
-	if useOpeningBook {
+	if UseOpeningBook {
 		// Initialize opening book
 		book := NewOpeningBook()
 
@@ -447,7 +454,7 @@ func SearchWithTime(b *Board, movetime int64) Move {
 	}
 
 	// Check tablebase if we're in an endgame position
-	if useTablebase && IsTablebasePosition(b) {
+	if UseTablebase && IsTablebasePosition(b) {
 		if score, bestMove, found := ProbeTablebase(b.ToFEN()); found {
 			if bestMove != "" {
 				// Check if this is a drawing position with multiple moves
@@ -493,12 +500,14 @@ func SearchWithTime(b *Board, movetime int64) Move {
 	}
 
 	fmt.Printf("searching for movetime %d\n", movetime)
+
 	SearchStartTime = time.Now()
 	AllowedTime = movetime
+	SearchStop = false
+
 	line := []Move{}
 	legalMoves := b.GenerateLegalMoves()
 	prevScore := 0
-	SearchStop = false
 
 	if len(legalMoves) == 1 {
 		return legalMoves[0]
@@ -573,7 +582,7 @@ func SearchWithTime(b *Board, movetime int64) Move {
 
 		// Check for stop signal after completing a depth
 		select {
-		case <-stopChannel:
+		case <-StopChannel:
 			return prevBest
 		default:
 			// Continue to next depth

@@ -10,11 +10,11 @@ import (
 )
 
 // Global channel to signal search stop
-var stopChannel chan struct{}
-var searchMutex sync.Mutex
-var isSearching bool
-var useOpeningBook bool = false
-var useTablebase bool = false
+var StopChannel chan struct{}
+var SearchMutex sync.Mutex
+var IsSearching bool
+var UseOpeningBook bool = false
+var UseTablebase bool = false
 
 func processPosition(command string) Board {
 	b := Board{}
@@ -51,16 +51,16 @@ func processPosition(command string) Board {
 }
 
 func processGo(command string, b *Board) {
-	searchMutex.Lock()
-	if isSearching {
-		searchMutex.Unlock()
+	SearchMutex.Lock()
+	if IsSearching {
+		SearchMutex.Unlock()
 		return
 	}
-	isSearching = true
-	searchMutex.Unlock()
+	IsSearching = true
+	SearchMutex.Unlock()
 
 	// Create a new stop channel for this search
-	stopChannel = make(chan struct{})
+	StopChannel = make(chan struct{})
 
 	words := strings.Split(command, " ")
 
@@ -148,12 +148,12 @@ func processGo(command string, b *Board) {
 		bestMove = SearchWithTime(b, movetime)
 
 		// Only output bestmove if we're still searching (i.e., not stopped)
-		searchMutex.Lock()
-		if isSearching {
+		SearchMutex.Lock()
+		if IsSearching {
 			fmt.Println("bestmove " + bestMove.ToUCI())
 		}
-		isSearching = false
-		searchMutex.Unlock()
+		IsSearching = false
+		SearchMutex.Unlock()
 	}()
 }
 
@@ -184,11 +184,11 @@ func UciLoop() {
 		} else if command == "quit" {
 			os.Exit(0)
 		} else if command == "stop" {
-			searchMutex.Lock()
-			if isSearching && stopChannel != nil {
-				close(stopChannel)
+			SearchMutex.Lock()
+			if IsSearching && StopChannel != nil {
+				close(StopChannel)
 			}
-			searchMutex.Unlock()
+			SearchMutex.Unlock()
 		} else if command == "ponderhit" {
 			// Currently we don't support pondering, so treat it like a regular move
 			continue
@@ -204,11 +204,11 @@ func UciLoop() {
 			}
 
 			if words[1] == "name" && words[2] == "UseBook" && words[3] == "value" {
-				useOpeningBook, _ = strconv.ParseBool(words[4])
+				UseOpeningBook, _ = strconv.ParseBool(words[4])
 			}
 
 			if words[1] == "name" && words[2] == "UseLichessTB" && words[3] == "value" {
-				useTablebase, _ = strconv.ParseBool(words[4])
+				UseTablebase, _ = strconv.ParseBool(words[4])
 			}
 		} else if command == "d" {
 			// Debug command to print current position
