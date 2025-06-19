@@ -1,17 +1,13 @@
 package engine
 
 // Values for material and checkmate
-const winVal int = 1000000
+const WIN_VAL int = 1000000
 
-var factor = [2]int{
-	WHITE: 1, BLACK: -1,
-}
+var MG_VALUES = []int{82, 365, 337, 477, 1025, 0} // pawn, bishop, knight, rook, queen, king
+var EG_VALUES = []int{94, 297, 281, 512, 936, 0}
+var PHASE_VALUES = []int{0, 1, 1, 2, 4, 0}
 
-var mgValues = []int{82, 365, 337, 477, 1025, 0} // pawn, bishop, knight, rook, queen, king
-var egValues = []int{94, 297, 281, 512, 936, 0}
-var phaseSlice = []int{0, 1, 1, 2, 4, 0}
-
-var reversePSQ = [64]int{
+var REVERSE_SQUARE = [64]int{
 	56, 57, 58, 59, 60, 61, 62, 63,
 	48, 49, 50, 51, 52, 53, 54, 55,
 	40, 41, 42, 43, 44, 45, 46, 47,
@@ -23,7 +19,7 @@ var reversePSQ = [64]int{
 }
 
 // PeSTO evaluation tables
-var pawnSTMG = [64]int{
+var PAWN_ST_MG = [64]int{
 	0, 0, 0, 0, 0, 0, 0, 0,
 	-35, -1, -20, -23, -15, 24, 38, -22,
 	-26, -4, -4, -10, 3, 3, 33, -12,
@@ -34,7 +30,7 @@ var pawnSTMG = [64]int{
 	0, 0, 0, 0, 0, 0, 0, 0,
 }
 
-var pawnSTEG = [64]int{
+var PAWN_ST_EG = [64]int{
 	0, 0, 0, 0, 0, 0, 0, 0,
 	13, 8, 8, 10, 13, 0, 2, -7,
 	4, 7, -6, 1, 0, -5, -1, -8,
@@ -45,7 +41,7 @@ var pawnSTEG = [64]int{
 	0, 0, 0, 0, 0, 0, 0, 0,
 }
 
-var knightSTMG = [64]int{
+var KNIGHT_ST_MG = [64]int{
 	-105, -21, -58, -33, -17, -28, -19, -23,
 	-29, -53, -12, -3, -1, 18, -14, -19,
 	-23, -9, 12, 10, 19, 17, 25, -16,
@@ -56,7 +52,7 @@ var knightSTMG = [64]int{
 	-167, -89, -34, -49, 61, -97, -15, -107,
 }
 
-var knightSTEG = [64]int{
+var KNIGHT_ST_EG = [64]int{
 	-29, -51, -23, -15, -22, -18, -50, -64,
 	-42, -20, -10, -5, -2, -20, -23, -44,
 	-23, -3, -1, 15, 10, -3, -20, -22,
@@ -67,7 +63,7 @@ var knightSTEG = [64]int{
 	-58, -38, -13, -28, -31, -27, -63, -99,
 }
 
-var bishopSTMG = [64]int{
+var BISHOP_ST_MG = [64]int{
 	-33, -3, -14, -21, -13, -12, -39, -21,
 	4, 15, 16, 0, 7, 21, 33, 1,
 	0, 15, 15, 15, 14, 27, 18, 10,
@@ -78,7 +74,7 @@ var bishopSTMG = [64]int{
 	-29, 4, -82, -37, -25, -42, 7, -8,
 }
 
-var bishopSTEG = [64]int{
+var BISHOP_ST_EG = [64]int{
 	-23, -9, -23, -5, -9, -16, -5, -17,
 	-14, -18, -7, -1, 4, -9, -15, -27,
 	-12, -3, 8, 10, 13, 3, -7, -15,
@@ -89,7 +85,7 @@ var bishopSTEG = [64]int{
 	-14, -21, -11, -8, -7, -9, -17, -24,
 }
 
-var rookSTMG = [64]int{
+var ROOK_ST_MG = [64]int{
 	-19, -13, 1, 17, 16, 7, -37, -26,
 	-44, -16, -20, -9, -1, 11, -6, -71,
 	-45, -25, -16, -17, 3, 0, -5, -33,
@@ -100,7 +96,7 @@ var rookSTMG = [64]int{
 	32, 42, 32, 51, 63, 9, 31, 43,
 }
 
-var rookSTEG = [64]int{
+var ROOK_ST_EG = [64]int{
 	-9, 2, 3, -1, -5, -13, 4, -20,
 	-6, -6, 0, 2, -9, -9, -11, -3,
 	-4, 0, -5, -1, -7, -12, -8, -16,
@@ -111,7 +107,7 @@ var rookSTEG = [64]int{
 	13, 10, 18, 15, 12, 12, 8, 5,
 }
 
-var queenSTMG = [64]int{
+var QUEEN_ST_MG = [64]int{
 	-1, -18, -9, 10, -15, -25, -31, -50,
 	-35, -8, 11, 2, 8, 15, -3, 1,
 	-14, 2, -11, -2, -5, 2, 14, 5,
@@ -122,7 +118,7 @@ var queenSTMG = [64]int{
 	-28, 0, 29, 12, 59, 44, 43, 45,
 }
 
-var queenSTEG = [64]int{
+var QUEEN_ST_EG = [64]int{
 	-33, -28, -22, -43, -5, -32, -20, -41,
 	-22, -23, -30, -16, -16, -23, -36, -32,
 	-16, -27, 15, 6, 9, 17, 10, 5,
@@ -133,7 +129,7 @@ var queenSTEG = [64]int{
 	-9, 22, 22, 27, 27, 19, 10, 20,
 }
 
-var kingSTMG = [64]int{
+var KING_ST_MG = [64]int{
 	-15, 36, 12, -54, 8, -28, 24, 14,
 	1, 7, -8, -64, -43, -16, 9, 8,
 	-14, -14, -22, -46, -44, -30, -15, -27,
@@ -144,7 +140,7 @@ var kingSTMG = [64]int{
 	-65, 23, 16, -15, -56, -34, 2, 13,
 }
 
-var kingSTEG = [64]int{
+var KING_ST_EG = [64]int{
 	-53, -34, -21, -11, -28, -14, -24, -43,
 	-27, -11, 4, 13, 14, 4, -5, -17,
 	-19, -3, 11, 21, 23, 16, 7, -9,
@@ -160,31 +156,31 @@ type PieceTables struct {
 	EG [64]int
 }
 
-var pieceTables = []PieceTables{
-	{MG: pawnSTMG, EG: pawnSTEG},     // index 0: pawn
-	{MG: bishopSTMG, EG: bishopSTEG}, // index 1: bishop
-	{MG: knightSTMG, EG: knightSTEG}, // index 2: knight
-	{MG: rookSTMG, EG: rookSTEG},     // index 3: rook
-	{MG: queenSTMG, EG: queenSTEG},   // index 4: queen
-	{MG: kingSTMG, EG: kingSTEG},     // index 5: king
+var PIECE_TABLES = []PieceTables{
+	{MG: PAWN_ST_MG, EG: PAWN_ST_EG},     // index 0: pawn
+	{MG: BISHOP_ST_MG, EG: BISHOP_ST_EG}, // index 1: bishop
+	{MG: KNIGHT_ST_MG, EG: KNIGHT_ST_EG}, // index 2: knight
+	{MG: ROOK_ST_MG, EG: ROOK_ST_EG},     // index 3: rook
+	{MG: QUEEN_ST_MG, EG: QUEEN_ST_EG},   // index 4: queen
+	{MG: KING_ST_MG, EG: KING_ST_EG},     // index 5: king
 }
 
 // Mobility bonus values for each piece (values from Blunder)
-var mobilityBonusMG = [6]int{0, 3, 5, 3, 0, 0}
-var mobilityBonusEG = [6]int{0, 2, 3, 2, 6, 0}
+var MOBILITY_BONUS_MG = [6]int{0, 3, 5, 3, 0, 0}
+var MOBILITY_BONUS_EG = [6]int{0, 2, 3, 2, 6, 0}
 
 // Pawn structure penalties and masks (isolated/doubled/passed)
-var isolatedPawnMasks [8]u64
-var doubledPawnMasks [2][64]u64
-var passedPawnMasks [2][64]u64
+var ISOLATED_PAWN_MASKS [8]u64
+var DOUBLED_PAWN_MASKS [2][64]u64
+var PASSED_PAWN_MASKS [2][64]u64
 
-const isolatedPawnPenaltyMG = 14
-const isolatedPawnPenaltyEG = 3
-const doubledPawnPenaltyMG = 1
-const doubledPawnPenaltyEG = 20
+const ISOLATED_PAWN_PENALTY_MG = 14
+const ISOLATED_PAWN_PENALTY_EG = 3
+const DOUBLED_PAWN_PENALTY_MG = 1
+const DOUBLED_PAWN_PENALTY_EG = 20
 
 // Passed pawn bonus tables (values from Blunder)
-var passedPawnSTMG = [64]int{
+var PASSED_PAWN_ST_MG = [64]int{
 	0, 0, 0, 0, 0, 0, 0, 0,
 	8, 9, 2, -8, -3, 8, 16, 9,
 	5, 3, -3, -14, -3, 10, 13, 19,
@@ -195,7 +191,7 @@ var passedPawnSTMG = [64]int{
 	0, 0, 0, 0, 0, 0, 0, 0,
 }
 
-var passedPawnSTEG = [64]int{
+var PASSED_PAWN_ST_EG = [64]int{
 	0, 0, 0, 0, 0, 0, 0, 0,
 	2, 3, -4, 0, -2, -1, 7, 6,
 	8, 6, 5, 1, 1, -1, 14, 7,
@@ -207,21 +203,21 @@ var passedPawnSTEG = [64]int{
 }
 
 // King safety evaluation penalties
-const pawnShieldLeftPenalty = 5
-const pawnShieldRightPenalty = 10
-const pawnShieldMiddlePenalty = 12
-const notCastledPenalty = 15
+const PAWN_SHIELD_LEFT_PENALTY = 5
+const PAWN_SHIELD_RIGHT_PENALTY = 10
+const PAWN_SHIELD_MIDDLE_PENALTY = 12
+const NOT_CASTLED_PENALTY = 15
 
 // Bishop pair bonus
-const bishopPairBonusMG = 20
-const bishopPairBonusEG = 30
+const BISHOP_PAIR_BONUS_MG = 20
+const BISHOP_PAIR_BONUS_EG = 30
 
 // Returns an evaluation of the position in cp
 // 1000000 or -1000000 is designated as checkmate
 // Evaluations are returned in White's perspective
 
-func evaluate(b *Board) int {
-	if b.isThreeFoldRep() || b.isInsufficientMaterial() {
+func Evaluate(b *Board) int {
+	if b.IsThreeFoldRep() || b.IsInsufficientMaterial() {
 		return 0
 	}
 
@@ -229,41 +225,41 @@ func evaluate(b *Board) int {
 	egEval := 0
 	totalPhase := 0
 
-	for piece := pawn; piece <= king; piece++ {
+	for piece := PAWN; piece <= KING; piece++ {
 		idx := piece
-		tbls := pieceTables[idx]
-		mgVal := mgValues[idx]
-		egVal := egValues[idx]
-		phase := phaseSlice[idx]
+		tbls := PIECE_TABLES[idx]
+		mgVal := MG_VALUES[idx]
+		egVal := EG_VALUES[idx]
+		phase := PHASE_VALUES[idx]
 
-		wpieces := b.getColorPieces(piece, WHITE)
-		bpieces := b.getColorPieces(piece, BLACK)
+		wpieces := b.GetColorPieces(piece, WHITE)
+		bpieces := b.GetColorPieces(piece, BLACK)
 
-		mobilityMG := mobilityBonusMG[piece]
-		mobilityEG := mobilityBonusEG[piece]
+		mobilityMG := MOBILITY_BONUS_MG[piece]
+		mobilityEG := MOBILITY_BONUS_EG[piece]
 
 		bishopCounter := 0
 		for wpieces != 0 {
 			totalPhase += phase
-			sq := Square(popLSB(&wpieces))
+			sq := Square(PopLSB(&wpieces))
 			mgEval += mgVal + tbls.MG[sq]
 			egEval += egVal + tbls.EG[sq]
 
 			moves := 0
-			if piece == bishop {
+			if piece == BISHOP {
 				bishopCounter += 1
-				moves = popCount(getBishopAttacks(sq, b.occupied))
-			} else if piece == knight {
-				moves = popCount(knightAttacks(sq))
-			} else if piece == rook {
-				moves = popCount(getRookAttacks(sq, b.occupied))
-			} else if piece == queen {
-				moves = popCount(getBishopAttacks(sq, b.occupied) | getRookAttacks(sq, b.occupied))
-			} else if piece == pawn {
+				moves = PopCount(BishopAttacks(sq, b.occupied))
+			} else if piece == KNIGHT {
+				moves = PopCount(KnightAttacks(sq))
+			} else if piece == ROOK {
+				moves = PopCount(RookAttacks(sq, b.occupied))
+			} else if piece == QUEEN {
+				moves = PopCount(BishopAttacks(sq, b.occupied) | RookAttacks(sq, b.occupied))
+			} else if piece == PAWN {
 				m, e := evaluatePawn(b, sq, WHITE)
 				mgEval += m
 				egEval += e
-			} else if piece == king {
+			} else if piece == KING {
 				m := evaluateKingSafetyWhite(b, sq)
 				mgEval += m
 			}
@@ -273,33 +269,33 @@ func evaluate(b *Board) int {
 		}
 
 		if bishopCounter >= 2 {
-			mgEval += bishopPairBonusMG
-			egEval += bishopPairBonusEG
+			mgEval += BISHOP_PAIR_BONUS_MG
+			egEval += BISHOP_PAIR_BONUS_EG
 		}
 
 		bishopCounter = 0
 		for bpieces != 0 {
 			totalPhase += phase
-			sq := Square(popLSB(&bpieces))
-			rsq := reversePSQ[sq]
+			sq := Square(PopLSB(&bpieces))
+			rsq := REVERSE_SQUARE[sq]
 			mgEval -= mgVal + tbls.MG[rsq]
 			egEval -= egVal + tbls.EG[rsq]
 
 			moves := 0
-			if piece == bishop {
+			if piece == BISHOP {
 				bishopCounter += 1
-				moves = popCount(getBishopAttacks(sq, b.occupied))
-			} else if piece == knight {
-				moves = popCount(knightAttacks(sq))
-			} else if piece == rook {
-				moves = popCount(getRookAttacks(sq, b.occupied))
-			} else if piece == queen {
-				moves = popCount(getBishopAttacks(sq, b.occupied) | getRookAttacks(sq, b.occupied))
-			} else if piece == pawn {
+				moves = PopCount(BishopAttacks(sq, b.occupied))
+			} else if piece == KNIGHT {
+				moves = PopCount(KnightAttacks(sq))
+			} else if piece == ROOK {
+				moves = PopCount(RookAttacks(sq, b.occupied))
+			} else if piece == QUEEN {
+				moves = PopCount(BishopAttacks(sq, b.occupied) | RookAttacks(sq, b.occupied))
+			} else if piece == PAWN {
 				m, e := evaluatePawn(b, sq, BLACK)
 				mgEval -= m
 				egEval -= e
-			} else if piece == king {
+			} else if piece == KING {
 				m := evaluateKingSafetyBlack(b, sq)
 				mgEval -= m
 			}
@@ -309,8 +305,8 @@ func evaluate(b *Board) int {
 		}
 
 		if bishopCounter >= 2 {
-			mgEval -= bishopPairBonusMG
-			egEval -= bishopPairBonusEG
+			mgEval -= BISHOP_PAIR_BONUS_MG
+			egEval -= BISHOP_PAIR_BONUS_EG
 		}
 	}
 
@@ -324,110 +320,110 @@ func evaluate(b *Board) int {
 }
 
 func evaluatePawn(b *Board, sq Square, color Color) (int, int) {
-	ourPawns := b.getColorPieces(pawn, color)
-	enemyPawns := b.getColorPieces(pawn, reverseColor(color))
+	ourPawns := b.GetColorPieces(PAWN, color)
+	enemyPawns := b.GetColorPieces(PAWN, ReverseColor(color))
 	mg := 0
 	eg := 0
 
-	if isolatedPawnMasks[sqToFile(sq)]&ourPawns == 0 {
-		mg -= isolatedPawnPenaltyMG
-		eg -= isolatedPawnPenaltyEG
+	if ISOLATED_PAWN_MASKS[SquareToFile(sq)]&ourPawns == 0 {
+		mg -= ISOLATED_PAWN_PENALTY_MG
+		eg -= ISOLATED_PAWN_PENALTY_EG
 	}
 
-	if doubledPawnMasks[color][sq]&ourPawns != 0 {
-		mg -= doubledPawnPenaltyMG
-		eg -= doubledPawnPenaltyEG
+	if DOUBLED_PAWN_MASKS[color][sq]&ourPawns != 0 {
+		mg -= DOUBLED_PAWN_PENALTY_MG
+		eg -= DOUBLED_PAWN_PENALTY_EG
 	}
 
-	if passedPawnMasks[color][sq]&enemyPawns == 0 && ourPawns&doubledPawnMasks[color][sq] == 0 {
-		mg += passedPawnSTMG[sq]
-		eg += passedPawnSTEG[sq]
+	if PASSED_PAWN_MASKS[color][sq]&enemyPawns == 0 && ourPawns&DOUBLED_PAWN_MASKS[color][sq] == 0 {
+		mg += PASSED_PAWN_ST_MG[sq]
+		eg += PASSED_PAWN_ST_EG[sq]
 	}
 
 	return mg, eg
 }
 
 func evaluateKingSafetyWhite(b *Board, sq Square) int {
-	if sq == e1 {
-		return -notCastledPenalty
+	if sq == E1 {
+		return -NOT_CASTLED_PENALTY
 	}
 
 	score := 0
-	pawns := b.pieces[wP] | b.pieces[wB] // include bishops in the case of fianchetto
-	bb := sToBB[sq]
+	pawns := b.pieces[W_P] | b.pieces[W_B] // include bishops in the case of fianchetto
+	bb := SQUARE_TO_BITBOARD[sq]
 
-	nw := shiftBitboard(bb, NW) & pawns
-	n := shiftBitboard(bb, NORTH) & pawns
-	ne := shiftBitboard(bb, NE) & pawns
+	nw := ShiftBitboard(bb, NW) & pawns
+	n := ShiftBitboard(bb, NORTH) & pawns
+	ne := ShiftBitboard(bb, NE) & pawns
 
-	onKingside := (b.pieces[wK] & kingside) != 0
+	onKingside := (b.pieces[W_K] & KINGSIDE) != 0
 
 	if nw == 0 {
 		if onKingside {
-			score -= pawnShieldLeftPenalty
+			score -= PAWN_SHIELD_LEFT_PENALTY
 		} else {
-			score -= pawnShieldRightPenalty
+			score -= PAWN_SHIELD_RIGHT_PENALTY
 		}
 	}
 	if ne == 0 {
 		if onKingside {
-			score -= pawnShieldRightPenalty
+			score -= PAWN_SHIELD_RIGHT_PENALTY
 		} else {
-			score -= pawnShieldLeftPenalty
+			score -= PAWN_SHIELD_LEFT_PENALTY
 		}
 	}
 	if n == 0 {
-		score -= pawnShieldMiddlePenalty
+		score -= PAWN_SHIELD_MIDDLE_PENALTY
 	}
 
 	return score
 }
 
 func evaluateKingSafetyBlack(b *Board, sq Square) int {
-	if sq == e8 {
-		return -notCastledPenalty
+	if sq == E8 {
+		return -NOT_CASTLED_PENALTY
 	}
 
 	score := 0
-	pawns := b.pieces[bP] | b.pieces[bB] // include bishops for the case of fianchetto
-	bb := sToBB[sq]
-	sw := shiftBitboard(bb, SW) & pawns
-	s := shiftBitboard(bb, SOUTH) & pawns
-	se := shiftBitboard(bb, SE) & pawns
+	pawns := b.pieces[B_P] | b.pieces[B_B] // include bishops for the case of fianchetto
+	bb := SQUARE_TO_BITBOARD[sq]
+	sw := ShiftBitboard(bb, SW) & pawns
+	s := ShiftBitboard(bb, SOUTH) & pawns
+	se := ShiftBitboard(bb, SE) & pawns
 
-	onKingside := (b.pieces[bK] & kingside) != 0
+	onKingside := (b.pieces[B_K] & KINGSIDE) != 0
 
 	if se == 0 {
 		if onKingside {
-			score -= pawnShieldLeftPenalty
+			score -= PAWN_SHIELD_LEFT_PENALTY
 		} else {
-			score -= pawnShieldRightPenalty
+			score -= PAWN_SHIELD_RIGHT_PENALTY
 		}
 	}
 	if sw == 0 {
 		if onKingside {
-			score -= pawnShieldLeftPenalty
+			score -= PAWN_SHIELD_LEFT_PENALTY
 		} else {
-			score -= pawnShieldRightPenalty
+			score -= PAWN_SHIELD_RIGHT_PENALTY
 		}
 	}
 	if s == 0 {
-		score -= pawnShieldMiddlePenalty
+		score -= PAWN_SHIELD_MIDDLE_PENALTY
 	}
 
 	return score
 }
 
-func initializePawnMasks() {
+func InitializePawnMasks() {
 	for file := 0; file < 8; file++ {
 		mask := u64(0)
 		if file > 0 {
-			mask |= files[file-1]
+			mask |= FILES[file-1]
 		}
 		if file < 7 {
-			mask |= files[file+1]
+			mask |= FILES[file+1]
 		}
-		isolatedPawnMasks[file] = mask
+		ISOLATED_PAWN_MASKS[file] = mask
 	}
 
 	for sq := 0; sq < 64; sq++ {
@@ -441,8 +437,8 @@ func initializePawnMasks() {
 		for r := 0; r < rank; r++ {
 			maskB |= 1 << (r*8 + file)
 		}
-		doubledPawnMasks[WHITE][sq] = maskW
-		doubledPawnMasks[BLACK][sq] = maskB
+		DOUBLED_PAWN_MASKS[WHITE][sq] = maskW
+		DOUBLED_PAWN_MASKS[BLACK][sq] = maskB
 	}
 
 	for sq := 0; sq < 64; sq++ {
@@ -463,7 +459,7 @@ func initializePawnMasks() {
 				maskB |= 1 << (r*8 + f)
 			}
 		}
-		passedPawnMasks[WHITE][sq] = maskW
-		passedPawnMasks[BLACK][sq] = maskB
+		PASSED_PAWN_MASKS[WHITE][sq] = maskW
+		PASSED_PAWN_MASKS[BLACK][sq] = maskB
 	}
 }

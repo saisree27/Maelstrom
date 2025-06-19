@@ -8,9 +8,9 @@ import (
 type bound uint8
 
 const (
-	upper bound = iota
-	lower
-	exact
+	UPPER bound = iota
+	LOWER
+	EXACT
 )
 
 type TTEntry struct {
@@ -23,15 +23,15 @@ type TTEntry struct {
 	_        [1]byte
 }
 
-type TTable struct {
+type TranspositionTable struct {
 	entries []TTEntry
 	count   u64
 	age     uint8 // Current age counter
 }
 
-var table TTable
+var TT TranspositionTable
 
-func initializeTTable(megabytes int) {
+func InitializeTT(megabytes int) {
 	// Total bytes available
 	totalBytes := uint64(megabytes) * 1024 * 1024
 
@@ -43,60 +43,60 @@ func initializeTTable(megabytes int) {
 	if numEntries == 0 {
 		numEntries = 1 // avoid zero-sized allocation
 	}
-	table.count = 1 << (bits.Len64(numEntries) - 1)
+	TT.count = 1 << (bits.Len64(numEntries) - 1)
 
 	// Allocate entries
-	table.entries = make([]TTEntry, table.count)
-	table.age = 0
+	TT.entries = make([]TTEntry, TT.count)
+	TT.age = 0
 }
 
-func clearTTable() {
-	for i := range table.entries {
-		table.entries[i] = TTEntry{}
+func ClearTT() {
+	for i := range TT.entries {
+		TT.entries[i] = TTEntry{}
 	}
-	table.age = 0
+	TT.age = 0
 }
 
-func storeEntry(b *Board, score int, bd bound, mv Move, depth uint8) {
-	entryIndex := b.zobrist % table.count
-	entry := &table.entries[entryIndex]
+func StoreEntry(b *Board, score int, bd bound, mv Move, depth uint8) {
+	entryIndex := b.zobrist % TT.count
+	entry := &TT.entries[entryIndex]
 
 	// Replace if:
 	// 1. We have a deeper search
 	// 2. Newer entry
-	if entry.depth <= depth || entry.depth != table.age {
+	if entry.depth <= depth || entry.depth != TT.age {
 		*entry = TTEntry{
 			bestMove: mv,
 			hash:     b.zobrist,
 			bd:       bd,
 			score:    int32(score),
 			depth:    depth,
-			age:      table.age,
+			age:      TT.age,
 		}
 	}
 }
 
-func probeTT(b *Board, alpha int, beta int, depth uint8, m *Move) (bool, int) {
-	entryIndex := b.zobrist % table.count
-	entry := &table.entries[entryIndex]
+func ProbeTT(b *Board, alpha int, beta int, depth uint8, m *Move) (bool, int) {
+	entryIndex := b.zobrist % TT.count
+	entry := &TT.entries[entryIndex]
 
 	if entry.hash == b.zobrist {
 		// Update age on access
-		entry.age = table.age
+		entry.age = TT.age
 
 		// Get the PV-move
 		*m = entry.bestMove
 		if entry.depth >= depth {
 			score := int(entry.score)
-			if entry.bd == lower && score >= beta {
+			if entry.bd == LOWER && score >= beta {
 				return true, beta
 			}
 
-			if entry.bd == upper && score <= alpha {
+			if entry.bd == UPPER && score <= alpha {
 				return true, alpha
 			}
 
-			if entry.bd == exact {
+			if entry.bd == EXACT {
 				return true, score
 			}
 		}
@@ -105,6 +105,6 @@ func probeTT(b *Board, alpha int, beta int, depth uint8, m *Move) (bool, int) {
 }
 
 // Increment age counter periodically
-func incrementAge() {
-	table.age++
+func IncrementTTAge() {
+	TT.age++
 }

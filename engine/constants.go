@@ -15,19 +15,19 @@ import (
 // Bitboard constants
 // Using Little-Endian Rank-File Mapping
 
-// Bitboard mask of a-h files
-var files = [8]u64{
+// Bitboard mask of a-h FILES
+var FILES = [8]u64{
 	0x101010101010101, 0x202020202020202, 0x404040404040404, 0x808080808080808,
 	0x1010101010101010, 0x2020202020202020, 0x4040404040404040, 0x8080808080808080,
 }
 
-// Bitboard mask of ranks 1-8
-var ranks = [8]u64{
+// Bitboard mask of RANKS 1-8
+var RANKS = [8]u64{
 	0xff, 0xff00, 0xff0000, 0xff000000,
 	0xff00000000, 0xff0000000000, 0xff000000000000, 0xff00000000000000,
 }
 
-var diagonals = [15]u64{
+var DIAGONALS = [15]u64{
 	0x80, 0x8040, 0x804020,
 	0x80402010, 0x8040201008, 0x804020100804,
 	0x80402010080402, 0x8040201008040201, 0x4020100804020100,
@@ -35,7 +35,7 @@ var diagonals = [15]u64{
 	0x402010000000000, 0x201000000000000, 0x100000000000000,
 }
 
-var antiDiagonals = [15]u64{
+var ANTI_DIAGONALS = [15]u64{
 	0x1, 0x102, 0x10204,
 	0x1020408, 0x102040810, 0x10204081020,
 	0x1020408102040, 0x102040810204080, 0x204081020408000,
@@ -43,13 +43,13 @@ var antiDiagonals = [15]u64{
 	0x2040800000000000, 0x4080000000000000, 0x8000000000000000,
 }
 
-const a1h8Diagonal = 0x8040201008040201
-const h1a8Diagonal = 0x0102040810204080
-const lightSquares = 0x55AA55AA55AA55AA
-const darkSquares = 0xAA55AA55AA55AA55
+const A1_H8_DIAGONAL = 0x8040201008040201
+const H1_A8_DIAGONAL = 0x0102040810204080
+const LIGHT_SQUARES = 0x55AA55AA55AA55AA
+const DARK_SQUARES = 0xAA55AA55AA55AA55
 
-const queenside = 0xf0f0f0f0f0f0f0f
-const kingside = 0xf0f0f0f0f0f0f0f0
+const QUEENSIDE = 0xf0f0f0f0f0f0f0f
+const KINGSIDE = 0xf0f0f0f0f0f0f0f0
 
 // Defining color (white = 0, black = 1)
 type Color uint8
@@ -60,53 +60,53 @@ const (
 	NONE
 )
 
-func reverseColor(c Color) Color {
+func ReverseColor(c Color) Color {
 	return Color(c ^ 1)
 }
 
 type Piece uint8
 
 const (
-	wP Piece = iota
-	wB
-	wN
-	wR
-	wQ
-	wK
-	bP
-	bB
-	bN
-	bR
-	bQ
-	bK
+	W_P Piece = iota
+	W_B
+	W_N
+	W_R
+	W_Q
+	W_K
+	B_P
+	B_B
+	B_N
+	B_R
+	B_Q
+	B_K
 	EMPTY
 )
 
-func (p Piece) toString() string {
+func (p Piece) ToString() string {
 	switch p {
-	case wP:
+	case W_P:
 		return "P"
-	case wB:
+	case W_B:
 		return "B"
-	case wN:
+	case W_N:
 		return "N"
-	case wR:
+	case W_R:
 		return "R"
-	case wQ:
+	case W_Q:
 		return "Q"
-	case wK:
+	case W_K:
 		return "K"
-	case bP:
+	case B_P:
 		return "p"
-	case bB:
+	case B_B:
 		return "b"
-	case bN:
+	case B_N:
 		return "n"
-	case bR:
+	case B_R:
 		return "r"
-	case bQ:
+	case B_Q:
 		return "q"
-	case bK:
+	case B_K:
 		return "k"
 	case EMPTY:
 		return "."
@@ -115,15 +115,15 @@ func (p Piece) toString() string {
 }
 
 var stringToPieceMap = map[string]Piece{
-	"P": wP, "B": wB, "N": wN, "R": wR, "Q": wQ, "K": wK,
-	"p": bP, "b": bB, "n": bN, "r": bR, "q": bQ, "k": bK,
+	"P": W_P, "B": W_B, "N": W_N, "R": W_R, "Q": W_Q, "K": W_K,
+	"p": B_P, "b": B_B, "n": B_N, "r": B_R, "q": B_Q, "k": B_K,
 }
 
-func (p Piece) getColor() Color {
+func (p Piece) GetColor() Color {
 	if p == EMPTY {
 		return NONE
 	}
-	if p == wP || p == wN || p == wB || p == wR || p == wQ || p == wK {
+	if p == W_P || p == W_N || p == W_B || p == W_R || p == W_Q || p == W_K {
 		return WHITE
 	} else {
 		return BLACK
@@ -133,38 +133,38 @@ func (p Piece) getColor() Color {
 type PieceType uint8
 
 const (
-	pawn PieceType = iota
-	bishop
-	knight
-	rook
-	queen
-	king
+	PAWN PieceType = iota
+	BISHOP
+	KNIGHT
+	ROOK
+	QUEEN
+	KING
 )
 
-func pieceTypeToPiece(c Color, pt PieceType) Piece {
-	return Piece(int(pt) + colorIndexOffset*int(c))
+func PieceTypeToPiece(c Color, pt PieceType) Piece {
+	return Piece(int(pt) + COLOR_INDEX_OFFSET*int(c))
 }
 
-func pieceToPieceType(p Piece) PieceType {
+func PieceToPieceType(p Piece) PieceType {
 	if p == EMPTY {
 		panic("cannot convert EMPTY to PieceType")
 	}
-	return PieceType(p % colorIndexOffset)
+	return PieceType(p % COLOR_INDEX_OFFSET)
 }
 
-// access bitboard of correct color (e.g. pieces[wP + colorIndexOffset * color])
-const colorIndexOffset = 6
+// access bitboard of correct color (e.g. pieces[wP + COLOR_INDEX_OFFSET * color])
+const COLOR_INDEX_OFFSET = 6
 
 type MoveType uint8
 
 const (
 	QUIET MoveType = iota
 	CAPTURE
-	KCASTLE
-	QCASTLE
+	K_CASTLE
+	Q_CASTLE
 	PROMOTION
-	ENPASSANT
-	CAPTUREANDPROMOTION
+	EN_PASSANT
+	CAPTURE_AND_PROMOTION
 )
 
 type Direction int
@@ -193,16 +193,16 @@ const (
 	H
 )
 
-var fileNeighbors [8]u64
+var FILE_NEIGHBORS [8]u64
 
-func initNeighborMasks() {
+func InitNeighborMasks() {
 	for f := A; f <= H; f++ {
 		if f == A {
-			fileNeighbors[f] = files[B]
+			FILE_NEIGHBORS[f] = FILES[B]
 		} else if f == H {
-			fileNeighbors[f] = files[G]
+			FILE_NEIGHBORS[f] = FILES[G]
 		} else {
-			fileNeighbors[f] = files[f-1] | files[f+1]
+			FILE_NEIGHBORS[f] = FILES[f-1] | FILES[f+1]
 		}
 	}
 }
@@ -220,109 +220,109 @@ const (
 	R8
 )
 
-var almostPromotion = []Rank{WHITE: R7, BLACK: R2}
-var startingRank = []Rank{WHITE: R2, BLACK: R7}
-var pawnPushDirection = []Direction{WHITE: NORTH, BLACK: SOUTH}
+var ALMOST_PROMOTION = []Rank{WHITE: R7, BLACK: R2}
+var STARTING_RANK = []Rank{WHITE: R2, BLACK: R7}
+var PAWN_PUSH_DIRECTION = []Direction{WHITE: NORTH, BLACK: SOUTH}
 
 type Square int8
 
 // LERM ordering
 const (
-	a1 Square = iota
-	b1
-	c1
-	d1
-	e1
-	f1
-	g1
-	h1
-	a2
-	b2
-	c2
-	d2
-	e2
-	f2
-	g2
-	h2
-	a3
-	b3
-	c3
-	d3
-	e3
-	f3
-	g3
-	h3
-	a4
-	b4
-	c4
-	d4
-	e4
-	f4
-	g4
-	h4
-	a5
-	b5
-	c5
-	d5
-	e5
-	f5
-	g5
-	h5
-	a6
-	b6
-	c6
-	d6
-	e6
-	f6
-	g6
-	h6
-	a7
-	b7
-	c7
-	d7
-	e7
-	f7
-	g7
-	h7
-	a8
-	b8
-	c8
-	d8
-	e8
-	f8
-	g8
-	h8
-	EMPTYSQ
+	A1 Square = iota
+	B1
+	C1
+	D1
+	E1
+	F1
+	G1
+	H1
+	A2
+	B2
+	C2
+	D2
+	E2
+	F2
+	G2
+	H2
+	A3
+	B3
+	C3
+	D3
+	E3
+	F3
+	G3
+	H3
+	A4
+	B4
+	C4
+	D4
+	E4
+	F4
+	G4
+	H4
+	A5
+	B5
+	C5
+	D5
+	E5
+	F5
+	G5
+	H5
+	A6
+	B6
+	C6
+	D6
+	E6
+	F6
+	G6
+	H6
+	A7
+	B7
+	C7
+	D7
+	E7
+	F7
+	G7
+	H7
+	A8
+	B8
+	C8
+	D8
+	E8
+	F8
+	G8
+	H8
+	EMPTY_SQ
 )
 
-var stringToSquareMap = map[string]Square{
-	"a1": a1, "a2": a2, "a3": a3, "a4": a4, "a5": a5, "a6": a6, "a7": a7, "a8": a8,
-	"b1": b1, "b2": b2, "b3": b3, "b4": b4, "b5": b5, "b6": b6, "b7": b7, "b8": b8,
-	"c1": c1, "c2": c2, "c3": c3, "c4": c4, "c5": c5, "c6": c6, "c7": c7, "c8": c8,
-	"d1": d1, "d2": d2, "d3": d3, "d4": d4, "d5": d5, "d6": d6, "d7": d7, "d8": d8,
-	"e1": e1, "e2": e2, "e3": e3, "e4": e4, "e5": e5, "e6": e6, "e7": e7, "e8": e8,
-	"f1": f1, "f2": f2, "f3": f3, "f4": f4, "f5": f5, "f6": f6, "f7": f7, "f8": f8,
-	"g1": g1, "g2": g2, "g3": g3, "g4": g4, "g5": g5, "g6": g6, "g7": g7, "g8": g8,
-	"h1": h1, "h2": h2, "h3": h3, "h4": h4, "h5": h5, "h6": h6, "h7": h7, "h8": h8,
+var STRING_TO_SQUARE_MAP = map[string]Square{
+	"a1": A1, "a2": A2, "a3": A3, "a4": A4, "a5": A5, "a6": A6, "a7": A7, "a8": A8,
+	"b1": B1, "b2": B2, "b3": B3, "b4": B4, "b5": B5, "b6": B6, "b7": B7, "b8": B8,
+	"c1": C1, "c2": C2, "c3": C3, "c4": C4, "c5": C5, "c6": C6, "c7": C7, "c8": C8,
+	"d1": D1, "d2": D2, "d3": D3, "d4": D4, "d5": D5, "d6": D6, "d7": D7, "d8": D8,
+	"e1": E1, "e2": E2, "e3": E3, "e4": E4, "e5": E5, "e6": E6, "e7": E7, "e8": E8,
+	"f1": F1, "f2": F2, "f3": F3, "f4": F4, "f5": F5, "f6": F6, "f7": F7, "f8": F8,
+	"g1": G1, "g2": G2, "g3": G3, "g4": G4, "g5": G5, "g6": G6, "g7": G7, "g8": G8,
+	"h1": H1, "h2": H2, "h3": H3, "h4": H4, "h5": H5, "h6": H6, "h7": H7, "h8": H8,
 }
 
-func sqToRank(s Square) Rank {
+func SquareToRank(s Square) Rank {
 	return Rank(s >> 3)
 }
 
-func sqToFile(s Square) File {
+func SquareToFile(s Square) File {
 	return File(s & 0b111)
 }
 
-func sqToDiag(s Square) u64 {
-	return diagonals[int(sqToRank(s))-int(sqToFile(s))+7]
+func SquareToDiagonal(s Square) u64 {
+	return DIAGONALS[int(SquareToRank(s))-int(SquareToFile(s))+7]
 }
 
-func sqToAntiDiag(s Square) u64 {
-	return antiDiagonals[int(sqToRank(s))+int(sqToFile(s))]
+func SquareToAntiDiagonal(s Square) u64 {
+	return ANTI_DIAGONALS[int(SquareToRank(s))+int(SquareToFile(s))]
 }
 
-var squareToStringMap = reversedMap(stringToSquareMap)
+var SQUARE_TO_STRING_MAP = reversedMap(STRING_TO_SQUARE_MAP)
 
 func reversedMap(m map[string]Square) map[Square]string {
 	n := make(map[Square]string, len(m))
@@ -332,76 +332,76 @@ func reversedMap(m map[string]Square) map[Square]string {
 	return n
 }
 
-func (sq Square) goDirection(d Direction) Square {
+func (sq Square) GoDirection(d Direction) Square {
 	return Square(int(sq) + int(d))
 }
 
-var kingAttacksSquareLookup [64]u64
+var KING_ATTACKS_LOOKUP [64]u64
 
-func initializeKingAttacks() {
+func InitializeKingAttacks() {
 	var bb u64 = 1
 	for i := 0; i < 64; i++ {
 		copy := bb
-		attacks := shiftBitboard(copy, EAST) | shiftBitboard(copy, WEST)
+		attacks := ShiftBitboard(copy, EAST) | ShiftBitboard(copy, WEST)
 		copy |= attacks
-		attacks |= shiftBitboard(copy, NORTH) | shiftBitboard(copy, SOUTH)
+		attacks |= ShiftBitboard(copy, NORTH) | ShiftBitboard(copy, SOUTH)
 
-		kingAttacksSquareLookup[i] = attacks
+		KING_ATTACKS_LOOKUP[i] = attacks
 		bb = bb << 1
 	}
 }
 
-var knightAttacksSquareLookup [64]u64
+var KNIGHT_ATTACKS_LOOKUP [64]u64
 
-func initializeKnightAttacks() {
+func InitializeKnightAttacks() {
 	var bb u64 = 1
 	for i := 0; i < 64; i++ {
 		var attacks u64 = 0
-		attacks |= (bb << 17) & ^files[A]
-		attacks |= (bb << 10) & ^files[A] & ^files[B]
-		attacks |= (bb >> 6) & ^files[A] & ^files[B]
-		attacks |= (bb >> 15) & ^files[A]
-		attacks |= (bb << 15) & ^files[H]
-		attacks |= (bb << 6) & ^files[G] & ^files[H]
-		attacks |= (bb >> 10) & ^files[G] & ^files[H]
-		attacks |= (bb >> 17) & ^files[H]
+		attacks |= (bb << 17) & ^FILES[A]
+		attacks |= (bb << 10) & ^FILES[A] & ^FILES[B]
+		attacks |= (bb >> 6) & ^FILES[A] & ^FILES[B]
+		attacks |= (bb >> 15) & ^FILES[A]
+		attacks |= (bb << 15) & ^FILES[H]
+		attacks |= (bb << 6) & ^FILES[G] & ^FILES[H]
+		attacks |= (bb >> 10) & ^FILES[G] & ^FILES[H]
+		attacks |= (bb >> 17) & ^FILES[H]
 
-		knightAttacksSquareLookup[i] = attacks
+		KNIGHT_ATTACKS_LOOKUP[i] = attacks
 		bb = bb << 1
 	}
 }
 
-var whitePawnAttacksSquareLookup [64]u64
-var blackPawnAttacksSquareLookup [64]u64
+var WHITE_PAWN_ATTACKS_LOOKUP [64]u64
+var BLACK_PAWN_ATTACKS_LOOKUP [64]u64
 
-func initializePawnAttacks() {
+func InitializePawnAttacks() {
 	var bb u64 = 1
 	for i := 0; i < 64; i++ {
-		var attacks u64 = shiftBitboard(bb, NE) | shiftBitboard(bb, NW)
-		whitePawnAttacksSquareLookup[i] = attacks
-		attacks = shiftBitboard(bb, SE) | shiftBitboard(bb, SW)
-		blackPawnAttacksSquareLookup[i] = attacks
+		var attacks u64 = ShiftBitboard(bb, NE) | ShiftBitboard(bb, NW)
+		WHITE_PAWN_ATTACKS_LOOKUP[i] = attacks
+		attacks = ShiftBitboard(bb, SE) | ShiftBitboard(bb, SW)
+		BLACK_PAWN_ATTACKS_LOOKUP[i] = attacks
 		bb = bb << 1
 	}
 }
 
-var colorToPawnLookup = []*[64]u64{
-	WHITE: &whitePawnAttacksSquareLookup, BLACK: &blackPawnAttacksSquareLookup,
+var COLOR_TO_PAWN_LOOKUP = []*[64]u64{
+	WHITE: &WHITE_PAWN_ATTACKS_LOOKUP, BLACK: &BLACK_PAWN_ATTACKS_LOOKUP,
 }
 
-var colorToPawnLookupReverse = []*[64]u64{
-	WHITE: &blackPawnAttacksSquareLookup, BLACK: &whitePawnAttacksSquareLookup,
+var COLOR_TO_PAWN_LOOKUP_REVERSE = []*[64]u64{
+	WHITE: &BLACK_PAWN_ATTACKS_LOOKUP, BLACK: &WHITE_PAWN_ATTACKS_LOOKUP,
 }
 
-var colorToKingLookup = []Piece{
-	WHITE: wK, BLACK: bK,
+var COLOR_TO_KING_LOOKUP = []Piece{
+	WHITE: W_K, BLACK: B_K,
 }
 
-var sToBB [64]u64
+var SQUARE_TO_BITBOARD [64]u64
 
-func initializeSQLookup() {
+func InitializeSQLookup() {
 	for i := 0; i < 64; i++ {
-		sToBB[i] = 1 << i
+		SQUARE_TO_BITBOARD[i] = 1 << i
 	}
 }
 
@@ -414,23 +414,23 @@ func initializeSQLookup() {
 
 // Function to get sliding attacks on a given line/diagonal
 // Implementation from https://github.com/nkarve/surge
-func slidingAttacks(s Square, b u64, locs u64) u64 {
-	a := (locs & b) - (sToBB[s])*2
-	c := (bits.Reverse64(uint64(b&locs)) - bits.Reverse64(uint64(sToBB[s]))*2)
+func SlidingAttacks(s Square, b u64, locs u64) u64 {
+	a := (locs & b) - (SQUARE_TO_BITBOARD[s])*2
+	c := (bits.Reverse64(uint64(b&locs)) - bits.Reverse64(uint64(SQUARE_TO_BITBOARD[s]))*2)
 	d := bits.Reverse64(c)
 	return (a ^ u64(d)) & locs
 }
 
 // masks
-var bishopMasks [64]u64
-var rookMasks [64]u64
+var BISHOP_MASKS [64]u64
+var ROOK_MASKS [64]u64
 
 // attacks
-var bishopAttacks [64][512]u64
-var rookAttacks [64][4096]u64
+var BISHOP_ATTACKS [64][512]u64
+var ROOK_ATTACKS [64][4096]u64
 
 // magics from Chess Programming YT video
-var rookMagics = [64]u64{
+var ROOK_MAGICS = [64]u64{
 	0xa8002c000108020, 0x6c00049b0002001, 0x100200010090040, 0x2480041000800801,
 	0x280028004000800, 0x900410008040022, 0x280020001001080, 0x2880002041000080,
 	0xa000800080400034, 0x4808020004000, 0x2290802004801000, 0x411000d00100020,
@@ -449,7 +449,7 @@ var rookMagics = [64]u64{
 	0x489a000810200402, 0x1004400080a13, 0x4000011008020084, 0x26002114058042,
 }
 
-var bishopMagics = [64]u64{
+var BISHOP_MAGICS = [64]u64{
 	0x89a1121896040240, 0x2004844802002010, 0x2068080051921000, 0x62880a0220200808,
 	0x4042004000000, 0x100822020200011, 0xc00444222012000a, 0x28808801216001,
 	0x400492088408100, 0x201c401040c0084, 0x840800910a0010, 0x82080240060,
@@ -469,37 +469,37 @@ var bishopMagics = [64]u64{
 }
 
 // rook occupancy bits
-var rookShifts = [64]int{}
+var ROOK_SHIFTS = [64]int{}
 
 // bishop occupancy bits
-var bishopShifts = [64]int{}
+var BISHOP_SHIFTS = [64]int{}
 
 func slidingBishopAttacksForInitialization(s Square, b u64) u64 {
 	var attacks u64 = 0
-	attacks |= slidingAttacks(s, b, sqToAntiDiag(s))
-	attacks |= slidingAttacks(s, b, sqToDiag(s))
+	attacks |= SlidingAttacks(s, b, SquareToAntiDiagonal(s))
+	attacks |= SlidingAttacks(s, b, SquareToDiagonal(s))
 	return attacks
 }
 
-func initBishopAttacks() {
-	for s := a1; s <= h8; s++ {
-		var edgeMask u64 = (files[A] | files[H]) & ^files[sqToFile(s)]
-		edgeMask |= (ranks[R1] | ranks[R8]) & ^ranks[sqToRank(s)]
+func InitBishopAttacks() {
+	for s := A1; s <= H8; s++ {
+		var edgeMask u64 = (FILES[A] | FILES[H]) & ^FILES[SquareToFile(s)]
+		edgeMask |= (RANKS[R1] | RANKS[R8]) & ^RANKS[SquareToRank(s)]
 		// printBitBoard(edgeMask)
 		// remove board edges from attack squares
-		bishopMasks[s] = (sqToAntiDiag(s) ^ sqToDiag(s)) & ^edgeMask
+		BISHOP_MASKS[s] = (SquareToAntiDiagonal(s) ^ SquareToDiagonal(s)) & ^edgeMask
 
 		// printBitBoard(bishopMasks[s])
 		// number of movement possibilities from square s
-		bishopShifts[s] = 64 - popCount(bishopMasks[s])
+		BISHOP_SHIFTS[s] = 64 - PopCount(BISHOP_MASKS[s])
 
 		var i u64 = 0
 		for {
 			j := i
-			j *= bishopMagics[s]
-			j >>= bishopShifts[s]
-			bishopAttacks[s][j] = slidingBishopAttacksForInitialization(s, i)
-			i = (i - bishopMasks[s]) & bishopMasks[s]
+			j *= BISHOP_MAGICS[s]
+			j >>= BISHOP_SHIFTS[s]
+			BISHOP_ATTACKS[s][j] = slidingBishopAttacksForInitialization(s, i)
+			i = (i - BISHOP_MASKS[s]) & BISHOP_MASKS[s]
 			if i == 0 {
 				break
 			}
@@ -509,29 +509,29 @@ func initBishopAttacks() {
 
 func slidingRookAttacksForInitialization(s Square, b u64) u64 {
 	var attacks u64 = 0
-	attacks |= slidingAttacks(s, b, files[sqToFile(s)])
-	attacks |= slidingAttacks(s, b, ranks[sqToRank(s)])
+	attacks |= SlidingAttacks(s, b, FILES[SquareToFile(s)])
+	attacks |= SlidingAttacks(s, b, RANKS[SquareToRank(s)])
 	return attacks
 }
 
-func initRookAttacks() {
-	for s := a1; s <= h8; s++ {
-		var edgeMask u64 = (files[A] | files[H]) & ^files[sqToFile(s)]
-		edgeMask |= (ranks[R1] | ranks[R8]) & ^ranks[sqToRank(s)]
+func InitRookAttacks() {
+	for s := A1; s <= H8; s++ {
+		var edgeMask u64 = (FILES[A] | FILES[H]) & ^FILES[SquareToFile(s)]
+		edgeMask |= (RANKS[R1] | RANKS[R8]) & ^RANKS[SquareToRank(s)]
 
 		// remove board edges from attack squares
-		rookMasks[s] = (files[sqToFile(s)] ^ ranks[sqToRank(s)]) & ^edgeMask
+		ROOK_MASKS[s] = (FILES[SquareToFile(s)] ^ RANKS[SquareToRank(s)]) & ^edgeMask
 
 		// number of movement possibilities from square s
-		rookShifts[s] = 64 - popCount(rookMasks[s])
+		ROOK_SHIFTS[s] = 64 - PopCount(ROOK_MASKS[s])
 
 		var i u64 = 0
 		for {
 			j := i
-			j *= rookMagics[s]
-			j >>= rookShifts[s]
-			rookAttacks[s][j] = slidingRookAttacksForInitialization(s, i)
-			i = (i - rookMasks[s]) & rookMasks[s]
+			j *= ROOK_MAGICS[s]
+			j >>= ROOK_SHIFTS[s]
+			ROOK_ATTACKS[s][j] = slidingRookAttacksForInitialization(s, i)
+			i = (i - ROOK_MASKS[s]) & ROOK_MASKS[s]
 			if i == 0 {
 				break
 			}
@@ -540,55 +540,55 @@ func initRookAttacks() {
 }
 
 // helpful tables found in nkarve/surge
-var squaresBetween [64][64]u64
+var SQUARES_BETWEEN [64][64]u64
 
-func initSquaresBetween() {
+func InitSquaresBetween() {
 	var squares u64
-	for i := a1; i <= h8; i++ {
-		for j := a1; j <= h8; j++ {
+	for i := A1; i <= H8; i++ {
+		for j := A1; j <= H8; j++ {
 			squares = 1<<i | 1<<j
-			if (sqToFile(i) == sqToFile(j)) || (sqToRank(i) == sqToRank(j)) {
-				squaresBetween[i][j] =
+			if (SquareToFile(i) == SquareToFile(j)) || (SquareToRank(i) == SquareToRank(j)) {
+				SQUARES_BETWEEN[i][j] =
 					slidingRookAttacksForInitialization(i, squares) & slidingRookAttacksForInitialization(j, squares)
-			} else if (sqToDiag(i) == sqToDiag(j)) || (sqToAntiDiag(i) == sqToAntiDiag(j)) {
-				squaresBetween[i][j] =
+			} else if (SquareToDiagonal(i) == SquareToDiagonal(j)) || (SquareToAntiDiagonal(i) == SquareToAntiDiagonal(j)) {
+				SQUARES_BETWEEN[i][j] =
 					slidingBishopAttacksForInitialization(i, squares) & slidingBishopAttacksForInitialization(j, squares)
 			}
 		}
 	}
 }
 
-var line [64][64]u64
+var LINE [64][64]u64
 
-func initLine() {
-	for i := a1; i <= h8; i++ {
-		for j := a1; j <= h8; j++ {
-			if (sqToFile(i) == sqToFile(j)) || (sqToRank(i) == sqToRank(j)) {
-				line[i][j] =
+func InitLine() {
+	for i := A1; i <= H8; i++ {
+		for j := A1; j <= H8; j++ {
+			if (SquareToFile(i) == SquareToFile(j)) || (SquareToRank(i) == SquareToRank(j)) {
+				LINE[i][j] =
 					(slidingRookAttacksForInitialization(i, 0) & slidingRookAttacksForInitialization(j, 0)) | 1<<i | 1<<j
-			} else if (sqToDiag(i) == sqToDiag(j)) || (sqToAntiDiag(i) == sqToAntiDiag(j)) {
-				line[i][j] =
+			} else if (SquareToDiagonal(i) == SquareToDiagonal(j)) || (SquareToAntiDiagonal(i) == SquareToAntiDiagonal(j)) {
+				LINE[i][j] =
 					(slidingBishopAttacksForInitialization(i, 0) & slidingBishopAttacksForInitialization(j, 0)) | 1<<i | 1<<j
 			}
 		}
 	}
 }
 
-var zobristTable [13][64]u64
-var turnHash u64
+var ZOBRIST_TABLE [13][64]u64
+var TURN_HASH u64
 
-func initZobrist() {
+func InitZobrist() {
 	rand.Seed(42)
 	for i := 0; i < 13; i++ {
 		for j := 0; j < 64; j++ {
-			zobristTable[i][j] = u64(rand.Uint64())
+			ZOBRIST_TABLE[i][j] = u64(rand.Uint64())
 		}
 	}
-	turnHash = u64(rand.Uint64())
+	TURN_HASH = u64(rand.Uint64())
 }
 
 // Some slice functions for unit testing and possibly other things in the engine
-func contains(s []interface{}, e interface{}) bool {
+func Contains(s []interface{}, e interface{}) bool {
 	for _, a := range s {
 		if a == e {
 			return true
@@ -597,7 +597,7 @@ func contains(s []interface{}, e interface{}) bool {
 	return false
 }
 
-func checkSameElements(a, b []string) bool {
+func CheckSameElements(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
 	}

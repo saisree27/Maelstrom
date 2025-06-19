@@ -5,24 +5,24 @@ import (
 	"strings"
 )
 
-func initializeEverythingExceptTTable() {
-	initializeKingAttacks()
-	initializeKnightAttacks()
-	initializePawnAttacks()
-	initBishopAttacks()
-	initRookAttacks()
-	initSquaresBetween()
-	initLine()
-	initializeSQLookup()
-	initZobrist()
-	initNeighborMasks()
-	initializePawnMasks()
-	initializeLMRTable()
+func InitializeEverythingExceptTTable() {
+	InitializeKingAttacks()
+	InitializeKnightAttacks()
+	InitializePawnAttacks()
+	InitBishopAttacks()
+	InitRookAttacks()
+	InitSquaresBetween()
+	InitLine()
+	InitializeSQLookup()
+	InitZobrist()
+	InitNeighborMasks()
+	InitializePawnMasks()
+	InitializeLMRTable()
 }
 
 func Run(command string, position string, depth int) {
-	initializeEverythingExceptTTable()
-	initializeTTable(256)
+	InitializeEverythingExceptTTable()
+	InitializeTT(256)
 	if command == "search" {
 		RunSearch(position, depth)
 	}
@@ -49,15 +49,15 @@ func RunSearch(position string, depth int) {
 		b.InitFEN(fen)
 	}
 
-	b.printFromBitBoards()
+	b.PrintFromBitBoards()
 
 	for i := 1; i <= depth; i++ {
 		line := []Move{}
 
 		fmt.Printf("Depth %d: ", i)
 
-		score, timeout := pvs(&b, i, i, -winVal-1, winVal+1, b.turn, true, &line)
-		score *= factor[b.turn]
+		score, timeout := Pvs(&b, i, i, -WIN_VAL-1, WIN_VAL+1, b.turn, true, &line)
+		score *= COLOR_SIGN[b.turn]
 
 		if timeout {
 			break
@@ -68,13 +68,13 @@ func RunSearch(position string, depth int) {
 
 		strLine := []string{}
 		for i, _ := range line {
-			strLine = append(strLine, line[i].toUCI())
+			strLine = append(strLine, line[i].ToUCI())
 		}
 
 		fmt.Print(strLine)
 		fmt.Println()
 
-		if score == winVal || score == -winVal {
+		if score == WIN_VAL || score == -WIN_VAL {
 			fmt.Println("Found mate.")
 			break
 		}
@@ -85,8 +85,8 @@ func RunSearch(position string, depth int) {
 }
 
 func RunSelfPlay(position string, depth int) {
-	initializeEverythingExceptTTable()
-	initializeTTable(256)
+	InitializeEverythingExceptTTable()
+	InitializeTT(256)
 	b := Board{}
 	if position == "startpos" {
 		b.InitStartPos()
@@ -97,30 +97,30 @@ func RunSelfPlay(position string, depth int) {
 
 	movesPlayed := []string{}
 
-	legals := b.generateLegalMoves()
+	legals := b.GenerateLegalMoves()
 
 	for {
 		if len(legals) == 0 {
 			break
 		}
 
-		b.printFromBitBoards()
+		b.PrintFromBitBoards()
 		score := 0
-		bestMove := searchWithTime(&b, 10000)
-		b.printFromBitBoards()
+		bestMove := SearchWithTime(&b, 10000)
+		b.PrintFromBitBoards()
 
-		fmt.Printf("SCORE: %d\n", score*factor[b.turn])
+		fmt.Printf("SCORE: %d\n", score*COLOR_SIGN[b.turn])
 
-		movesPlayed = append(movesPlayed, bestMove.toUCI())
-		b.makeMove(bestMove)
+		movesPlayed = append(movesPlayed, bestMove.ToUCI())
+		b.MakeMove(bestMove)
 
 		fmt.Println(movesPlayed)
 	}
 }
 
 func RunPlay(position string, depth int, player Color) {
-	initializeEverythingExceptTTable()
-	initializeTTable(256)
+	InitializeEverythingExceptTTable()
+	InitializeTT(256)
 	b := Board{}
 	if position == "startpos" {
 		b.InitStartPos()
@@ -130,13 +130,13 @@ func RunPlay(position string, depth int, player Color) {
 	}
 	movesPlayed := []string{}
 
-	legals := b.generateLegalMoves()
+	legals := b.GenerateLegalMoves()
 	for {
 		if len(legals) == 0 {
 			break
 		}
 
-		b.printFromBitBoards()
+		b.PrintFromBitBoards()
 
 		if b.turn == player {
 			fmt.Println("Your turn: ")
@@ -144,7 +144,7 @@ func RunPlay(position string, depth int, player Color) {
 
 			fmt.Scanln(&move)
 
-			b.makeMoveFromUCI(move)
+			b.MakeMoveFromUCI(move)
 			movesPlayed = append(movesPlayed, move)
 		} else {
 			line := []Move{}
@@ -156,19 +156,19 @@ func RunPlay(position string, depth int, player Color) {
 
 				fmt.Printf("Depth %d: ", i)
 
-				score, _ = pvs(&b, i, i, -winVal-1, winVal+1, b.turn, true, &line)
+				score, _ = Pvs(&b, i, i, -WIN_VAL-1, WIN_VAL+1, b.turn, true, &line)
 
-				if score == winVal || score == -winVal {
+				if score == WIN_VAL || score == -WIN_VAL {
 					fmt.Println("Found mate.")
 					break
 				}
 
-				fmt.Print(score * factor[b.turn])
+				fmt.Print(score * COLOR_SIGN[b.turn])
 				fmt.Print(" ")
 
 				strLine := []string{}
 				for i, _ := range line {
-					strLine = append(strLine, line[i].toUCI())
+					strLine = append(strLine, line[i].ToUCI())
 				}
 
 				fmt.Print(strLine)
@@ -177,10 +177,10 @@ func RunPlay(position string, depth int, player Color) {
 			}
 			bestMove := line[0]
 
-			fmt.Printf("SCORE: %d\n", score*factor[b.turn])
+			fmt.Printf("SCORE: %d\n", score*COLOR_SIGN[b.turn])
 
-			movesPlayed = append(movesPlayed, bestMove.toUCI())
-			b.makeMove(bestMove)
+			movesPlayed = append(movesPlayed, bestMove.ToUCI())
+			b.MakeMove(bestMove)
 
 			fmt.Print("Moves played: ")
 			fmt.Println(movesPlayed)

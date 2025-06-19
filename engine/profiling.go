@@ -26,7 +26,7 @@ func SearchWithProfiling(b *Board, movetime int64) Move {
 	defer pprof.StopCPUProfile()
 
 	// Run the search
-	move := searchWithTime(b, movetime)
+	move := SearchWithTime(b, movetime)
 
 	// Write memory profile
 	memFile, err := os.Create("mem.prof")

@@ -7,15 +7,15 @@ import (
 )
 
 func init() {
-	initializeKingAttacks()
-	initializeKnightAttacks()
-	initializePawnAttacks()
-	initBishopAttacks()
-	initRookAttacks()
-	initSquaresBetween()
-	initLine()
-	initializeSQLookup()
-	initZobrist()
+	InitializeKingAttacks()
+	InitializeKnightAttacks()
+	InitializePawnAttacks()
+	InitBishopAttacks()
+	InitRookAttacks()
+	InitSquaresBetween()
+	InitLine()
+	InitializeSQLookup()
+	InitZobrist()
 }
 
 func Perft(b *Board, depth int) int {
@@ -23,33 +23,33 @@ func Perft(b *Board, depth int) int {
 		return 1
 	}
 
-	moves := b.generateLegalMoves()
+	moves := b.GenerateLegalMoves()
 	if depth == 1 {
 		return len(moves)
 	}
 
 	var numNodes int = 0
 	for _, move := range moves {
-		b.makeMove(move)
+		b.MakeMove(move)
 		numNodes += Perft(b, depth-1)
-		b.undo()
+		b.Undo()
 	}
 	return numNodes
 }
 
 func Divide(b *Board, depth int) int {
-	moves := b.generateLegalMoves()
+	moves := b.GenerateLegalMoves()
 
 	var numNodes int = 0
 
 	for _, move := range moves {
 		var branch int = 0
-		b.makeMove(move)
+		b.MakeMove(move)
 
 		branch = Perft(b, depth-1)
-		fmt.Printf("%q: %d nodes\n", move.toUCI(), branch)
+		fmt.Printf("%q: %d nodes\n", move.ToUCI(), branch)
 		numNodes += branch
-		b.undo()
+		b.Undo()
 	}
 	return numNodes
 }
@@ -65,7 +65,7 @@ func RunPerfTests(t *testing.T, position string, maxDepth int, expected int) {
 		b.InitFEN(position)
 	}
 
-	b.printFromBitBoards()
+	b.PrintFromBitBoards()
 	fmt.Println()
 	nodes := 0
 
@@ -93,7 +93,7 @@ func RunDivide(position string, depth int) {
 		b.InitFEN(position)
 	}
 
-	b.printFromBitBoards()
+	b.PrintFromBitBoards()
 	fmt.Println()
 
 	fmt.Printf("Depth %d finished, Nodes: %d\n", depth, Divide(&b, depth))

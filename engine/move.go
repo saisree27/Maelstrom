@@ -15,28 +15,28 @@ type Move struct {
 	null       bool     // null move (default false)
 }
 
-func (m Move) toUCI() string {
+func (m Move) ToUCI() string {
 	var s = ""
-	s += squareToStringMap[m.from]
-	s += squareToStringMap[m.to]
-	if m.movetype == PROMOTION || m.movetype == CAPTUREANDPROMOTION {
-		s += strings.ToLower(m.promote.toString())
+	s += SQUARE_TO_STRING_MAP[m.from]
+	s += SQUARE_TO_STRING_MAP[m.to]
+	if m.movetype == PROMOTION || m.movetype == CAPTURE_AND_PROMOTION {
+		s += strings.ToLower(m.promote.ToString())
 	}
 	return s
 }
 
-func fromUCI(uci string, b *Board) Move {
+func FromUCI(uci string, b *Board) Move {
 	// parse UCI string into Move
 	// should only be necessary for testing, as UCI gives fen position
 	var m = Move{}
-	var from, to Square = stringToSquareMap[uci[:2]], stringToSquareMap[uci[2:4]]
+	var from, to Square = STRING_TO_SQUARE_MAP[uci[:2]], STRING_TO_SQUARE_MAP[uci[2:4]]
 	var promotion = EMPTY
 
 	m.movetype = QUIET
 	m.from = from
 	m.to = to
 	m.piece = b.squares[from]
-	m.colorMoved = m.piece.getColor()
+	m.colorMoved = m.piece.GetColor()
 
 	if len(uci) == 5 {
 		m.movetype = PROMOTION
@@ -44,27 +44,27 @@ func fromUCI(uci string, b *Board) Move {
 		switch s {
 		case "n":
 			if m.colorMoved == WHITE {
-				promotion = wN
+				promotion = W_N
 			} else {
-				promotion = bN
+				promotion = B_N
 			}
 		case "b":
 			if m.colorMoved == WHITE {
-				promotion = wB
+				promotion = W_B
 			} else {
-				promotion = bB
+				promotion = B_B
 			}
 		case "r":
 			if m.colorMoved == WHITE {
-				promotion = wR
+				promotion = W_R
 			} else {
-				promotion = bR
+				promotion = B_R
 			}
 		case "q":
 			if m.colorMoved == WHITE {
-				promotion = wQ
+				promotion = W_Q
 			} else {
-				promotion = bQ
+				promotion = B_Q
 			}
 		}
 	}
@@ -73,33 +73,33 @@ func fromUCI(uci string, b *Board) Move {
 
 	if b.squares[to] != EMPTY {
 		if m.promote != EMPTY {
-			m.movetype = CAPTUREANDPROMOTION
+			m.movetype = CAPTURE_AND_PROMOTION
 		} else {
 			m.movetype = CAPTURE
 		}
 		m.captured = b.squares[to]
 	}
 
-	if (from == e1 && to == g1 && m.piece == wK) || (from == e8 && to == g8 && m.piece == bK) {
-		m.movetype = KCASTLE
+	if (from == E1 && to == G1 && m.piece == W_K) || (from == E8 && to == G8 && m.piece == B_K) {
+		m.movetype = K_CASTLE
 	}
 
-	if (from == e1 && to == c1 && m.piece == wK) || (from == e8 && to == c8 && m.piece == bK) {
-		m.movetype = QCASTLE
+	if (from == E1 && to == C1 && m.piece == W_K) || (from == E8 && to == C8 && m.piece == B_K) {
+		m.movetype = Q_CASTLE
 	}
 
 	var oneSquare = int(to-from) == int(NORTH)
 	var twoSquares = int(to-from) == 2*int(NORTH)
 
-	if m.piece == wP && !(oneSquare || twoSquares) && m.movetype == QUIET {
-		m.movetype = ENPASSANT
+	if m.piece == W_P && !(oneSquare || twoSquares) && m.movetype == QUIET {
+		m.movetype = EN_PASSANT
 	}
 
 	oneSquare = int(to-from) == int(SOUTH)
 	twoSquares = int(to-from) == 2*int(SOUTH)
 
-	if m.piece == bP && !(oneSquare || twoSquares) && m.movetype == QUIET {
-		m.movetype = ENPASSANT
+	if m.piece == B_P && !(oneSquare || twoSquares) && m.movetype == QUIET {
+		m.movetype = EN_PASSANT
 	}
 
 	return m

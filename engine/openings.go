@@ -29,7 +29,7 @@ func NewOpeningBook() *OpeningBook {
 	}
 
 	// Initialize both repertoires with starting position
-	startBoard := newBoard()
+	startBoard := NewBoard()
 	book.whiteRepertoire.zobrist = startBoard.zobrist
 	book.blackRepertoire.zobrist = startBoard.zobrist
 
@@ -66,10 +66,10 @@ func NewOpeningBook() *OpeningBook {
 // addWhiteLine adds a sequence of moves to the white repertoire
 func (book *OpeningBook) addWhiteLine(moves []string, name string) {
 	current := book.whiteRepertoire
-	board := newBoard()
+	board := NewBoard()
 
 	for i, move := range moves {
-		board.makeMoveFromUCI(move)
+		board.MakeMoveFromUCI(move)
 
 		found := false
 		for _, child := range current.children {
@@ -97,10 +97,10 @@ func (book *OpeningBook) addWhiteLine(moves []string, name string) {
 // addBlackLine adds a sequence of moves to the black repertoire
 func (book *OpeningBook) addBlackLine(moves []string, name string) {
 	current := book.blackRepertoire
-	board := newBoard()
+	board := NewBoard()
 
 	for i, move := range moves {
-		board.makeMoveFromUCI(move)
+		board.MakeMoveFromUCI(move)
 
 		found := false
 		for _, child := range current.children {

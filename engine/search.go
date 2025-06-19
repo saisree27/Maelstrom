@@ -13,29 +13,18 @@ type moveBonus struct {
 	bonus int
 }
 
-const PVMoveBonus = 2000000
-const MVVLVABonus = 1000000
-const promotionBonus = 800000
-const firstKillerMoveBonus = 600000
-const secondKillerMoveBonus = 590000
-
-var nodesSearched = 0
-var killerMoves = [100][2]Move{}
-var historyHeuristic = [2][64][64]int{}
-var flagStop = false
-
-var MVVLVA = [7][7]int{
-	{15, 13, 14, 12, 11, 10, 0}, // victim P, attacker P, B, N, R, Q, K, Empty
-	{35, 33, 34, 32, 31, 30, 0}, // victim B, attacker P, B, N, R, Q, K, Empty
-	{25, 23, 24, 22, 21, 20, 0}, // victim N, attacker P, B, N, R, Q, K, Empty
-	{45, 43, 44, 42, 41, 40, 0}, // victim R, attacker P, B, N, R, Q, K, Empty
-	{55, 53, 54, 52, 51, 50, 0}, // victim Q, attacker P, B, N, R, Q, K, Empty
-	{0, 0, 0, 0, 0, 0, 0},       // victim K, attacker P, B, N, R, Q, K, Empty
-	{0, 0, 0, 0, 0, 0, 0},       // victim Empty, attacker P, B, N, R, Q, K, Empty
+var COLOR_SIGN = [2]int{
+	WHITE: 1, BLACK: -1,
 }
 
+const PV_MOVE_BONUS = 2000000
+const MVV_LVA_BONUS = 1000000
+const PROMOTION_BONUS = 800000
+const FIRST_KILLER_MOVE_BONUS = 600000
+const SECOND_KILLER_MOVE_BONUS = 590000
+
 // Futility margins from Blunder
-var futilityMargins = [9]int{
+var FUTILITY_MARGINS = [9]int{
 	0,
 	100, // depth 1
 	160, // depth 2
@@ -47,15 +36,31 @@ var futilityMargins = [9]int{
 	520, // depth 8
 }
 
-var lmrTable = [101][101]int{}
+var MVV_LVA_TABLE = [7][7]int{
+	{15, 13, 14, 12, 11, 10, 0}, // victim P, attacker P, B, N, R, Q, K, Empty
+	{35, 33, 34, 32, 31, 30, 0}, // victim B, attacker P, B, N, R, Q, K, Empty
+	{25, 23, 24, 22, 21, 20, 0}, // victim N, attacker P, B, N, R, Q, K, Empty
+	{45, 43, 44, 42, 41, 40, 0}, // victim R, attacker P, B, N, R, Q, K, Empty
+	{55, 53, 54, 52, 51, 50, 0}, // victim Q, attacker P, B, N, R, Q, K, Empty
+	{0, 0, 0, 0, 0, 0, 0},       // victim K, attacker P, B, N, R, Q, K, Empty
+	{0, 0, 0, 0, 0, 0, 0},       // victim Empty, attacker P, B, N, R, Q, K, Empty
+}
+
+var LMR_TABLE = [101][101]int{}
+
+var KillerMovesTable = [100][2]Move{}
+var HistoryTable = [2][64][64]int{}
+
+var NodesSearched = 0
 
 // Global variables for PVS to keep track of search time
 // Defaults to 10 sec/search but these values are changed in searchWithTime
-var startTime time.Time = time.Now()
-var allowedTime int64 = 10000
+var SearchStartTime time.Time = time.Now()
+var AllowedTime int64 = 10000
+var SearchStop = false
 
-func quiesce(b *Board, limit int, alpha int, beta int, c Color, rd int) int {
-	nodesSearched++
+func QuiescenceSearch(b *Board, limit int, alpha int, beta int, c Color, rd int) int {
+	NodesSearched++
 
 	// Check for stop signal
 	select {
@@ -65,13 +70,13 @@ func quiesce(b *Board, limit int, alpha int, beta int, c Color, rd int) int {
 		// Continue search
 	}
 
-	if flagStop {
+	if SearchStop {
 		return 0
 	}
 
-	eval := evaluate(b) * factor[c]
+	eval := Evaluate(b) * COLOR_SIGN[c]
 
-	inCheck := rd <= 2 && b.isCheck(c)
+	inCheck := rd <= 2 && b.IsCheck(c)
 
 	if limit <= 0 && !inCheck {
 		return eval
@@ -83,7 +88,7 @@ func quiesce(b *Board, limit int, alpha int, beta int, c Color, rd int) int {
 	}
 
 	// Delta pruning
-	delta := mgValues[queen]
+	delta := MG_VALUES[QUEEN]
 	if eval < alpha-delta {
 		return alpha
 	}
@@ -92,13 +97,13 @@ func quiesce(b *Board, limit int, alpha int, beta int, c Color, rd int) int {
 		alpha = eval
 	}
 
-	allLegalMoves := b.generateLegalMoves()
+	allLegalMoves := b.GenerateLegalMoves()
 
 	for _, move := range allLegalMoves {
-		if inCheck || move.movetype == CAPTURE || move.movetype == CAPTUREANDPROMOTION || move.movetype == ENPASSANT {
-			b.makeMove(move)
-			score := -quiesce(b, limit-1, -beta, -alpha, reverseColor(c), rd+1)
-			b.undo()
+		if inCheck || move.movetype == CAPTURE || move.movetype == CAPTURE_AND_PROMOTION || move.movetype == EN_PASSANT {
+			b.MakeMove(move)
+			score := -QuiescenceSearch(b, limit-1, -beta, -alpha, ReverseColor(c), rd+1)
+			b.Undo()
 
 			// Check for stop signal after recursive call
 			select {
@@ -108,7 +113,7 @@ func quiesce(b *Board, limit int, alpha int, beta int, c Color, rd int) int {
 				// Continue
 			}
 
-			if flagStop {
+			if SearchStop {
 				return 0
 			}
 
@@ -132,25 +137,25 @@ func orderMovesPV(b *Board, moves *[]Move, pv Move, c Color, depth int) {
 	for i, mv := range *moves {
 		if mv == pv {
 			(*moves)[i], (*moves)[0] = (*moves)[0], pv
-			bonuses[i] = moveBonus{move: mv, bonus: PVMoveBonus} // Highest priority for PV moves
+			bonuses[i] = moveBonus{move: mv, bonus: PV_MOVE_BONUS} // Highest priority for PV moves
 			continue
 		}
 
 		var bonus int
-		if mv.movetype == CAPTURE || mv.movetype == CAPTUREANDPROMOTION {
-			score := MVVLVA[pieceToPieceType(mv.captured)][pieceToPieceType(mv.piece)]
-			bonus = MVVLVABonus + score
+		if mv.movetype == CAPTURE || mv.movetype == CAPTURE_AND_PROMOTION {
+			score := MVV_LVA_TABLE[PieceToPieceType(mv.captured)][PieceToPieceType(mv.piece)]
+			bonus = MVV_LVA_BONUS + score
 		} else if mv.movetype == PROMOTION {
-			bonus = promotionBonus // Promotions are valuable
+			bonus = PROMOTION_BONUS // Promotions are valuable
 		} else {
 			// Quiet moves
-			if mv == killerMoves[depth][0] {
-				bonus = firstKillerMoveBonus // First killer move
-			} else if mv == killerMoves[depth][1] {
-				bonus = secondKillerMoveBonus // Second killer move
+			if mv == KillerMovesTable[depth][0] {
+				bonus = FIRST_KILLER_MOVE_BONUS // First killer move
+			} else if mv == KillerMovesTable[depth][1] {
+				bonus = SECOND_KILLER_MOVE_BONUS // Second killer move
 			} else {
 				// History heuristic for remaining quiet moves
-				bonus = historyHeuristic[b.turn][mv.from][mv.to]
+				bonus = HistoryTable[b.turn][mv.from][mv.to]
 			}
 		}
 		bonuses[i] = moveBonus{move: mv, bonus: bonus}
@@ -167,55 +172,48 @@ func orderMovesPV(b *Board, moves *[]Move, pv Move, c Color, depth int) {
 	}
 }
 
-func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool, line *[]Move) (int, bool) {
-	nodesSearched++
+func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool, line *[]Move) (int, bool) {
+	NodesSearched++
 
 	// Check for stop signal
 	select {
 	case <-stopChannel:
-		flagStop = true
+		SearchStop = true
 		return 0, true
 	default:
 		// Continue search
 	}
 
-	if flagStop {
+	if SearchStop {
 		return 0, true
 	}
 
-	if nodesSearched%2047 == 0 && time.Since(startTime).Milliseconds() > allowedTime {
-		flagStop = true
+	if NodesSearched%2047 == 0 && time.Since(SearchStartTime).Milliseconds() > AllowedTime {
+		SearchStop = true
 		return 0, true
-	}
-
-	// Pre-allocate PV line to avoid reallocations
-	if cap(*line) < 100 {
-		*line = make([]Move, 0, 100)
-	} else {
-		*line = (*line)[:0]
 	}
 
 	isPv := beta > alpha+1
 	isRoot := depth == rd
-	check := b.isCheck(c)
+	check := b.IsCheck(c)
 	if check {
 		depth++
 	}
 
 	if depth <= 0 {
-		return quiesce(b, 4, alpha, beta, c, rd-depth), false
+		return QuiescenceSearch(b, 4, alpha, beta, c, rd-depth), false
 	}
 
 	// Check for two-fold repetition
-	if !isRoot && b.isTwoFold() {
+	if !isRoot && b.IsTwoFold() {
 		// Don't store repetition positions in TT since their value depends on game history
 		return 0, false
 	}
 
-	legalMoves := b.generateLegalMoves()
+	legalMoves := b.GenerateLegalMoves()
 	if len(legalMoves) == 0 {
-		if b.isCheck(b.turn) {
-			return -winVal, false
+		if b.IsCheck(b.turn) {
+			return -WIN_VAL, false
 		} else {
 			return 0, false
 		}
@@ -224,7 +222,7 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	timeout := false
 	bestMove := Move{}
 
-	res, score := probeTT(b, alpha, beta, uint8(depth), &bestMove)
+	res, score := ProbeTT(b, alpha, beta, uint8(depth), &bestMove)
 	if res && !isRoot {
 		*line = append(*line, bestMove)
 		return score, false
@@ -235,10 +233,10 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	// 1. Not in check
 	// 2. Not in PV node
 	// 3. Not searching for mate
-	if !check && !isPv && beta < winVal-100 && beta > -winVal+100 {
+	if !check && !isPv && beta < WIN_VAL-100 && beta > -WIN_VAL+100 {
 
 		// Get static evaluation with some margin
-		staticEval := evaluate(b) * factor[c]
+		staticEval := Evaluate(b) * COLOR_SIGN[c]
 
 		// Margin increases with depth
 		margin := 85 * depth
@@ -253,21 +251,21 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	childPV := make([]Move, 0, 100)
 
 	// Null Move Pruning
-	hasNotJustPawns := b.colors[c] ^ b.getColorPieces(pawn, c)
+	hasNotJustPawns := b.colors[c] ^ b.GetColorPieces(PAWN, c)
 	if doNull && !check && !isPv && hasNotJustPawns != 0 {
-		b.makeNullMove()
+		b.MakeNullMove()
 		R := 3 + depth/6
-		score, timeout = pvs(b, depth-1-R, rd, -beta, -beta+1, reverseColor(c), false, &childPV)
+		score, timeout = Pvs(b, depth-1-R, rd, -beta, -beta+1, ReverseColor(c), false, &childPV)
 		score *= -1
 		if timeout {
-			b.undoNullMove()
+			b.UndoNullMove()
 			return 0, true
 		}
 
 		childPV = make([]Move, 0, 100)
-		b.undoNullMove()
+		b.UndoNullMove()
 
-		if flagStop {
+		if SearchStop {
 			return 0, true
 		}
 
@@ -279,14 +277,14 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	// Razoring
 	// Only apply razoring at shallow depths and non-PV nodes
 	if depth <= 2 && !check && !isPv {
-		staticEval := evaluate(b) * factor[c]
+		staticEval := Evaluate(b) * COLOR_SIGN[c]
 
 		// Razoring margins based on depth
 		razorMargin := 300 + depth*60
 
 		if staticEval+razorMargin <= alpha {
 			// Try qsearch to verify if position is really bad
-			qScore := quiesce(b, 4, alpha, beta, c, 4)
+			qScore := QuiescenceSearch(b, 4, alpha, beta, c, 4)
 			if qScore < alpha {
 				return qScore, false
 			}
@@ -295,12 +293,12 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 
 	// Internal Iterative Deepening
 	if depth >= 4 && isPv && bestMove.from == 0 {
-		_, _ = pvs(b, depth-3, rd+1, -beta, -alpha, c, false, line)
+		_, _ = Pvs(b, depth-3, rd+1, -beta, -alpha, c, false, line)
 		if len(*line) > 0 {
 			bestMove = (*line)[0]
 		}
 		*line = (*line)[:0]
-		if flagStop {
+		if SearchStop {
 			return 0, true
 		}
 	}
@@ -310,50 +308,54 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		orderMovesPV(b, &legalMoves, bestMove, c, depth)
 	}
 
-	bestScore := -winVal - 1
+	bestScore := -WIN_VAL - 1
 	bestMove = Move{}
-	ttFlag := upper
-	staticEval := evaluate(b) * factor[c]
+	ttFlag := UPPER
+	staticEval := Evaluate(b) * COLOR_SIGN[c]
 
 	for mvCnt, move := range legalMoves {
-		b.makeMove(move)
+		b.MakeMove(move)
 
 		score := 0
 		if mvCnt == 0 {
-			score, timeout = pvs(b, depth-1, rd, -beta, -alpha, reverseColor(c), true, &childPV)
+			score, timeout = Pvs(b, depth-1, rd, -beta, -alpha, ReverseColor(c), true, &childPV)
 			score *= -1
 		} else {
 			// Late move reduction
-			shouldReduce := !isPv && move.movetype != CAPTURE && move.movetype != PROMOTION
+			quietMove := !isPv && move.movetype != CAPTURE && move.movetype != PROMOTION
 			R := 0
 
-			if depth >= 3 && shouldReduce && !check {
-				R = lmrTable[depth][mvCnt+1]
+			if depth >= 3 && quietMove && !check {
+				R = LMR_TABLE[depth][mvCnt+1]
 			}
 
-			checkAfterMove := b.isCheck(b.turn)
-			if shouldReduce && !checkAfterMove && depth-R-1 < len(futilityMargins) && futilityMargins[depth-R-1]+staticEval < alpha {
-				b.undo()
+			checkAfterMove := b.IsCheck(b.turn)
+			if quietMove && !checkAfterMove && depth-R-1 < len(FUTILITY_MARGINS) && FUTILITY_MARGINS[depth-R-1]+staticEval < alpha {
+				b.Undo()
 				continue
 			}
 
-			score, timeout = pvs(b, depth-1-R, rd, -alpha-1, -alpha, reverseColor(c), true, &childPV)
+			score, timeout = Pvs(b, depth-1-R, rd, -alpha-1, -alpha, ReverseColor(c), true, &childPV)
 			score *= -1
 
 			if score > alpha && R > 0 {
-				score, timeout = pvs(b, depth-1, rd, -alpha-1, -alpha, reverseColor(c), true, &childPV)
+				score, timeout = Pvs(b, depth-1, rd, -alpha-1, -alpha, ReverseColor(c), true, &childPV)
 				score *= -1
 				if score > alpha {
-					score, timeout = pvs(b, depth-1, rd, -beta, -alpha, reverseColor(c), true, &childPV)
+					score, timeout = Pvs(b, depth-1, rd, -beta, -alpha, ReverseColor(c), true, &childPV)
 					score *= -1
 				}
 			} else if score > alpha && score < beta {
-				score, timeout = pvs(b, depth-1, rd, -beta, -alpha, reverseColor(c), true, &childPV)
+				score, timeout = Pvs(b, depth-1, rd, -beta, -alpha, ReverseColor(c), true, &childPV)
 				score *= -1
 			}
 		}
 
-		b.undo()
+		b.Undo()
+
+		if timeout || SearchStop {
+			return 0, true
+		}
 
 		if score > bestScore {
 			bestScore = score
@@ -361,77 +363,72 @@ func pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		}
 
 		if score >= beta {
-			ttFlag = lower
-
-			// Store killer moves
-			if move.movetype == QUIET && killerMoves[depth][0].toUCI() != move.toUCI() {
-				killerMoves[depth][1] = killerMoves[depth][0]
-				killerMoves[depth][0] = move
-			}
-
-			// Increment history table
-			if move.movetype == QUIET {
-				historyHeuristic[b.turn][move.from][move.to] += depth * depth
-			}
-
-			if historyHeuristic[b.turn][move.from][move.to] > secondKillerMoveBonus {
-				historyHeuristic[b.turn][move.from][move.to] /= 2
-			}
-
+			ttFlag = LOWER
+			storeKillerMove(move, depth)
+			incrementHistoryTable(move, depth, b.turn)
 			break
 		} else {
-			// Decrement history table
-			if move.movetype == QUIET {
-				if historyHeuristic[b.turn][move.from][move.to] > 0 {
-					historyHeuristic[b.turn][move.from][move.to]--
-				}
-			}
+			decrementHistoryTable(move, b.turn)
 		}
 
 		if score > alpha {
 			alpha = score
-			ttFlag = exact
+			ttFlag = EXACT
 
 			*line = (*line)[:0]
 			*line = append(*line, move)
 			*line = append(*line, childPV...)
 
-			// Increment history table
-			if move.movetype == QUIET {
-				historyHeuristic[b.turn][move.from][move.to] += depth * depth
-			}
-
-			if historyHeuristic[b.turn][move.from][move.to] > secondKillerMoveBonus {
-				historyHeuristic[b.turn][move.from][move.to] /= 2
-			}
+			incrementHistoryTable(move, depth, b.turn)
 		} else {
-			// Decrement history table
-			if move.movetype == QUIET {
-				if historyHeuristic[b.turn][move.from][move.to] > 0 {
-					historyHeuristic[b.turn][move.from][move.to]--
-				}
-			}
+			decrementHistoryTable(move, b.turn)
 		}
 	}
 
-	if !timeout && !flagStop {
-		storeEntry(b, bestScore, ttFlag, bestMove, uint8(depth))
+	if !timeout && !SearchStop {
+		StoreEntry(b, bestScore, ttFlag, bestMove, uint8(depth))
 	}
 
 	return bestScore, timeout
 }
 
-func initializeLMRTable() {
+func storeKillerMove(move Move, depth int) {
+	if move.movetype == QUIET && KillerMovesTable[depth][0].ToUCI() != move.ToUCI() {
+		KillerMovesTable[depth][1] = KillerMovesTable[depth][0]
+		KillerMovesTable[depth][0] = move
+	}
+}
+
+func incrementHistoryTable(move Move, depth int, color Color) {
+	if move.movetype == QUIET {
+		HistoryTable[color][move.from][move.to] += depth * depth
+	}
+
+	if HistoryTable[color][move.from][move.to] > SECOND_KILLER_MOVE_BONUS {
+		HistoryTable[color][move.from][move.to] /= 2
+	}
+}
+
+func decrementHistoryTable(move Move, color Color) {
+	if move.movetype == QUIET {
+		if HistoryTable[color][move.from][move.to] > 0 {
+			HistoryTable[color][move.from][move.to]--
+		}
+	}
+
+}
+
+func InitializeLMRTable() {
 	for depth := 1; depth <= 100; depth++ {
 		for moveCnt := 1; moveCnt <= 100; moveCnt++ {
 			// Formula from Ethereal
-			lmrTable[depth][moveCnt] = int(0.7844 + math.Log(float64(depth))*math.Log(float64(moveCnt))/2.4696)
+			LMR_TABLE[depth][moveCnt] = int(0.7844 + math.Log(float64(depth))*math.Log(float64(moveCnt))/2.4696)
 		}
 	}
 }
 
-// searchWithTime searches for the best move given a time constraint
-func searchWithTime(b *Board, movetime int64) Move {
+// SearchWithTime searches for the best move given a time constraint
+func SearchWithTime(b *Board, movetime int64) Move {
 	if useOpeningBook {
 		// Initialize opening book
 		book := NewOpeningBook()
@@ -439,7 +436,7 @@ func searchWithTime(b *Board, movetime int64) Move {
 		// Check if we can use a book move
 		if bookMove, variation := book.LookupPosition(b, b.turn); bookMove != "" {
 			// Convert UCI string to Move
-			move := fromUCI(bookMove, b)
+			move := FromUCI(bookMove, b)
 			if variation != "" {
 				fmt.Printf("info string Book move: %s (%s)\n", bookMove, variation)
 			} else {
@@ -450,8 +447,8 @@ func searchWithTime(b *Board, movetime int64) Move {
 	}
 
 	// Check tablebase if we're in an endgame position
-	if useTablebase && isTablebasePosition(b) {
-		if score, bestMove, found := probeTablebase(b.toFEN()); found {
+	if useTablebase && IsTablebasePosition(b) {
+		if score, bestMove, found := ProbeTablebase(b.ToFEN()); found {
 			if bestMove != "" {
 				// Check if this is a drawing position with multiple moves
 				if strings.HasPrefix(bestMove, "draw:") {
@@ -459,7 +456,7 @@ func searchWithTime(b *Board, movetime int64) Move {
 					drawingMoves := strings.Split(strings.TrimPrefix(bestMove, "draw:"), ",")
 
 					// Search these moves to find the best one
-					bestScore := -winVal - 1
+					bestScore := -WIN_VAL - 1
 					var bestDrawingMove Move
 					line := []Move{}
 					strLine := ""
@@ -467,28 +464,28 @@ func searchWithTime(b *Board, movetime int64) Move {
 					searchStart := time.Now()
 					// Try each drawing move
 					for _, moveStr := range drawingMoves {
-						move := fromUCI(moveStr, b)
-						b.makeMove(move)
-						score, _ := pvs(b, 6, 6, -winVal-1, winVal+1, b.turn, true, &line)
+						move := FromUCI(moveStr, b)
+						b.MakeMove(move)
+						score, _ := Pvs(b, 6, 6, -WIN_VAL-1, WIN_VAL+1, b.turn, true, &line)
 						score *= -1 // Negate score since we evaluated from opponent's perspective
-						b.undo()
+						b.Undo()
 
 						if score > bestScore {
 							bestScore = score
 							bestDrawingMove = move
-							strLine = bestDrawingMove.toUCI()
+							strLine = bestDrawingMove.ToUCI()
 							for _, m := range line {
-								strLine += " " + m.toUCI()
+								strLine += " " + m.ToUCI()
 							}
 						}
 					}
 
-					fmt.Printf("info depth 6 nodes %d time %d score cp %d pv %s\n", nodesSearched, time.Since(searchStart).Milliseconds(), bestScore*factor[b.turn], strLine)
+					fmt.Printf("info depth 6 nodes %d time %d score cp %d pv %s\n", NodesSearched, time.Since(searchStart).Milliseconds(), bestScore*COLOR_SIGN[b.turn], strLine)
 					return bestDrawingMove
 				}
 
 				// Not a drawing position, use the tablebase move directly
-				move := fromUCI(bestMove, b)
+				move := FromUCI(bestMove, b)
 				fmt.Printf("info depth 99 nodes 1 time 1 score cp %d pv %s\n", score, bestMove)
 				return move
 			}
@@ -496,12 +493,12 @@ func searchWithTime(b *Board, movetime int64) Move {
 	}
 
 	fmt.Printf("searching for movetime %d\n", movetime)
-	startTime = time.Now()
-	allowedTime = movetime
+	SearchStartTime = time.Now()
+	AllowedTime = movetime
 	line := []Move{}
-	legalMoves := b.generateLegalMoves()
+	legalMoves := b.GenerateLegalMoves()
 	prevScore := 0
-	flagStop = false
+	SearchStop = false
 
 	if len(legalMoves) == 1 {
 		return legalMoves[0]
@@ -516,12 +513,12 @@ func searchWithTime(b *Board, movetime int64) Move {
 	prevBest := legalMoves[0]
 
 	for i := 1; i <= 100; i++ {
-		nodesSearched = 0
+		NodesSearched = 0
 		searchStart := time.Now()
 
 		// Aspiration windows
-		alpha := -winVal - 1
-		beta := winVal + 1
+		alpha := -WIN_VAL - 1
+		beta := WIN_VAL + 1
 		windowSize := 50 // Default window size
 
 		if i > 5 { // Only use aspiration windows after depth 5
@@ -537,17 +534,17 @@ func searchWithTime(b *Board, movetime int64) Move {
 
 		// Aspiration window search with research on fail
 		for {
-			score, timeout = pvs(b, i, i, alpha, beta, b.turn, true, &line)
+			score, timeout = Pvs(b, i, i, alpha, beta, b.turn, true, &line)
 			if timeout {
 				return prevBest
 			}
 
 			if score <= alpha {
-				alpha = max(-winVal-1, alpha-windowSize*2)
+				alpha = max(-WIN_VAL-1, alpha-windowSize*2)
 				continue
 			}
 			if score >= beta {
-				beta = min(winVal+1, beta+windowSize*2)
+				beta = min(WIN_VAL+1, beta+windowSize*2)
 				continue
 			}
 			break
@@ -557,18 +554,18 @@ func searchWithTime(b *Board, movetime int64) Move {
 		timeTaken := time.Since(searchStart).Milliseconds()
 		timeTakenNanoSeconds := time.Since(searchStart).Nanoseconds()
 
-		incrementAge()
+		IncrementTTAge()
 
 		strLine := ""
 		for _, move := range line {
-			strLine += " " + move.toUCI()
+			strLine += " " + move.ToUCI()
 		}
 
-		nps := nodesSearched * 1000000000 / max(int(timeTakenNanoSeconds), 1)
-		fmt.Printf("info depth %d nodes %d time %d score cp %d nps %d pv%s\n", i, nodesSearched, timeTaken, score, nps, strLine)
+		nps := NodesSearched * 1000000000 / max(int(timeTakenNanoSeconds), 1)
+		fmt.Printf("info depth %d nodes %d time %d score cp %d nps %d pv%s\n", i, NodesSearched, timeTaken, score, nps, strLine)
 
-		if score == winVal || score == -winVal {
-			clearTTable()
+		if score == WIN_VAL || score == -WIN_VAL {
+			ClearTT()
 			return line[0]
 		}
 

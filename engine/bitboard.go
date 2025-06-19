@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func printBitBoard(u u64) {
+func PrintBitBoard(u u64) {
 	var s strings.Builder
 	s.WriteString("\n")
 	for i := 56; i >= 0; i -= 8 {
@@ -23,13 +23,13 @@ func printBitBoard(u u64) {
 	fmt.Print(s.String())
 }
 
-func popCount(u u64) int {
+func PopCount(u u64) int {
 	return bits.OnesCount64(uint64(u))
 }
 
 // Below bitboard operations are for ease of use when generating legal moves
 // Found on chessprogramming wiki
-var index64 = [64]int{
+var INDEX_64 = [64]int{
 	0, 47, 1, 56, 48, 27, 2, 60,
 	57, 49, 41, 37, 28, 16, 3, 61,
 	54, 58, 35, 52, 50, 42, 21, 44,
@@ -39,18 +39,18 @@ var index64 = [64]int{
 	25, 39, 14, 33, 19, 30, 9, 24,
 	13, 18, 8, 12, 7, 6, 5, 63}
 
-func bitScanForward(bb u64) int {
+func BitScanForward(bb u64) int {
 	const debruijn64 = u64(0x03f79d71b4cb0a89)
-	return index64[((bb^(bb-1))*debruijn64)>>58]
+	return INDEX_64[((bb^(bb-1))*debruijn64)>>58]
 }
 
-func popLSB(bb *u64) int {
-	lsb := bitScanForward(*bb)
+func PopLSB(bb *u64) int {
+	lsb := BitScanForward(*bb)
 	*bb &= *bb - 1
 	return lsb
 }
 
-func flipVertical(x u64) u64 {
+func FlipVertical(x u64) u64 {
 	const k1 = u64(0x00FF00FF00FF00FF)
 	const k2 = u64(0x0000FFFF0000FFFF)
 
@@ -61,7 +61,7 @@ func flipVertical(x u64) u64 {
 	return x
 }
 
-func mirrorHorizontal(x u64) u64 {
+func MirrorHorizontal(x u64) u64 {
 	const k1 = u64(0x5555555555555555)
 	const k2 = u64(0x3333333333333333)
 	const k4 = u64(0x0f0f0f0f0f0f0f0f)
@@ -71,7 +71,7 @@ func mirrorHorizontal(x u64) u64 {
 	return x
 }
 
-func flipDiagA1H8(x u64) u64 {
+func FlipDiagonalA1H8(x u64) u64 {
 	var t u64
 	const k1 = u64(0x5500550055005500)
 	const k2 = u64(0x3333000033330000)
@@ -85,7 +85,7 @@ func flipDiagA1H8(x u64) u64 {
 	return x
 }
 
-func flipDiagA8H1(x u64) u64 {
+func FlipDiagonalA8H1(x u64) u64 {
 	var t u64
 	const k1 = u64(0xaa00aa00aa00aa00)
 	const k2 = u64(0xcccc0000cccc0000)
@@ -100,26 +100,26 @@ func flipDiagA8H1(x u64) u64 {
 }
 
 // all rotations below are done clockwise
-func rotate90(x u64) u64 {
-	return flipVertical(flipDiagA1H8(x))
+func Rotate90(x u64) u64 {
+	return FlipVertical(FlipDiagonalA1H8(x))
 }
-func rotate180(x u64) u64 {
-	return mirrorHorizontal(flipVertical(x))
+func Rotate180(x u64) u64 {
+	return MirrorHorizontal(FlipVertical(x))
 }
-func rotate270(x u64) u64 {
-	return flipDiagA1H8(flipVertical(x))
+func Rotate270(x u64) u64 {
+	return FlipDiagonalA1H8(FlipVertical(x))
 }
 
 // bitwise rotate (shift but wrap around)
-func rotateLeft(x u64, n int) u64 {
+func RotateLeft(x u64, n int) u64 {
 	return u64(bits.RotateLeft64(uint64(x), n))
 }
 
-func rotateRight(x u64, n int) u64 {
+func RotateRight(x u64, n int) u64 {
 	return (x >> n) | (x << (64 - n))
 }
 
-func shiftBitboard(x u64, d Direction) u64 {
+func ShiftBitboard(x u64, d Direction) u64 {
 	switch d {
 	case NORTH:
 		return x << NORTH
@@ -132,18 +132,18 @@ func shiftBitboard(x u64, d Direction) u64 {
 		return x >> int(2*NORTH)
 	case EAST:
 		// remove pieces on H file which will still remain after shift
-		return (x & ^files[H]) << EAST
+		return (x & ^FILES[H]) << EAST
 	case WEST:
 		// remove pieces on A file which will still remain after shift
-		return (x & ^files[A]) >> EAST
+		return (x & ^FILES[A]) >> EAST
 	case NE:
-		return (x & ^files[H]) << NE
+		return (x & ^FILES[H]) << NE
 	case SE:
-		return (x & ^files[H]) >> -SE
+		return (x & ^FILES[H]) >> -SE
 	case NW:
-		return (x & ^files[A]) << NW
+		return (x & ^FILES[A]) << NW
 	case SW:
-		return (x & ^files[A]) >> -SW
+		return (x & ^FILES[A]) >> -SW
 	}
 	return 0
 }

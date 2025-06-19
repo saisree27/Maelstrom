@@ -33,12 +33,12 @@ type TablebaseResult struct {
 	Moves       []TablebaseMove `json:"moves"`        // Available moves and their evaluations
 }
 
-// probeTablebase queries the lichess tablebase API for a position
+// ProbeTablebase queries the lichess tablebase API for a position
 // Returns (score, bestMove, found)
 // score: tablebase score (mate score if DTM available, otherwise uses DTZ)
 // bestMove: best move in UCI format (or comma-separated list of drawing moves if position is a draw)
 // found: whether the position was found in the tablebase
-func probeTablebase(fen string) (int, string, bool) {
+func ProbeTablebase(fen string) (int, string, bool) {
 	// Encode FEN for URL
 	encodedFEN := url.QueryEscape(fen)
 	url := fmt.Sprintf("https://tablebase.lichess.ovh/standard?fen=%s", encodedFEN)
@@ -83,13 +83,13 @@ func probeTablebase(fen string) (int, string, bool) {
 	var score int
 	switch result.Category {
 	case "win":
-		score = winVal - 100
+		score = WIN_VAL - 100
 	case "cursed-win":
 		score = 300
 	case "blessed-loss":
 		score = -300
 	case "loss":
-		score = -winVal + 100
+		score = -WIN_VAL + 100
 	case "draw":
 		score = 0
 	default:
@@ -123,11 +123,11 @@ func probeTablebase(fen string) (int, string, bool) {
 	return score, bestMove.Uci, true
 }
 
-// isTablebasePosition checks if a position should be probed in the tablebase
-func isTablebasePosition(b *Board) bool {
+// IsTablebasePosition checks if a position should be probed in the tablebase
+func IsTablebasePosition(b *Board) bool {
 	// Count total pieces
-	whitePieces := popCount(b.colors[WHITE])
-	blackPieces := popCount(b.colors[BLACK])
+	whitePieces := PopCount(b.colors[WHITE])
+	blackPieces := PopCount(b.colors[BLACK])
 	totalPieces := whitePieces + blackPieces
 
 	// Only probe if 7 or fewer pieces total

@@ -4,8 +4,8 @@ import "testing"
 
 func TestSearchWithProfiling(t *testing.T) {
 	// Initialize the engine
-	initializeEverythingExceptTTable()
-	initializeTTable(256)
+	InitializeEverythingExceptTTable()
+	InitializeTT(256)
 
 	// Create a board with a complex position for testing
 	b := Board{}

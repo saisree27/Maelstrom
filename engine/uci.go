@@ -44,7 +44,7 @@ func processPosition(command string) Board {
 	}
 
 	for i := mvStart; i < length; i++ {
-		b.makeMoveFromUCI(words[i])
+		b.MakeMoveFromUCI(words[i])
 	}
 
 	return b
@@ -145,12 +145,12 @@ func processGo(command string, b *Board) {
 			}
 		}
 
-		bestMove = searchWithTime(b, movetime)
+		bestMove = SearchWithTime(b, movetime)
 
 		// Only output bestmove if we're still searching (i.e., not stopped)
 		searchMutex.Lock()
 		if isSearching {
-			fmt.Println("bestmove " + bestMove.toUCI())
+			fmt.Println("bestmove " + bestMove.ToUCI())
 		}
 		isSearching = false
 		searchMutex.Unlock()
@@ -159,8 +159,8 @@ func processGo(command string, b *Board) {
 
 func UciLoop() {
 	ttSize := int64(256)
-	initializeEverythingExceptTTable()
-	initializeTTable(int(ttSize))
+	InitializeEverythingExceptTTable()
+	InitializeTT(int(ttSize))
 
 	b := Board{}
 	scanner := bufio.NewScanner(os.Stdin)
@@ -180,7 +180,7 @@ func UciLoop() {
 		} else if command == "ucinewgame" {
 			b = Board{}
 			b.InitStartPos()
-			clearTTable()
+			ClearTT()
 		} else if command == "quit" {
 			os.Exit(0)
 		} else if command == "stop" {
@@ -200,7 +200,7 @@ func UciLoop() {
 			words := strings.Split(command, " ")
 			if len(words) >= 5 && words[1] == "name" && words[2] == "Hash" && words[3] == "value" {
 				ttSize, _ = strconv.ParseInt(words[4], 10, 64)
-				initializeTTable(int(ttSize))
+				InitializeTT(int(ttSize))
 			}
 
 			if words[1] == "name" && words[2] == "UseBook" && words[3] == "value" {
@@ -212,7 +212,7 @@ func UciLoop() {
 			}
 		} else if command == "d" {
 			// Debug command to print current position
-			b.printFromBitBoards()
+			b.PrintFromBitBoards()
 		}
 	}
 }
