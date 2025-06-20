@@ -7,11 +7,6 @@ import (
 	"time"
 )
 
-type moveBonus struct {
-	move  Move
-	bonus int
-}
-
 var COLOR_SIGN = [2]int{
 	WHITE: 1, BLACK: -1,
 }
@@ -224,7 +219,6 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 
 	res, score := ProbeTT(b, alpha, beta, uint8(depth), &bestMove)
 	if res && !isRoot {
-		*line = append(*line, bestMove)
 		return score, false
 	}
 
