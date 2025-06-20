@@ -23,6 +23,7 @@ type Board struct {
 	history      []prev    // Stores history for board
 	zobrist      u64       // Zobrist hash (TODO)
 	plyCnt       int       // Stores number of half moves played
+	plyCnt50     int       // Stores number of half moves played since a capture (for 50-move rule)
 	moveCount    int       // Stores which move currently we are at
 	whiteCastled bool      // Stores whether white has previously castled
 	blackCastled bool      // Stores whether black has previously castled
@@ -38,6 +39,7 @@ type prev struct {
 	hash         u64    // Zobrist hash of prev position
 	whiteCastled bool   // Stores whether white has previously castled
 	blackCastled bool   // Stores whether black has previously castled
+	plyCnt50     int    // Stores number of half moves played since a capture (for 50-move rule)
 }
 
 func NewBoard() *Board {
@@ -140,6 +142,7 @@ func (b *Board) InitFEN(fen string) {
 
 	halfMoveClock := attrs[4]
 	b.plyCnt, _ = strconv.Atoi(halfMoveClock)
+	b.plyCnt50 = b.plyCnt
 
 	moveCount := attrs[5]
 	b.moveCount, _ = strconv.Atoi(moveCount)
@@ -271,21 +274,28 @@ func (b *Board) MakeMoveNoUpdate(mv Move) {
 }
 
 func (b *Board) MakeMove(mv Move) {
-	var entry prev = prev{move: mv, OO: b.OO, OOO: b.OOO, oo: b.oo, ooo: b.ooo, enPassant: b.enPassant, hash: b.zobrist, whiteCastled: b.whiteCastled, blackCastled: b.blackCastled}
+	var entry prev = prev{move: mv, OO: b.OO, OOO: b.OOO, oo: b.oo, ooo: b.ooo, enPassant: b.enPassant, hash: b.zobrist, whiteCastled: b.whiteCastled, blackCastled: b.blackCastled, plyCnt50: b.plyCnt50}
 	b.history = append(b.history, entry)
+	b.plyCnt50++
 
 	if !mv.null {
 		switch mv.movetype {
 		case QUIET:
 			b.movePiece(mv.piece, mv.from, mv.to, mv.colorMoved)
+			if PieceToPieceType(mv.piece) == PAWN {
+				b.plyCnt50 = 0
+			}
 		case CAPTURE:
 			b.capturePiece(mv.piece, mv.captured, mv.from, mv.to, mv.colorMoved)
+			b.plyCnt50 = 0
 		case PROMOTION:
 			b.movePiece(mv.piece, mv.from, mv.to, mv.colorMoved)
 			b.replacePiece(mv.piece, mv.promote, mv.to)
+			b.plyCnt50 = 0
 		case CAPTURE_AND_PROMOTION:
 			b.capturePiece(mv.piece, mv.captured, mv.from, mv.to, mv.colorMoved)
 			b.replacePiece(mv.piece, mv.promote, mv.to)
+			b.plyCnt50 = 0
 		case K_CASTLE:
 			if mv.colorMoved == WHITE {
 				b.movePiece(W_K, E1, G1, WHITE)
@@ -296,6 +306,7 @@ func (b *Board) MakeMove(mv Move) {
 				b.movePiece(B_R, H8, F8, BLACK)
 				b.blackCastled = true
 			}
+			b.plyCnt50 = 0
 		case Q_CASTLE:
 			if mv.colorMoved == WHITE {
 				b.movePiece(W_K, E1, C1, WHITE)
@@ -306,6 +317,7 @@ func (b *Board) MakeMove(mv Move) {
 				b.movePiece(B_R, A8, D8, BLACK)
 				b.blackCastled = true
 			}
+			b.plyCnt50 = 0
 		case EN_PASSANT:
 			b.movePiece(mv.piece, mv.from, mv.to, mv.colorMoved)
 			if mv.colorMoved == WHITE {
@@ -313,7 +325,10 @@ func (b *Board) MakeMove(mv Move) {
 			} else {
 				b.removePiece(W_P, mv.to.GoDirection(NORTH), WHITE)
 			}
+			b.plyCnt50 = 0
 		}
+	} else {
+		b.plyCnt50 = 0
 	}
 
 	b.turn = ReverseColor(b.turn)
@@ -451,6 +466,7 @@ func (b *Board) Undo() {
 	b.turn = ReverseColor(b.turn)
 	b.whiteCastled = prevEntry.whiteCastled
 	b.blackCastled = prevEntry.blackCastled
+	b.plyCnt50 = prevEntry.plyCnt50
 
 	b.history = b.history[:len(b.history)-1]
 	b.plyCnt--

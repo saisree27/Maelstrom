@@ -199,8 +199,10 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		return QuiescenceSearch(b, 4, alpha, beta, c, rd-depth), false
 	}
 
-	// Check for two-fold repetition
-	if !isRoot && b.IsTwoFold() {
+	// Check for two-fold repetition or 50 move rule. Edge case check from Blunder:
+	// ensure that mate in 1 is not possible when checking for 50-move rule.
+	possibleCheckmate := check && rd == depth
+	if !isRoot && (b.IsTwoFold() || (b.plyCnt50 >= 100 && !possibleCheckmate)) {
 		// Don't store repetition positions in TT since their value depends on game history
 		return 0, false
 	}
