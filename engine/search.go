@@ -17,6 +17,11 @@ const PROMOTION_BONUS = 800000
 const FIRST_KILLER_MOVE_BONUS = 600000
 const SECOND_KILLER_MOVE_BONUS = 590000
 
+const RFP_DEPTH_MARGIN = 85
+
+// Razoring margins from Carballo
+var RAZORING_MARGINS = [3]int{0, 225, 230}
+
 // Futility margins from Blunder
 var FUTILITY_MARGINS = [9]int{
 	0,
@@ -184,6 +189,7 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	}
 
 	if NodesSearched%2047 == 0 && time.Since(SearchStartTime).Milliseconds() > AllowedTime {
+		fmt.Printf("stopping search after %d\n", time.Since(SearchStartTime).Milliseconds())
 		SearchStop = true
 		return 0, true
 	}
@@ -224,20 +230,20 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		return score, false
 	}
 
-	// Static Null Move Pruning
-	// Only do SNMP if:
-	// 1. Not in check
-	// 2. Not in PV node
-	// 3. Not searching for mate
-	if !check && !isPv && beta < WIN_VAL-100 && beta > -WIN_VAL+100 {
+	// Compute static eval to be used for pruning checks
+	staticEval := Evaluate(b) * COLOR_SIGN[c]
 
-		// Get static evaluation with some margin
-		staticEval := Evaluate(b) * COLOR_SIGN[c]
-
-		// Margin increases with depth
-		margin := 85 * depth
-
-		// If static eval is way above beta, likely we can prune
+	// REVERSE FUTILITY PRUNING / STATIC NULL MOVE PRUNING
+	// Motivation: If the material balance minus a safety margin does not improve beta,
+	// 			   then we can fail-high because the child node would not improve alpha.
+	// 			   Currently the margin is a constant multiple of depth, this can be improved.
+	// Conditions:
+	//    1. Not in check
+	//    2. Not in PV node
+	//    3. TT move exists and is not a capture
+	// More info: https://www.chessprogramming.org/Reverse_Futility_Pruning
+	if !check && !isPv && bestMove.from != 0 && bestMove.movetype != CAPTURE {
+		margin := RFP_DEPTH_MARGIN * depth
 		if staticEval-margin >= beta {
 			return staticEval - margin, false
 		}
@@ -246,22 +252,27 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	// Pre-allocate PV line for child nodes
 	childPV := []Move{}
 
-	// Null Move Pruning
-	hasNotJustPawns := b.colors[c] ^ b.GetColorPieces(PAWN, c)
-	if doNull && !check && !isPv && hasNotJustPawns != 0 {
+	// NULL MOVE PRUNING
+	// Motivation: The null move would be worse than any possible legal move, so
+	// 			   if we can have a reduced search by performing a null move that still fails high
+	// 			   we can be relatively sure that the best legal move would also fail high over beta,
+	//             so we can avoid having to check this node. Reduced depth here is 3 + d/6, formula from Blunder
+	// Conditions:
+	//    1. Not in check
+	//    2. Side to move does not have just king and pawns
+	// 	  3. Not in PV node
+	// More info: https://www.chessprogramming.org/Null_Move_Pruning
+	notJustPawnsAndKing := b.colors[c] ^ (b.GetColorPieces(PAWN, c) | b.GetColorPieces(KING, c))
+	if doNull && !check && !isPv && notJustPawnsAndKing != 0 {
 		b.MakeNullMove()
 		R := 3 + depth/6
 		score, timeout = Pvs(b, depth-1-R, rd, -beta, -beta+1, ReverseColor(c), false, &childPV)
 		score *= -1
-		if timeout {
-			b.UndoNullMove()
-			return 0, true
-		}
-
-		childPV = []Move{}
 		b.UndoNullMove()
 
-		if SearchStop {
+		childPV = []Move{}
+
+		if SearchStop || timeout {
 			return 0, true
 		}
 
@@ -270,13 +281,17 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		}
 	}
 
-	// Razoring
-	// Only apply razoring at shallow depths and non-PV nodes
-	if depth <= 2 && !check && !isPv {
-		staticEval := Evaluate(b) * COLOR_SIGN[c]
-
-		// Razoring margins based on depth
-		razorMargin := 300 + depth*60
+	// RAZORING
+	// Motivation: we can prune branches at shallow depths if the static evaluation
+	//             with a safety margin is less than alpha and quiescence confirms that
+	//             we can fail low.
+	// Conditions:
+	//    1. Not a PV node
+	//    2. TT move does not exist
+	// 	  3. Not searching for mate
+	// More info: https://www.chessprogramming.org/Razoring
+	if depth < len(RAZORING_MARGINS) && !isPv && bestMove.from == 0 && beta < WIN_VAL-100 && -beta > -(WIN_VAL-100) {
+		razorMargin := RAZORING_MARGINS[depth]
 
 		if staticEval+razorMargin <= alpha {
 			// Try qsearch to verify if position is really bad
@@ -287,7 +302,15 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		}
 	}
 
-	// Internal Iterative Deepening
+	// INTERNAL ITERATIVE DEEPENING (IID)
+	// Motivation: when we don't have a TT move but we're in a PV node, we want to find a
+	//             good move to search first rather than go through all moves at high depth.
+	//             We can find a good move by first searching at a reduced depth.
+	// Conditions:
+	//    1. Depth >= 4
+	//    2. Is in a PV node
+	//    3. TT move does not exist
+	// https://www.chessprogramming.org/Internal_Iterative_Deepening
 	if depth >= 4 && isPv && bestMove.from == 0 {
 		_, _ = Pvs(b, depth-3, rd+1, -beta, -alpha, c, false, line)
 		if len(*line) > 0 {
@@ -303,10 +326,10 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	bestScore := -WIN_VAL - 1
 	bestMove = Move{}
 	ttFlag := UPPER
-	staticEval := Evaluate(b) * COLOR_SIGN[c]
 
 	for mvCnt := 0; mvCnt < len(legalMoves); mvCnt++ {
-		// Move ordering
+		// BEST MOVE SELECTION (MOVE ORDERING)
+		// Motivation: If we select good moves to search first, we can prune later moves.
 		move := selectMove(mvCnt, legalMoves, b, pvMove, depth)
 		b.MakeMove(move)
 
@@ -315,7 +338,15 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 			score, timeout = Pvs(b, depth-1, rd, -beta, -alpha, ReverseColor(c), true, &childPV)
 			score *= -1
 		} else {
-			// Late move reduction
+			// LATE MOVE REDUCTION (LMR)
+			// Motivation: Because of move ordering, we can save time by reducing search depth of moves that are
+			//             late in order. If these moves fail high, we need to re-search them since we probably
+			//             missed something. The reduction depth is currently based on a formula used by Ethereal
+			// Conditions:
+			//    1. Quiet, seemingly unimportant move (means not a PV node)
+			//    2. Position not in check before move
+			//    3. Not a shallow depth
+			// https://www.chessprogramming.org/Late_Move_Reductions
 			quietMove := !isPv && move.movetype != CAPTURE && move.movetype != PROMOTION
 			R := 0
 
@@ -323,6 +354,13 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 				R = LMR_TABLE[depth][mvCnt+1]
 			}
 
+			// FUTILITY PRUNING
+			// Motivation: We want to discard moves which have no potential of raising alpha. We use a margin to estimate
+			//             the potential value of a move (based on depth).
+			// Conditions:
+			//    1. Quiet, seemingly unimportant move (means not a PV node)
+			//    2. Ensure moves pruned don't give check
+			// https://www.chessprogramming.org/Futility_Pruning
 			checkAfterMove := b.IsCheck(b.turn)
 			if quietMove && !checkAfterMove && depth-R-1 < len(FUTILITY_MARGINS) && FUTILITY_MARGINS[depth-R-1]+staticEval < alpha {
 				b.Undo()
@@ -533,7 +571,8 @@ func SearchWithTime(b *Board, movetime int64) Move {
 		// Aspiration window search with research on fail
 		for {
 			score, timeout = Pvs(b, i, i, alpha, beta, b.turn, true, &line)
-			if timeout {
+			if timeout || SearchStop {
+				fmt.Printf("returning prev best move after %d\n", time.Since(SearchStartTime).Milliseconds())
 				return prevBest
 			}
 
