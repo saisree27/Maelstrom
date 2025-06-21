@@ -73,7 +73,7 @@ func QuiescenceSearch(b *Board, limit int, alpha int, beta int, c Color, rd int)
 		return 0
 	}
 
-	eval := Evaluate(b) * COLOR_SIGN[c]
+	eval := EvaluateNNUE(b) * COLOR_SIGN[c]
 
 	inCheck := rd <= 2 && b.IsCheck(c)
 
@@ -231,7 +231,7 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	}
 
 	// Compute static eval to be used for pruning checks
-	staticEval := Evaluate(b) * COLOR_SIGN[c]
+	staticEval := EvaluateNNUE(b) * COLOR_SIGN[c]
 
 	// REVERSE FUTILITY PRUNING / STATIC NULL MOVE PRUNING
 	// Motivation: If the material balance minus a safety margin does not improve beta,
@@ -577,11 +577,11 @@ func SearchWithTime(b *Board, movetime int64) Move {
 			}
 
 			if score <= alpha {
-				alpha = max(-WIN_VAL-1, alpha-windowSize*2)
+				alpha = Max(-WIN_VAL-1, alpha-windowSize*2)
 				continue
 			}
 			if score >= beta {
-				beta = min(WIN_VAL+1, beta+windowSize*2)
+				beta = Min(WIN_VAL+1, beta+windowSize*2)
 				continue
 			}
 			break
@@ -598,7 +598,7 @@ func SearchWithTime(b *Board, movetime int64) Move {
 			strLine += " " + move.ToUCI()
 		}
 
-		nps := NodesSearched * 1000000000 / max(int(timeTakenNanoSeconds), 1)
+		nps := NodesSearched * 1000000000 / Max(int(timeTakenNanoSeconds), 1)
 		fmt.Printf("info depth %d nodes %d time %d score cp %d nps %d pv%s\n", i, NodesSearched, timeTaken, score, nps, strLine)
 
 		if score == WIN_VAL || score == -WIN_VAL {
@@ -617,18 +617,4 @@ func SearchWithTime(b *Board, movetime int64) Move {
 		}
 	}
 	return prevBest
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
