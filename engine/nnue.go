@@ -1,7 +1,14 @@
 package engine
 
 import (
+	"bytes"
+	"encoding/binary"
+	"fmt"
+	"log"
 	"math/rand"
+	"os"
+	"path/filepath"
+	"runtime"
 	"time"
 )
 
@@ -236,4 +243,81 @@ func NewRandomNNUE() NNUE {
 	return network
 }
 
-var GlobalNNUE NNUE = NewRandomNNUE()
+func LoadNNUEFromFile(path string) (*NNUE, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file: %w", err)
+	}
+	if len(data) < 197_378 {
+		return nil, fmt.Errorf("file too short: expected at least 197,378 bytes, got %d", len(data))
+	}
+
+	reader := bytes.NewReader(data)
+	nnue := &NNUE{}
+
+	readInt16 := func(dst *int16) error {
+		return binary.Read(reader, binary.LittleEndian, dst)
+	}
+
+	for i := 0; i < INPUT_LAYER_SIZE; i++ {
+		for j := 0; j < HIDDEN_LAYER_SIZE; j++ {
+			if err := readInt16(&nnue.accumulator_weights[i][j]); err != nil {
+				return nil, fmt.Errorf("accumulator_weights[%d][%d]: %w", i, j, err)
+			}
+		}
+	}
+
+	for i := 0; i < HIDDEN_LAYER_SIZE; i++ {
+		if err := readInt16(&nnue.accumulator_biases[i]); err != nil {
+			return nil, fmt.Errorf("accumulator_biases[%d]: %w", i, err)
+		}
+	}
+
+	for i := 0; i < 2*HIDDEN_LAYER_SIZE; i++ {
+		if err := readInt16(&nnue.output_weights[i]); err != nil {
+			return nil, fmt.Errorf("output_weights[%d]: %w", i, err)
+		}
+	}
+
+	if err := readInt16(&nnue.output_bias); err != nil {
+		return nil, fmt.Errorf("output_bias: %w", err)
+	}
+
+	// Ignore padding — you're done!
+	return nnue, nil
+}
+
+var GlobalNNUE NNUE
+
+func GetProjectRootPath() (string, error) {
+	_, filename, _, ok := runtime.Caller(0)
+	if !ok {
+		return "", fmt.Errorf("could not get caller info")
+	}
+	dir := filepath.Dir(filename)
+	for !fileExists(filepath.Join(dir, "go.mod")) && dir != filepath.Dir(dir) {
+		dir = filepath.Dir(dir)
+	}
+	if !fileExists(filepath.Join(dir, "go.mod")) {
+		return "", fmt.Errorf("project root not found")
+	}
+	return dir, nil
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+func InitializeNNUE() {
+	root, err := GetProjectRootPath()
+	if err != nil {
+		log.Fatalf("Failed to find project root: %v", err)
+	}
+	path := filepath.Join(root, "nn_weights", "quantised.bin")
+	nnue, err := LoadNNUEFromFile(path)
+	if err != nil {
+		log.Fatalf("Failed to load NNUE: %v", err)
+	}
+	GlobalNNUE = *nnue
+	fmt.Println("NNUE loaded successfully.")
+}

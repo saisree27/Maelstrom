@@ -18,6 +18,7 @@ func InitializeEverythingExceptTTable() {
 	InitNeighborMasks()
 	InitializePawnMasks()
 	InitializeLMRTable()
+	InitializeNNUE()
 }
 
 func Run(command string, position string, depth int) {

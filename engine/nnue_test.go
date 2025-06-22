@@ -15,11 +15,8 @@ func TestAccumulatorUpdateMatchesRecompute(t *testing.T) {
 	b.accumulators = GlobalNNUE.RecomputeAccumulators(&b)
 
 	// Make moves
-	move := FromUCI("b1a3", &b)
-	b.MakeMove(move)
-
-	move = FromUCI("b8a6", &b)
-	b.MakeMove(move)
+	b.MakeMoveFromUCI("b1a3")
+	b.MakeMoveFromUCI("b8a6")
 
 	// Recompute from scratch
 	expected := GlobalNNUE.RecomputeAccumulators(&b)
@@ -191,14 +188,11 @@ func TestEvalConsistencyAfterUpdate(t *testing.T) {
 	b := Board{}
 	b.InitStartPos()
 
-	// Pick a simple move
-	move := FromUCI("e2e4", &b)
-
 	// Save pre-move eval
 	beforeEval := Forward(&GlobalNNUE, &b.accumulators.white, &b.accumulators.black)
 
 	// Apply accumulator update
-	b.MakeMove(move)
+	b.MakeMoveFromUCI("e2e4")
 
 	// Forward after incremental update
 	afterEval := Forward(&GlobalNNUE, &b.accumulators.white, &b.accumulators.black)
@@ -213,5 +207,24 @@ func TestEvalConsistencyAfterUpdate(t *testing.T) {
 
 	if beforeEval == afterEval {
 		t.Errorf("Eval mismatch after move: before=%d, after=%d", beforeEval, afterEval)
+	}
+}
+
+func TestEvalOppositeSide(t *testing.T) {
+	GlobalNNUE = NewRandomNNUE()
+	b := Board{}
+	b.InitStartPos()
+	b.MakeMoveFromUCI("e2e4")
+
+	blackPerspectiveEval := Forward(&GlobalNNUE, &b.accumulators.white, &b.accumulators.black)
+
+	// Manually change STM
+	b.turn = WHITE
+
+	whitePerspectiveEval := -Forward(&GlobalNNUE, &b.accumulators.white, &b.accumulators.black)
+	expected := -blackPerspectiveEval
+
+	if whitePerspectiveEval != expected {
+		t.Errorf("Eval mismatch after perspective change: before=%d, after=%d", blackPerspectiveEval, whitePerspectiveEval)
 	}
 }

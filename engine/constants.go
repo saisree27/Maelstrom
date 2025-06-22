@@ -68,14 +68,14 @@ type Piece uint8
 
 const (
 	W_P Piece = iota
-	W_B
 	W_N
+	W_B
 	W_R
 	W_Q
 	W_K
 	B_P
-	B_B
 	B_N
+	B_B
 	B_R
 	B_Q
 	B_K
@@ -134,8 +134,8 @@ type PieceType uint8
 
 const (
 	PAWN PieceType = iota
-	BISHOP
 	KNIGHT
+	BISHOP
 	ROOK
 	QUEEN
 	KING
