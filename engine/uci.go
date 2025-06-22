@@ -158,9 +158,11 @@ func processGo(command string, b *Board) {
 }
 
 func UciLoop() {
+	fmt.Println("initializing...")
 	ttSize := int64(256)
 	InitializeEverythingExceptTTable()
 	InitializeTT(int(ttSize))
+	fmt.Println("done, ready for UCI commands")
 
 	b := Board{}
 	scanner := bufio.NewScanner(os.Stdin)
@@ -169,7 +171,7 @@ func UciLoop() {
 		command := scanner.Text()
 
 		if command == "uci" {
-			fmt.Println("id name Maelstrom v2.1.0")
+			fmt.Println("id name Maelstrom v3.0.0")
 			fmt.Println("id author saisree27")
 			fmt.Println("option name Hash type spin default 256 min 1 max 4096")
 			fmt.Println("option name UseBook type check default false")

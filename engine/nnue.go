@@ -24,6 +24,8 @@ import (
 //  y = O(concat(a + a^)) + c
 // where O is the output layer weights and c is the output layer biases
 
+const WEIGHTS_FILENAME = "hl_128_screlu_40_epochs.bin"
+
 const INPUT_LAYER_SIZE = 768
 const HIDDEN_LAYER_SIZE = 128
 const OUTPUT_LAYER_SIZE = 1
@@ -180,24 +182,27 @@ func (network *NNUE) UpdateAccumulatorOnMove(b *Board, move Move, stm Color) {
 	}
 }
 
-func CReLU(value int16, min int16, max int16) int16 {
-	if value <= min {
-		return min
+func SCReLU(value int16, min int16, max int16) int32 {
+	if value < min {
+		value = min
 	}
 
-	if value >= max {
-		return max
+	if value > max {
+		value = max
 	}
 
-	return value
+	return int32(value) * int32(value)
 }
 
 func Forward(nnue *NNUE, stmAccumulator *Accumulator, ntmAccumulator *Accumulator) int32 {
 	var eval int32 = 0
 	for i := 0; i < HIDDEN_LAYER_SIZE; i++ {
-		eval += int32(CReLU(stmAccumulator.values[i], 0, QA)) * int32(nnue.output_weights[i])
-		eval += int32(CReLU(ntmAccumulator.values[i], 0, QA)) * int32(nnue.output_weights[i+HIDDEN_LAYER_SIZE])
+		eval += int32(SCReLU(stmAccumulator.values[i], 0, QA)) * int32(nnue.output_weights[i])
+		eval += int32(SCReLU(ntmAccumulator.values[i], 0, QA)) * int32(nnue.output_weights[i+HIDDEN_LAYER_SIZE])
 	}
+
+	// Need this scaling when using SCReLU
+	eval /= int32(QA)
 
 	eval += int32(nnue.output_bias)
 	eval *= SCALE
@@ -313,11 +318,10 @@ func InitializeNNUE() {
 	if err != nil {
 		log.Fatalf("Failed to find project root: %v", err)
 	}
-	path := filepath.Join(root, "nn_weights", "quantised.bin")
+	path := filepath.Join(root, "nn_weights", WEIGHTS_FILENAME)
 	nnue, err := LoadNNUEFromFile(path)
 	if err != nil {
 		log.Fatalf("Failed to load NNUE: %v", err)
 	}
 	GlobalNNUE = *nnue
-	fmt.Println("NNUE loaded successfully.")
 }
