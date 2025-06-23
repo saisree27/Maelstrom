@@ -17,7 +17,7 @@ const PROMOTION_BONUS = 800000
 const FIRST_KILLER_MOVE_BONUS = 600000
 const SECOND_KILLER_MOVE_BONUS = 590000
 
-var RFP_DEPTH_MARGIN = 200
+var RFP_DEPTH_MARGIN = 300
 var RAZORING_MARGINS_DEPTH_1 = 225
 var RAZORING_MARGINS_DEPTH_2 = 230
 var FUTILITY_BASE = 40
@@ -357,10 +357,6 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 			// https://www.chessprogramming.org/Futility_Pruning
 			checkAfterMove := b.IsCheck(b.turn)
 			if quietMove && !checkAfterMove && depth-R-1 <= FUTILITY_DEPTH_LIMIT {
-				if depth-R-1 == 0 && staticEval < alpha {
-					b.Undo()
-					continue
-				}
 				if FUTILITY_BASE+FUTILITY_MULT*(depth-R-1)+staticEval < alpha {
 					b.Undo()
 					continue
