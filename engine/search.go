@@ -17,23 +17,17 @@ const PROMOTION_BONUS = 800000
 const FIRST_KILLER_MOVE_BONUS = 600000
 const SECOND_KILLER_MOVE_BONUS = 590000
 
-const RFP_DEPTH_MARGIN = 85
+var RFP_DEPTH_MARGIN = 200
+var RAZORING_MARGINS_DEPTH_1 = 225
+var RAZORING_MARGINS_DEPTH_2 = 230
+var FUTILITY_BASE = 40
+var FUTILITY_MULT = 60
+var FUTILITY_DEPTH_LIMIT = 8
+var IID_DEPTH_LIMIT = 4
+var IID_DEPTH_REDUCTION = 3
+var LMR_DEPTH_LIMIT = 3
 
-// Razoring margins from Carballo
-var RAZORING_MARGINS = [3]int{0, 225, 230}
-
-// Futility margins from Blunder
-var FUTILITY_MARGINS = [9]int{
-	0,
-	100, // depth 1
-	160, // depth 2
-	220, // depth 3
-	280, // depth 4
-	340, // depth 5
-	400, // depth 6
-	460, // depth 7
-	520, // depth 8
-}
+var RAZORING_MARGINS = [3]int{0, RAZORING_MARGINS_DEPTH_1, RAZORING_MARGINS_DEPTH_2}
 
 var MVV_LVA_TABLE = [7][7]int{
 	{15, 13, 14, 12, 11, 10, 0}, // victim P, attacker P, B, N, R, Q, K, Empty
@@ -311,8 +305,8 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	//    2. Is in a PV node
 	//    3. TT move does not exist
 	// https://www.chessprogramming.org/Internal_Iterative_Deepening
-	if depth >= 4 && isPv && bestMove.from == 0 {
-		_, _ = Pvs(b, depth-3, rd+1, -beta, -alpha, c, false, line)
+	if depth >= IID_DEPTH_LIMIT && isPv && bestMove.from == 0 {
+		_, _ = Pvs(b, depth-IID_DEPTH_REDUCTION, rd+1, -beta, -alpha, c, false, line)
 		if len(*line) > 0 {
 			bestMove = (*line)[0]
 		}
@@ -350,7 +344,7 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 			quietMove := !isPv && move.movetype != CAPTURE && move.movetype != PROMOTION
 			R := 0
 
-			if depth >= 3 && quietMove && !check {
+			if depth >= LMR_DEPTH_LIMIT && quietMove && !check {
 				R = LMR_TABLE[depth][mvCnt+1]
 			}
 
@@ -362,9 +356,15 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 			//    2. Ensure moves pruned don't give check
 			// https://www.chessprogramming.org/Futility_Pruning
 			checkAfterMove := b.IsCheck(b.turn)
-			if quietMove && !checkAfterMove && depth-R-1 < len(FUTILITY_MARGINS) && FUTILITY_MARGINS[depth-R-1]+staticEval < alpha {
-				b.Undo()
-				continue
+			if quietMove && !checkAfterMove && depth-R-1 <= FUTILITY_DEPTH_LIMIT {
+				if depth-R-1 == 0 && staticEval < alpha {
+					b.Undo()
+					continue
+				}
+				if FUTILITY_BASE+FUTILITY_MULT*(depth-R-1)+staticEval < alpha {
+					b.Undo()
+					continue
+				}
 			}
 
 			score, timeout = Pvs(b, depth-1-R, rd, -alpha-1, -alpha, ReverseColor(c), true, &childPV)

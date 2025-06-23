@@ -212,6 +212,51 @@ func UciLoop() {
 			if words[1] == "name" && words[2] == "UseLichessTB" && words[3] == "value" {
 				UseTablebase, _ = strconv.ParseBool(words[4])
 			}
+
+			if words[1] == "name" && words[2] == "RFP_M" && words[3] == "value" {
+				val, _ := strconv.ParseInt(words[4], 10, 64)
+				RFP_DEPTH_MARGIN = int(val)
+			}
+
+			if words[1] == "name" && words[2] == "Raz_MD_1" && words[3] == "value" {
+				val, _ := strconv.ParseInt(words[4], 10, 64)
+				RAZORING_MARGINS_DEPTH_1 = int(val)
+			}
+
+			if words[1] == "name" && words[2] == "Raz_MD_2" && words[3] == "value" {
+				val, _ := strconv.ParseInt(words[4], 10, 64)
+				RAZORING_MARGINS_DEPTH_2 = int(val)
+			}
+
+			if words[1] == "name" && words[2] == "IID_D_L" && words[3] == "value" {
+				val, _ := strconv.ParseInt(words[4], 10, 64)
+				IID_DEPTH_LIMIT = int(val)
+			}
+
+			if words[1] == "name" && words[2] == "IID_D_R" && words[3] == "value" {
+				val, _ := strconv.ParseInt(words[4], 10, 64)
+				IID_DEPTH_REDUCTION = int(val)
+			}
+
+			if words[1] == "name" && words[2] == "LMR_D_L" && words[3] == "value" {
+				val, _ := strconv.ParseInt(words[4], 10, 64)
+				LMR_DEPTH_LIMIT = int(val)
+			}
+
+			if words[1] == "name" && words[2] == "F_B" && words[3] == "value" {
+				val, _ := strconv.ParseInt(words[4], 10, 64)
+				FUTILITY_BASE = int(val)
+			}
+
+			if words[1] == "name" && words[2] == "F_M" && words[3] == "value" {
+				val, _ := strconv.ParseInt(words[4], 10, 64)
+				FUTILITY_MULT = int(val)
+			}
+
+			if words[1] == "name" && words[2] == "F_D_L" && words[3] == "value" {
+				val, _ := strconv.ParseInt(words[4], 10, 64)
+				FUTILITY_DEPTH_LIMIT = int(val)
+			}
 		} else if command == "d" {
 			// Debug command to print current position
 			b.PrintFromBitBoards()
