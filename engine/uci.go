@@ -215,9 +215,6 @@ func UciLoop() {
 		} else if command == "d" {
 			// Debug command to print current position
 			b.PrintFromBitBoards()
-		} else if command == "eval" {
-			eval := EvaluateNNUE(&b)
-			fmt.Println(eval)
 		}
 	}
 }

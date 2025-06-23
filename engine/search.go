@@ -17,19 +17,23 @@ const PROMOTION_BONUS = 800000
 const FIRST_KILLER_MOVE_BONUS = 600000
 const SECOND_KILLER_MOVE_BONUS = 590000
 
-// Tunable parameters for Weather Factory
-var RFP_DEPTH_MARGIN_MULT = 85
-var RAZORING_MARGIN_DEPTH_1 = 225
-var RAZORING_MARGIN_DEPTH_2 = 230
-var IID_DEPTH_LIMIT = 4
-var IID_DEPTH_REDUCTION = 3
-var LMR_DEPTH_LIMIT = 3
-var FUTILITY_BASE = 40
-var FUTILITY_MULT = 60
-var FUTILITY_DEPTH_LIMIT = 8
+const RFP_DEPTH_MARGIN = 85
 
-// Razoring margins
-var RAZORING_MARGINS = [3]int{0, RAZORING_MARGIN_DEPTH_1, RAZORING_MARGIN_DEPTH_2}
+// Razoring margins from Carballo
+var RAZORING_MARGINS = [3]int{0, 225, 230}
+
+// Futility margins from Blunder
+var FUTILITY_MARGINS = [9]int{
+	0,
+	100, // depth 1
+	160, // depth 2
+	220, // depth 3
+	280, // depth 4
+	340, // depth 5
+	400, // depth 6
+	460, // depth 7
+	520, // depth 8
+}
 
 var MVV_LVA_TABLE = [7][7]int{
 	{15, 13, 14, 12, 11, 10, 0}, // victim P, attacker P, B, N, R, Q, K, Empty
@@ -239,7 +243,7 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	//    3. TT move exists and is not a capture
 	// More info: https://www.chessprogramming.org/Reverse_Futility_Pruning
 	if !check && !isPv && bestMove.from != 0 && bestMove.movetype != CAPTURE {
-		margin := RFP_DEPTH_MARGIN_MULT * depth
+		margin := RFP_DEPTH_MARGIN * depth
 		if staticEval-margin >= beta {
 			return staticEval - margin, false
 		}
@@ -307,8 +311,8 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	//    2. Is in a PV node
 	//    3. TT move does not exist
 	// https://www.chessprogramming.org/Internal_Iterative_Deepening
-	if depth >= IID_DEPTH_LIMIT && isPv && bestMove.from == 0 {
-		_, _ = Pvs(b, depth-IID_DEPTH_REDUCTION, rd+1, -beta, -alpha, c, false, line)
+	if depth >= 4 && isPv && bestMove.from == 0 {
+		_, _ = Pvs(b, depth-3, rd+1, -beta, -alpha, c, false, line)
 		if len(*line) > 0 {
 			bestMove = (*line)[0]
 		}
@@ -346,7 +350,7 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 			quietMove := !isPv && move.movetype != CAPTURE && move.movetype != PROMOTION
 			R := 0
 
-			if depth >= LMR_DEPTH_LIMIT && quietMove && !check {
+			if depth >= 3 && quietMove && !check {
 				R = LMR_TABLE[depth][mvCnt+1]
 			}
 
@@ -358,11 +362,9 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 			//    2. Ensure moves pruned don't give check
 			// https://www.chessprogramming.org/Futility_Pruning
 			checkAfterMove := b.IsCheck(b.turn)
-			if quietMove && !checkAfterMove && depth-R-1 <= FUTILITY_DEPTH_LIMIT {
-				if FUTILITY_BASE+FUTILITY_MULT*(depth-R-1)+staticEval < alpha {
-					b.Undo()
-					continue
-				}
+			if quietMove && !checkAfterMove && depth-R-1 < len(FUTILITY_MARGINS) && FUTILITY_MARGINS[depth-R-1]+staticEval < alpha {
+				b.Undo()
+				continue
 			}
 
 			score, timeout = Pvs(b, depth-1-R, rd, -alpha-1, -alpha, ReverseColor(c), true, &childPV)
