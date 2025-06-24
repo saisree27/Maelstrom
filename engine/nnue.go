@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"log"
+	"maelstrom/engine/screlu"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -182,24 +183,13 @@ func (network *NNUE) UpdateAccumulatorOnMove(b *Board, move Move, stm Color) {
 	}
 }
 
-func SCReLU(value int16, min int16, max int16) int32 {
-	if value < min {
-		value = min
-	}
-
-	if value > max {
-		value = max
-	}
-
-	return int32(value) * int32(value)
-}
-
 func Forward(nnue *NNUE, stmAccumulator *Accumulator, ntmAccumulator *Accumulator) int32 {
-	var eval int32 = 0
-	for i := 0; i < HIDDEN_LAYER_SIZE; i++ {
-		eval += int32(SCReLU(stmAccumulator.values[i], 0, QA)) * int32(nnue.output_weights[i])
-		eval += int32(SCReLU(ntmAccumulator.values[i], 0, QA)) * int32(nnue.output_weights[i+HIDDEN_LAYER_SIZE])
-	}
+	eval := screlu.SCReLUFusedSIMDSum(
+		stmAccumulator.values[:],
+		ntmAccumulator.values[:],
+		nnue.output_weights[:],
+		QA,
+	)
 
 	// Need this scaling when using SCReLU
 	eval /= int32(QA)

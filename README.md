@@ -31,6 +31,11 @@ Maelstrom often plays on Lichess [here](https://lichess.org/@/Maelstrom-Chess). 
 Checkout and download binaries and source code from the Releases page.
 
 ## Building from Source
+Requirements:
+- go version 1.23.0 or later
+- any C compiler
+- AVX-2 enabled processor (if not enabled, update `engine/screlu/screlu.go` with `AVX2_ENABLED=false` and remove the AVX2 CFLAGS)
+
 Clone the repository, then run `go build maelstrom/main.go`. The engine binary will be built into the project root folder as the binary `main`. Run this executable to start the CLI, which uses the [UCI-protocol](https://official-stockfish.github.io/docs/stockfish-wiki/UCI-&-Commands.html).
 Enter the following commands to run the engine on starting position from binary:
 
@@ -51,4 +56,14 @@ cutechess-cli -engine proto=uci cmd={BINARY_TO_TEST} name={TEST_NAME} -engine pr
 ```
 
 ## References
-Definitely the most helpful reference in developing this engine for me has been the Chess Programming [wiki](https://www.chessprogramming.org/Main_Page)! If you're interested in developing your own chess engine or move library, this website has everything. Also want to shoutout [Blunder](https://github.com/deanmchris/blunder) as a great and readable reference for helping me improve the engine!
+- Definitely the most helpful reference in developing this engine for me has been the Chess Programming [wiki](https://www.chessprogramming.org/Main_Page)! If you're interested in developing your own chess engine or move library, this website has everything.
+- Engine references:
+  - [Blunder](https://github.com/deanmchris/blunder) as a great and readable reference for helping me improve the engine!
+  - [Carballo](https://github.com/albertoruibal/carballo)
+  - [Ethereal](https://github.com/AndyGrant/Ethereal.git)
+  - [Stockfish](https://github.com/official-stockfish/Stockfish)
+  - [Zahak](https://github.com/amanjpro/zahak)
+  - [Stormphrax](https://github.com/Ciekce/Stormphrax)
+  - and many more engines, these are just the ones I can name off the top of my head
+- [bullet](https://github.com/jw1912/bullet) for allowing me to easily train the NNUE
+- Engine Programmers and Stockfish discord servers for their huge knowledge base/resources and advice
