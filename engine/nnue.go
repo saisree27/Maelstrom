@@ -24,7 +24,7 @@ import (
 //  y = O(concat(a + a^)) + c
 // where O is the output layer weights and c is the output layer biases
 
-const WEIGHTS_FILENAME = "hl_128_screlu_40_epochs.bin"
+const WEIGHTS_FILENAME = "hl_128_screlu_wdl_0_800.bin"
 
 const INPUT_LAYER_SIZE = 768
 const HIDDEN_LAYER_SIZE = 128
