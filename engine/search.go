@@ -17,15 +17,15 @@ const PROMOTION_BONUS = 800000
 const FIRST_KILLER_MOVE_BONUS = 600000
 const SECOND_KILLER_MOVE_BONUS = 590000
 
-var RFP_DEPTH_MARGIN = 300
-var RAZORING_MARGINS_DEPTH_1 = 225
-var RAZORING_MARGINS_DEPTH_2 = 230
-var FUTILITY_BASE = 40
-var FUTILITY_MULT = 60
-var FUTILITY_DEPTH_LIMIT = 8
-var IID_DEPTH_LIMIT = 4
-var IID_DEPTH_REDUCTION = 3
-var LMR_DEPTH_LIMIT = 3
+const RFP_DEPTH_MARGIN = 300
+const RAZORING_MARGINS_DEPTH_1 = 225
+const RAZORING_MARGINS_DEPTH_2 = 230
+const FUTILITY_BASE = 40
+const FUTILITY_MULT = 60
+const FUTILITY_DEPTH_LIMIT = 8
+const IIR_DEPTH_LIMIT = 4
+const IIR_DEPTH_REDUCTION = 1
+const LMR_DEPTH_LIMIT = 3
 
 var RAZORING_MARGINS = [3]int{0, RAZORING_MARGINS_DEPTH_1, RAZORING_MARGINS_DEPTH_2}
 
@@ -296,24 +296,16 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		}
 	}
 
-	// INTERNAL ITERATIVE DEEPENING (IID)
-	// Motivation: when we don't have a TT move but we're in a PV node, we want to find a
-	//             good move to search first rather than go through all moves at high depth.
-	//             We can find a good move by first searching at a reduced depth.
+	// INTERNAL ITERATIVE REDUCTION (IIR)
+	// Motivation: If there is no TT move, we hope we can safely reduce the depth of node since we
+	//             did not look at this position in prior searches. We can do IIR on PV nodes and
+	//             expected cut nodes.
 	// Conditions:
-	//    1. Depth >= 4
-	//    2. Is in a PV node
-	//    3. TT move does not exist
-	// https://www.chessprogramming.org/Internal_Iterative_Deepening
-	if depth >= IID_DEPTH_LIMIT && isPv && bestMove.from == 0 {
-		_, _ = Pvs(b, depth-IID_DEPTH_REDUCTION, rd+1, -beta, -alpha, c, false, line)
-		if len(*line) > 0 {
-			bestMove = (*line)[0]
-		}
-		*line = (*line)[:0]
-		if SearchStop {
-			return 0, true
-		}
+	//    1. TT move not found
+	//    2. Depth is greater than some limit
+	//    3. Is in a PV node
+	if bestMove.from == 0 && depth >= IIR_DEPTH_LIMIT && isPv {
+		depth -= IIR_DEPTH_REDUCTION
 	}
 
 	pvMove := bestMove
@@ -361,6 +353,18 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 					b.Undo()
 					continue
 				}
+			}
+
+			// INTERNAL ITERATIVE REDUCTION (IIR)
+			// Motivation: If there is no TT move, we hope we can safely reduce the depth of node since we
+			//             did not look at this position in prior searches. We can do IIR on PV nodes and
+			//             expected cut nodes.
+			// Conditions:
+			//    1. TT move not found
+			//    2. Depth is greater than some limit (usually 5)
+			//    3. Expected cut node - if we are doing an LMR, we can expect this will be a cut node
+			if pvMove.from == 0 && depth >= IIR_DEPTH_LIMIT && R != 0 {
+				depth -= IIR_DEPTH_REDUCTION
 			}
 
 			score, timeout = Pvs(b, depth-1-R, rd, -alpha-1, -alpha, ReverseColor(c), true, &childPV)
