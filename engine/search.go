@@ -284,17 +284,17 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	//    2. TT move does not exist
 	// 	  3. Not searching for mate
 	// More info: https://www.chessprogramming.org/Razoring
-	if depth < len(RAZORING_MARGINS) && !isPv && bestMove.from == 0 && beta < WIN_VAL-100 && -beta > -(WIN_VAL-100) {
-		razorMargin := RAZORING_MARGINS[depth]
+	// if depth < len(RAZORING_MARGINS) && !isPv && bestMove.from == 0 && beta < WIN_VAL-100 && -beta > -(WIN_VAL-100) {
+	// 	razorMargin := RAZORING_MARGINS[depth]
 
-		if staticEval+razorMargin <= alpha {
-			// Try qsearch to verify if position is really bad
-			qScore := QuiescenceSearch(b, 4, alpha, beta, c, 4)
-			if qScore < alpha {
-				return qScore, false
-			}
-		}
-	}
+	// 	if staticEval+razorMargin <= alpha {
+	// 		// Try qsearch to verify if position is really bad
+	// 		qScore := QuiescenceSearch(b, 4, alpha, beta, c, 4)
+	// 		if qScore < alpha {
+	// 			return qScore, false
+	// 		}
+	// 	}
+	// }
 
 	// INTERNAL ITERATIVE REDUCTION (IIR)
 	// Motivation: If there is no TT move, we hope we can safely reduce the depth of node since we

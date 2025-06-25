@@ -136,11 +136,23 @@ func processGo(command string, b *Board) {
 				} else {
 					movetime = wtime / 30
 				}
+
+				// Just to ensure engine doesn't flag when playing on lichess
+				if movetime > wtime-500 {
+					fmt.Println("shortening movetime to avoid flagging")
+					movetime = wtime - 500
+				}
 			} else {
 				if binc >= 0 {
 					movetime = btime/25 + binc - 200
 				} else {
 					movetime = btime / 30
+				}
+
+				// Just to ensure engine doesn't flag when playing on lichess
+				if movetime > btime-500 {
+					fmt.Println("shortening movetime to avoid flagging")
+					movetime = btime - 500
 				}
 			}
 		}
