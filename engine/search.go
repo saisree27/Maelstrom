@@ -52,12 +52,13 @@ var SearchStartTime time.Time = time.Now()
 var AllowedTime int64 = 10000
 var SearchStop = false
 
-func QuiescenceSearch(b *Board, limit int, alpha int, beta int, c Color, rd int) int {
+func QuiescenceSearch(b *Board, alpha int, beta int, c Color, rd int) int {
 	NodesSearched++
 
 	// Check for stop signal
 	select {
 	case <-StopChannel:
+		SearchStop = true
 		return 0
 	default:
 		// Continue search
@@ -70,10 +71,6 @@ func QuiescenceSearch(b *Board, limit int, alpha int, beta int, c Color, rd int)
 	eval := EvaluateNNUE(b) * COLOR_SIGN[c]
 
 	inCheck := rd <= 2 && b.IsCheck(c)
-
-	if limit <= 0 && !inCheck {
-		return eval
-	}
 
 	// Beta cutoff
 	if eval >= beta && !inCheck {
@@ -95,16 +92,8 @@ func QuiescenceSearch(b *Board, limit int, alpha int, beta int, c Color, rd int)
 		move := selectMove(mvCnt, moves, b, Move{}, rd)
 		if inCheck || move.movetype == CAPTURE || move.movetype == CAPTURE_AND_PROMOTION || move.movetype == EN_PASSANT {
 			b.MakeMove(move)
-			score := -QuiescenceSearch(b, limit-1, -beta, -alpha, ReverseColor(c), rd+1)
+			score := -QuiescenceSearch(b, -beta, -alpha, ReverseColor(c), rd+1)
 			b.Undo()
-
-			// Check for stop signal after recursive call
-			select {
-			case <-StopChannel:
-				return 0
-			default:
-				// Continue
-			}
 
 			if SearchStop {
 				return 0
@@ -191,7 +180,7 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	}
 
 	if depth <= 0 {
-		return QuiescenceSearch(b, 4, alpha, beta, c, rd-depth), false
+		return QuiescenceSearch(b, alpha, beta, c, rd-depth), false
 	}
 
 	// Check for two-fold repetition or 50 move rule. Edge case check from Blunder:
