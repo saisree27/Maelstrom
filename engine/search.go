@@ -80,12 +80,6 @@ func QuiescenceSearch(b *Board, limit int, alpha int, beta int, c Color, rd int)
 		return beta
 	}
 
-	// Delta pruning
-	delta := MG_VALUES[QUEEN]
-	if eval < alpha-delta {
-		return alpha
-	}
-
 	if alpha < eval {
 		alpha = eval
 	}
@@ -97,7 +91,8 @@ func QuiescenceSearch(b *Board, limit int, alpha int, beta int, c Color, rd int)
 		moves = b.GenerateCaptures()
 	}
 
-	for _, move := range moves {
+	for mvCnt, _ := range moves {
+		move := selectMove(mvCnt, moves, b, Move{}, rd)
 		if inCheck || move.movetype == CAPTURE || move.movetype == CAPTURE_AND_PROMOTION || move.movetype == EN_PASSANT {
 			b.MakeMove(move)
 			score := -QuiescenceSearch(b, limit-1, -beta, -alpha, ReverseColor(c), rd+1)
