@@ -26,13 +26,13 @@ Maelstrom often plays on Lichess [here](https://lichess.org/@/Maelstrom-Chess). 
  - Static null move pruning
  - Late move reductions
  - Check extensions
- - Razoring
- - Quiescence search with delta pruning
- - NNUE Evaluation using a (768->128)x2 -> 1 architecture using a SIMD SCReLU activation function, trained on Lc0/SF data 
+ - Futility pruning
+ - Quiescence search
+ - NNUE Evaluation using a (768->128)x2 -> 1 architecture using a SIMD SCReLU activation function, trained on Lc0/SF data. The current release (v2.1.0) uses HCE evaluation based off PeSTO, mobility scores, bishop pair and king pawn shield.
  - UCI protocol implementation, so you can run the engine using a UCI-supported GUI such as [CuteChess](https://github.com/cutechess/cutechess/releases).
  - Time management
  - Custom opening book (by default opening book is off, but can be enabled with `setoption name UseBook value true`)
- - Integration with lichess 7-man tablebase (by default tablebase is off, but can be enabled with `setoption name UseLichessTB value true`) 
+ - Integration with lichess 7-man tablebase (by default integration is off, but can be enabled with `setoption name UseLichessTB value true`)
 
 ## Releases
 Checkout and download binaries and source code from the Releases page.
@@ -41,7 +41,7 @@ Checkout and download binaries and source code from the Releases page.
 Requirements:
 - go version 1.23.0 or later
 - any C compiler
-- AVX-2 enabled processor (if not enabled, update `engine/screlu/screlu.go` with `AVX2_ENABLED=false` and remove the AVX2 CFLAGS)
+- AVX2 enabled processor (if not enabled, update `engine/screlu/screlu.go` with `AVX2_ENABLED=false` and remove the AVX2 CFLAGS)
 
 Clone the repository, then run `go build maelstrom/main.go`. The engine binary will be built into the project root folder as the binary `main`. Run this executable to start the CLI, which uses the [UCI-protocol](https://official-stockfish.github.io/docs/stockfish-wiki/UCI-&-Commands.html).
 Enter the following commands to run the engine on starting position from binary:
