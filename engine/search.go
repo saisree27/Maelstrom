@@ -17,23 +17,17 @@ const PROMOTION_BONUS = 800000
 const FIRST_KILLER_MOVE_BONUS = 600000
 const SECOND_KILLER_MOVE_BONUS = 590000
 
-const RFP_DEPTH_MARGIN = 85
+const RFP_DEPTH_MARGIN = 300
+const RAZORING_MARGINS_DEPTH_1 = 225
+const RAZORING_MARGINS_DEPTH_2 = 230
+const FUTILITY_BASE = 40
+const FUTILITY_MULT = 60
+const FUTILITY_DEPTH_LIMIT = 8
+const IIR_DEPTH_LIMIT = 4
+const IIR_DEPTH_REDUCTION = 1
+const LMR_DEPTH_LIMIT = 3
 
-// Razoring margins from Carballo
-var RAZORING_MARGINS = [3]int{0, 225, 230}
-
-// Futility margins from Blunder
-var FUTILITY_MARGINS = [9]int{
-	0,
-	100, // depth 1
-	160, // depth 2
-	220, // depth 3
-	280, // depth 4
-	340, // depth 5
-	400, // depth 6
-	460, // depth 7
-	520, // depth 8
-}
+var RAZORING_MARGINS = [3]int{0, RAZORING_MARGINS_DEPTH_1, RAZORING_MARGINS_DEPTH_2}
 
 var MVV_LVA_TABLE = [7][7]int{
 	{15, 13, 14, 12, 11, 10, 0}, // victim P, attacker P, B, N, R, Q, K, Empty
@@ -58,12 +52,13 @@ var SearchStartTime time.Time = time.Now()
 var AllowedTime int64 = 10000
 var SearchStop = false
 
-func QuiescenceSearch(b *Board, limit int, alpha int, beta int, c Color, rd int) int {
+func QuiescenceSearch(b *Board, alpha int, beta int, c Color, rd int) int {
 	NodesSearched++
 
 	// Check for stop signal
 	select {
 	case <-StopChannel:
+		SearchStop = true
 		return 0
 	default:
 		// Continue search
@@ -73,23 +68,13 @@ func QuiescenceSearch(b *Board, limit int, alpha int, beta int, c Color, rd int)
 		return 0
 	}
 
-	eval := Evaluate(b) * COLOR_SIGN[c]
+	eval := EvaluateNNUE(b) * COLOR_SIGN[c]
 
 	inCheck := rd <= 2 && b.IsCheck(c)
-
-	if limit <= 0 && !inCheck {
-		return eval
-	}
 
 	// Beta cutoff
 	if eval >= beta && !inCheck {
 		return beta
-	}
-
-	// Delta pruning
-	delta := MG_VALUES[QUEEN]
-	if eval < alpha-delta {
-		return alpha
 	}
 
 	if alpha < eval {
@@ -103,19 +88,12 @@ func QuiescenceSearch(b *Board, limit int, alpha int, beta int, c Color, rd int)
 		moves = b.GenerateCaptures()
 	}
 
-	for _, move := range moves {
+	for mvCnt, _ := range moves {
+		move := selectMove(mvCnt, moves, b, Move{}, rd)
 		if inCheck || move.movetype == CAPTURE || move.movetype == CAPTURE_AND_PROMOTION || move.movetype == EN_PASSANT {
 			b.MakeMove(move)
-			score := -QuiescenceSearch(b, limit-1, -beta, -alpha, ReverseColor(c), rd+1)
+			score := -QuiescenceSearch(b, -beta, -alpha, ReverseColor(c), rd+1)
 			b.Undo()
-
-			// Check for stop signal after recursive call
-			select {
-			case <-StopChannel:
-				return 0
-			default:
-				// Continue
-			}
 
 			if SearchStop {
 				return 0
@@ -202,7 +180,7 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	}
 
 	if depth <= 0 {
-		return QuiescenceSearch(b, 4, alpha, beta, c, rd-depth), false
+		return QuiescenceSearch(b, alpha, beta, c, rd-depth), false
 	}
 
 	// Check for two-fold repetition or 50 move rule. Edge case check from Blunder:
@@ -231,7 +209,7 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	}
 
 	// Compute static eval to be used for pruning checks
-	staticEval := Evaluate(b) * COLOR_SIGN[c]
+	staticEval := EvaluateNNUE(b) * COLOR_SIGN[c]
 
 	// REVERSE FUTILITY PRUNING / STATIC NULL MOVE PRUNING
 	// Motivation: If the material balance minus a safety margin does not improve beta,
@@ -290,36 +268,28 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	//    2. TT move does not exist
 	// 	  3. Not searching for mate
 	// More info: https://www.chessprogramming.org/Razoring
-	if depth < len(RAZORING_MARGINS) && !isPv && bestMove.from == 0 && beta < WIN_VAL-100 && -beta > -(WIN_VAL-100) {
-		razorMargin := RAZORING_MARGINS[depth]
+	// if depth < len(RAZORING_MARGINS) && !isPv && bestMove.from == 0 && beta < WIN_VAL-100 && -beta > -(WIN_VAL-100) {
+	// 	razorMargin := RAZORING_MARGINS[depth]
 
-		if staticEval+razorMargin <= alpha {
-			// Try qsearch to verify if position is really bad
-			qScore := QuiescenceSearch(b, 4, alpha, beta, c, 4)
-			if qScore < alpha {
-				return qScore, false
-			}
-		}
-	}
+	// 	if staticEval+razorMargin <= alpha {
+	// 		// Try qsearch to verify if position is really bad
+	// 		qScore := QuiescenceSearch(b, 4, alpha, beta, c, 4)
+	// 		if qScore < alpha {
+	// 			return qScore, false
+	// 		}
+	// 	}
+	// }
 
-	// INTERNAL ITERATIVE DEEPENING (IID)
-	// Motivation: when we don't have a TT move but we're in a PV node, we want to find a
-	//             good move to search first rather than go through all moves at high depth.
-	//             We can find a good move by first searching at a reduced depth.
+	// INTERNAL ITERATIVE REDUCTION (IIR)
+	// Motivation: If there is no TT move, we hope we can safely reduce the depth of node since we
+	//             did not look at this position in prior searches. We can do IIR on PV nodes and
+	//             expected cut nodes.
 	// Conditions:
-	//    1. Depth >= 4
-	//    2. Is in a PV node
-	//    3. TT move does not exist
-	// https://www.chessprogramming.org/Internal_Iterative_Deepening
-	if depth >= 4 && isPv && bestMove.from == 0 {
-		_, _ = Pvs(b, depth-3, rd+1, -beta, -alpha, c, false, line)
-		if len(*line) > 0 {
-			bestMove = (*line)[0]
-		}
-		*line = (*line)[:0]
-		if SearchStop {
-			return 0, true
-		}
+	//    1. TT move not found
+	//    2. Depth is greater than some limit
+	//    3. Is in a PV node
+	if bestMove.from == 0 && depth >= IIR_DEPTH_LIMIT && isPv {
+		depth -= IIR_DEPTH_REDUCTION
 	}
 
 	pvMove := bestMove
@@ -350,7 +320,7 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 			quietMove := !isPv && move.movetype != CAPTURE && move.movetype != PROMOTION
 			R := 0
 
-			if depth >= 3 && quietMove && !check {
+			if depth >= LMR_DEPTH_LIMIT && quietMove && !check {
 				R = LMR_TABLE[depth][mvCnt+1]
 			}
 
@@ -362,9 +332,23 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 			//    2. Ensure moves pruned don't give check
 			// https://www.chessprogramming.org/Futility_Pruning
 			checkAfterMove := b.IsCheck(b.turn)
-			if quietMove && !checkAfterMove && depth-R-1 < len(FUTILITY_MARGINS) && FUTILITY_MARGINS[depth-R-1]+staticEval < alpha {
-				b.Undo()
-				continue
+			if quietMove && !checkAfterMove && depth-R-1 <= FUTILITY_DEPTH_LIMIT {
+				if FUTILITY_BASE+FUTILITY_MULT*(depth-R-1)+staticEval < alpha {
+					b.Undo()
+					continue
+				}
+			}
+
+			// INTERNAL ITERATIVE REDUCTION (IIR)
+			// Motivation: If there is no TT move, we hope we can safely reduce the depth of node since we
+			//             did not look at this position in prior searches. We can do IIR on PV nodes and
+			//             expected cut nodes.
+			// Conditions:
+			//    1. TT move not found
+			//    2. Depth is greater than some limit (usually 5)
+			//    3. Expected cut node - if we are doing an LMR, we can expect this will be a cut node
+			if pvMove.from == 0 && depth >= IIR_DEPTH_LIMIT && R != 0 {
+				depth -= IIR_DEPTH_REDUCTION
 			}
 
 			score, timeout = Pvs(b, depth-1-R, rd, -alpha-1, -alpha, ReverseColor(c), true, &childPV)
@@ -555,20 +539,19 @@ func SearchWithTime(b *Board, movetime int64) Move {
 		// Aspiration windows
 		alpha := -WIN_VAL - 1
 		beta := WIN_VAL + 1
-		windowSize := 50 // Default window size
 
-		if i > 5 { // Only use aspiration windows after depth 5
-			if i > 7 {
-				windowSize = 25 // Narrow window for deeper searches
-			}
-			alpha = prevScore - windowSize
-			beta = prevScore + windowSize
+		alphaWindowSize := -25
+		betaWindowSize := 25
+
+		if i > 5 {
+			alpha = prevScore + alphaWindowSize
+			beta = prevScore + betaWindowSize
 		}
 
 		score := 0
 		timeout := false
 
-		// Aspiration window search with research on fail
+		// Aspiration window search with exponentially-widening research on fail
 		for {
 			score, timeout = Pvs(b, i, i, alpha, beta, b.turn, true, &line)
 			if timeout || SearchStop {
@@ -577,11 +560,13 @@ func SearchWithTime(b *Board, movetime int64) Move {
 			}
 
 			if score <= alpha {
-				alpha = max(-WIN_VAL-1, alpha-windowSize*2)
+				alpha = Max(-WIN_VAL-1, alpha+alphaWindowSize*2)
+				alphaWindowSize *= -alphaWindowSize
 				continue
 			}
 			if score >= beta {
-				beta = min(WIN_VAL+1, beta+windowSize*2)
+				beta = Min(WIN_VAL+1, beta+betaWindowSize*2)
+				betaWindowSize *= betaWindowSize
 				continue
 			}
 			break
@@ -598,7 +583,7 @@ func SearchWithTime(b *Board, movetime int64) Move {
 			strLine += " " + move.ToUCI()
 		}
 
-		nps := NodesSearched * 1000000000 / max(int(timeTakenNanoSeconds), 1)
+		nps := NodesSearched * 1000000000 / Max(int(timeTakenNanoSeconds), 1)
 		fmt.Printf("info depth %d nodes %d time %d score cp %d nps %d pv%s\n", i, NodesSearched, timeTaken, score, nps, strLine)
 
 		if score == WIN_VAL || score == -WIN_VAL {
@@ -617,18 +602,4 @@ func SearchWithTime(b *Board, movetime int64) Move {
 		}
 	}
 	return prevBest
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

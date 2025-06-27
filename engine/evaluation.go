@@ -212,10 +212,18 @@ const NOT_CASTLED_PENALTY = 15
 const BISHOP_PAIR_BONUS_MG = 20
 const BISHOP_PAIR_BONUS_EG = 30
 
+func EvaluateNNUE(b *Board) int {
+	stm := b.turn
+	if stm == WHITE {
+		return int(Forward(&GlobalNNUE, &b.accumulators.white, &b.accumulators.black))
+	} else {
+		return -int(Forward(&GlobalNNUE, &b.accumulators.black, &b.accumulators.white))
+	}
+}
+
 // Returns an evaluation of the position in cp
 // 1000000 or -1000000 is designated as checkmate
 // Evaluations are returned in White's perspective
-
 func Evaluate(b *Board) int {
 	if b.IsThreeFoldRep() || b.IsInsufficientMaterial() {
 		return 0
