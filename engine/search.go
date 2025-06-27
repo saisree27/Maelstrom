@@ -20,8 +20,8 @@ const SECOND_KILLER_MOVE_BONUS = 590000
 const RFP_DEPTH_MARGIN = 300
 const RAZORING_MARGINS_DEPTH_1 = 225
 const RAZORING_MARGINS_DEPTH_2 = 230
-const FUTILITY_BASE = 40
-const FUTILITY_MULT = 60
+const FUTILITY_BASE = 50
+const FUTILITY_MULT = 150
 const FUTILITY_DEPTH_LIMIT = 8
 const IIR_DEPTH_LIMIT = 4
 const IIR_DEPTH_REDUCTION = 1
@@ -301,6 +301,24 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		// BEST MOVE SELECTION (MOVE ORDERING)
 		// Motivation: If we select good moves to search first, we can prune later moves.
 		move := selectMove(mvCnt, legalMoves, b, pvMove, depth)
+
+		isQuiet := move.movetype != CAPTURE && move.movetype != PROMOTION && move.movetype != EN_PASSANT
+		lmrDepth := Max(depth-LMR_TABLE[depth][mvCnt+1], 0)
+
+		if !isRoot && !isPv && bestScore > -WIN_VAL+100 {
+			margin := FUTILITY_MULT*lmrDepth + FUTILITY_BASE
+			// FUTILITY PRUNING
+			// Motivation: We want to discard moves which have no potential of raising alpha. We use a margin to estimate
+			//             the potential value of a move (based on depth).
+			// Conditions:
+			//    1. Quiet, seemingly unimportant move (means not a PV node)
+			//    2. Ensure we are not searching for mate
+			// https://www.chessprogramming.org/Futility_Pruning
+			if isQuiet && !check && lmrDepth <= FUTILITY_DEPTH_LIMIT && staticEval+margin <= alpha {
+				continue
+			}
+		}
+
 		b.MakeMove(move)
 
 		score := 0
@@ -317,26 +335,10 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 			//    2. Position not in check before move
 			//    3. Not a shallow depth
 			// https://www.chessprogramming.org/Late_Move_Reductions
-			quietMove := !isPv && move.movetype != CAPTURE && move.movetype != PROMOTION
 			R := 0
 
-			if depth >= LMR_DEPTH_LIMIT && quietMove && !check {
+			if depth >= LMR_DEPTH_LIMIT && isQuiet && !isPv && !check {
 				R = LMR_TABLE[depth][mvCnt+1]
-			}
-
-			// FUTILITY PRUNING
-			// Motivation: We want to discard moves which have no potential of raising alpha. We use a margin to estimate
-			//             the potential value of a move (based on depth).
-			// Conditions:
-			//    1. Quiet, seemingly unimportant move (means not a PV node)
-			//    2. Ensure moves pruned don't give check
-			// https://www.chessprogramming.org/Futility_Pruning
-			checkAfterMove := b.IsCheck(b.turn)
-			if quietMove && !checkAfterMove && depth-R-1 <= FUTILITY_DEPTH_LIMIT {
-				if FUTILITY_BASE+FUTILITY_MULT*(depth-R-1)+staticEval < alpha {
-					b.Undo()
-					continue
-				}
 			}
 
 			// INTERNAL ITERATIVE REDUCTION (IIR)
