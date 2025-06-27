@@ -539,20 +539,19 @@ func SearchWithTime(b *Board, movetime int64) Move {
 		// Aspiration windows
 		alpha := -WIN_VAL - 1
 		beta := WIN_VAL + 1
-		windowSize := 50 // Default window size
 
-		if i > 5 { // Only use aspiration windows after depth 5
-			if i > 7 {
-				windowSize = 25 // Narrow window for deeper searches
-			}
-			alpha = prevScore - windowSize
-			beta = prevScore + windowSize
+		alphaWindowSize := -25
+		betaWindowSize := 25
+
+		if i > 5 {
+			alpha = prevScore + alphaWindowSize
+			beta = prevScore + betaWindowSize
 		}
 
 		score := 0
 		timeout := false
 
-		// Aspiration window search with research on fail
+		// Aspiration window search with exponentially-widening research on fail
 		for {
 			score, timeout = Pvs(b, i, i, alpha, beta, b.turn, true, &line)
 			if timeout || SearchStop {
@@ -561,11 +560,13 @@ func SearchWithTime(b *Board, movetime int64) Move {
 			}
 
 			if score <= alpha {
-				alpha = Max(-WIN_VAL-1, alpha-windowSize*2)
+				alpha = Max(-WIN_VAL-1, alpha+alphaWindowSize*2)
+				alphaWindowSize *= -alphaWindowSize
 				continue
 			}
 			if score >= beta {
-				beta = Min(WIN_VAL+1, beta+windowSize*2)
+				beta = Min(WIN_VAL+1, beta+betaWindowSize*2)
+				betaWindowSize *= betaWindowSize
 				continue
 			}
 			break
