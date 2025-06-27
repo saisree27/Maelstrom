@@ -17,17 +17,17 @@ const PROMOTION_BONUS = 800000
 const FIRST_KILLER_MOVE_BONUS = 600000
 const SECOND_KILLER_MOVE_BONUS = 590000
 
-const RFP_DEPTH_MARGIN = 300
-const RAZORING_MARGINS_DEPTH_1 = 225
-const RAZORING_MARGINS_DEPTH_2 = 230
+const RFP_MULT = 120
+const RFP_MAX_DEPTH = 9
+const RAZORING_MULT = 220
+const RAZORING_MAX_DEPTH = 2
 const FUTILITY_BASE = 50
 const FUTILITY_MULT = 150
 const FUTILITY_DEPTH_LIMIT = 8
 const IIR_DEPTH_LIMIT = 4
 const IIR_DEPTH_REDUCTION = 1
 const LMR_DEPTH_LIMIT = 3
-
-var RAZORING_MARGINS = [3]int{0, RAZORING_MARGINS_DEPTH_1, RAZORING_MARGINS_DEPTH_2}
+const NMP_MIN_DEPTH = 3
 
 var MVV_LVA_TABLE = [7][7]int{
 	{15, 13, 14, 12, 11, 10, 0}, // victim P, attacker P, B, N, R, Q, K, Empty
@@ -211,74 +211,75 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	// Compute static eval to be used for pruning checks
 	staticEval := EvaluateNNUE(b) * COLOR_SIGN[c]
 
-	// REVERSE FUTILITY PRUNING / STATIC NULL MOVE PRUNING
-	// Motivation: If the material balance minus a safety margin does not improve beta,
-	// 			   then we can fail-high because the child node would not improve alpha.
-	// 			   Currently the margin is a constant multiple of depth, this can be improved.
-	// Conditions:
-	//    1. Not in check
-	//    2. Not in PV node
-	//    3. TT move exists and is not a capture
-	// More info: https://www.chessprogramming.org/Reverse_Futility_Pruning
-	if !check && !isPv && bestMove.from != 0 && bestMove.movetype != CAPTURE {
-		margin := RFP_DEPTH_MARGIN * depth
-		if staticEval-margin >= beta {
-			return staticEval - margin, false
-		}
-	}
-
 	// Pre-allocate PV line for child nodes
 	childPV := []Move{}
 
-	// NULL MOVE PRUNING
-	// Motivation: The null move would be worse than any possible legal move, so
-	// 			   if we can have a reduced search by performing a null move that still fails high
-	// 			   we can be relatively sure that the best legal move would also fail high over beta,
-	//             so we can avoid having to check this node. Reduced depth here is 3 + d/6, formula from Blunder
-	// Conditions:
-	//    1. Not in check
-	//    2. Side to move does not have just king and pawns
-	// 	  3. Not in PV node
-	// More info: https://www.chessprogramming.org/Null_Move_Pruning
-	notJustPawnsAndKing := b.colors[c] ^ (b.GetColorPieces(PAWN, c) | b.GetColorPieces(KING, c))
-	if doNull && !check && !isPv && notJustPawnsAndKing != 0 {
-		b.MakeNullMove()
-		R := 3 + depth/6
-		score, timeout = Pvs(b, depth-1-R, rd, -beta, -beta+1, ReverseColor(c), false, &childPV)
-		score *= -1
-		b.UndoNullMove()
-
-		childPV = []Move{}
-
-		if SearchStop || timeout {
-			return 0, true
+	// Conditions for RFP, Razoring, NMP
+	if !isRoot && !isPv && !check {
+		// REVERSE FUTILITY PRUNING / STATIC NULL MOVE PRUNING
+		// Motivation: If the material balance minus a safety margin does not improve beta,
+		// 			   then we can fail-high because the child node would not improve alpha.
+		// 			   Currently the margin is a constant multiple of depth, this can be improved.
+		// Conditions:
+		//    1. Not in check
+		//    2. Not in PV node
+		//    3. TT move exists and is not a capture
+		// More info: https://www.chessprogramming.org/Reverse_Futility_Pruning
+		if depth <= RFP_MAX_DEPTH && bestMove.from != 0 && bestMove.movetype != CAPTURE && beta > -WIN_VAL-100 {
+			margin := RFP_MULT * depth
+			if staticEval-margin >= beta {
+				return staticEval - margin, false
+			}
 		}
 
-		if score >= beta {
-			return score, false
+		// RAZORING
+		// Motivation: we can prune branches at shallow depths if the static evaluation
+		//             with a safety margin is less than alpha and quiescence confirms that
+		//             we can fail low.
+		// Conditions:
+		//    1. Not a PV node
+		// 	  2. Not searching for mate
+		// More info: https://www.chessprogramming.org/Razoring
+		if depth <= RAZORING_MAX_DEPTH && alpha < WIN_VAL/10 && beta > -WIN_VAL/10 {
+			razorMargin := RAZORING_MULT * depth
+			if staticEval+razorMargin <= alpha {
+				// Try qsearch to verify if position is really bad
+				qScore := QuiescenceSearch(b, alpha, beta, c, 4)
+				if qScore < alpha {
+					return qScore, false
+				}
+			}
+		}
+
+		// NULL MOVE PRUNING
+		// Motivation: The null move would be worse than any possible legal move, so
+		// 			   if we can have a reduced search by performing a null move that still fails high
+		// 			   we can be relatively sure that the best legal move would also fail high over beta,
+		//             so we can avoid having to check this node. Reduced depth here is 3 + d/6, formula from Blunder
+		// Conditions:
+		//    1. Not in check
+		//    2. Side to move does not have just king and pawns
+		// 	  3. Not in PV node
+		// More info: https://www.chessprogramming.org/Null_Move_Pruning
+		notJustPawnsAndKing := b.colors[c] ^ (b.GetColorPieces(PAWN, c) | b.GetColorPieces(KING, c))
+		if depth >= NMP_MIN_DEPTH && doNull && notJustPawnsAndKing != 0 {
+			b.MakeNullMove()
+			R := 3 + depth/6
+			score, timeout = Pvs(b, depth-1-R, rd, -beta, -beta+1, ReverseColor(c), false, &childPV)
+			score *= -1
+			b.UndoNullMove()
+
+			childPV = []Move{}
+
+			if SearchStop || timeout {
+				return 0, true
+			}
+
+			if score >= beta {
+				return score, false
+			}
 		}
 	}
-
-	// RAZORING
-	// Motivation: we can prune branches at shallow depths if the static evaluation
-	//             with a safety margin is less than alpha and quiescence confirms that
-	//             we can fail low.
-	// Conditions:
-	//    1. Not a PV node
-	//    2. TT move does not exist
-	// 	  3. Not searching for mate
-	// More info: https://www.chessprogramming.org/Razoring
-	// if depth < len(RAZORING_MARGINS) && !isPv && bestMove.from == 0 && beta < WIN_VAL-100 && -beta > -(WIN_VAL-100) {
-	// 	razorMargin := RAZORING_MARGINS[depth]
-
-	// 	if staticEval+razorMargin <= alpha {
-	// 		// Try qsearch to verify if position is really bad
-	// 		qScore := QuiescenceSearch(b, 4, alpha, beta, c, 4)
-	// 		if qScore < alpha {
-	// 			return qScore, false
-	// 		}
-	// 	}
-	// }
 
 	// INTERNAL ITERATIVE REDUCTION (IIR)
 	// Motivation: If there is no TT move, we hope we can safely reduce the depth of node since we
