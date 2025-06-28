@@ -16,7 +16,6 @@ func InitializeEverythingExceptTTable() {
 	InitializeSQLookup()
 	InitZobrist()
 	InitNeighborMasks()
-	InitializePawnMasks()
 	InitializeLMRTable()
 	InitializeNNUE()
 }

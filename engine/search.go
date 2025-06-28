@@ -208,7 +208,7 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		if depth <= RFP_MAX_DEPTH && bestMove.from != 0 && bestMove.movetype != CAPTURE && beta > -WIN_VAL-100 {
 			margin := RFP_MULT * depth
 			if staticEval-margin >= beta {
-				return staticEval - margin
+				return beta + (staticEval-beta)/2
 			}
 		}
 
