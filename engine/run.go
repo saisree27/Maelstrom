@@ -57,10 +57,10 @@ func RunSearch(position string, depth int) {
 
 		fmt.Printf("Depth %d: ", i)
 
-		score, timeout := Pvs(&b, i, i, -WIN_VAL-1, WIN_VAL+1, b.turn, true, &line)
+		score := Pvs(&b, i, i, -WIN_VAL-1, WIN_VAL+1, b.turn, true, &line)
 		score *= COLOR_SIGN[b.turn]
 
-		if timeout {
+		if SearchStop {
 			break
 		}
 
@@ -157,7 +157,7 @@ func RunPlay(position string, depth int, player Color) {
 
 				fmt.Printf("Depth %d: ", i)
 
-				score, _ = Pvs(&b, i, i, -WIN_VAL-1, WIN_VAL+1, b.turn, true, &line)
+				score = Pvs(&b, i, i, -WIN_VAL-1, WIN_VAL+1, b.turn, true, &line)
 
 				if score == WIN_VAL || score == -WIN_VAL {
 					fmt.Println("Found mate.")

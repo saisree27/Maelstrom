@@ -243,9 +243,6 @@ func LoadNNUEFromFile(path string) (*NNUE, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
-	if len(data) < 197_378 {
-		return nil, fmt.Errorf("file too short: expected at least 197,378 bytes, got %d", len(data))
-	}
 
 	reader := bytes.NewReader(data)
 	nnue := &NNUE{}
@@ -278,7 +275,6 @@ func LoadNNUEFromFile(path string) (*NNUE, error) {
 		return nil, fmt.Errorf("output_bias: %w", err)
 	}
 
-	// Ignore padding — you're done!
 	return nnue, nil
 }
 

@@ -3,7 +3,6 @@ package engine
 import (
 	"fmt"
 	"math"
-	"strings"
 	"time"
 )
 
@@ -52,7 +51,7 @@ var SearchStartTime time.Time = time.Now()
 var AllowedTime int64 = 10000
 var SearchStop = false
 
-func QuiescenceSearch(b *Board, alpha int, beta int, c Color, rd int) int {
+func QuiescenceSearch(b *Board, alpha int, beta int, c Color) int {
 	NodesSearched++
 
 	// Check for stop signal
@@ -70,10 +69,8 @@ func QuiescenceSearch(b *Board, alpha int, beta int, c Color, rd int) int {
 
 	eval := EvaluateNNUE(b) * COLOR_SIGN[c]
 
-	inCheck := rd <= 2 && b.IsCheck(c)
-
 	// Beta cutoff
-	if eval >= beta && !inCheck {
+	if eval >= beta {
 		return beta
 	}
 
@@ -81,30 +78,23 @@ func QuiescenceSearch(b *Board, alpha int, beta int, c Color, rd int) int {
 		alpha = eval
 	}
 
-	var moves []Move
-	if inCheck {
-		moves = b.GenerateLegalMoves()
-	} else {
-		moves = b.GenerateCaptures()
-	}
+	moves := b.GenerateCaptures()
 
 	for mvCnt, _ := range moves {
-		move := selectMove(mvCnt, moves, b, Move{}, rd)
-		if inCheck || move.movetype == CAPTURE || move.movetype == CAPTURE_AND_PROMOTION || move.movetype == EN_PASSANT {
-			b.MakeMove(move)
-			score := -QuiescenceSearch(b, -beta, -alpha, ReverseColor(c), rd+1)
-			b.Undo()
+		move := selectMove(mvCnt, moves, b, Move{}, 0)
+		b.MakeMove(move)
+		score := -QuiescenceSearch(b, -beta, -alpha, ReverseColor(c))
+		b.Undo()
 
-			if SearchStop {
-				return 0
-			}
+		if SearchStop {
+			return 0
+		}
 
-			if score >= beta {
-				return beta
-			}
-			if score > alpha {
-				alpha = score
-			}
+		if score >= beta {
+			return beta
+		}
+		if score > alpha {
+			alpha = score
 		}
 	}
 
@@ -150,26 +140,26 @@ func selectMove(idx int, moves []Move, b *Board, pv Move, depth int) Move {
 	return moves[idx]
 }
 
-func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool, line *[]Move) (int, bool) {
+func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool, line *[]Move) int {
 	NodesSearched++
 
 	// Check for stop signal
 	select {
 	case <-StopChannel:
 		SearchStop = true
-		return 0, true
+		return 0
 	default:
 		// Continue search
 	}
 
 	if SearchStop {
-		return 0, true
+		return 0
 	}
 
 	if NodesSearched%2047 == 0 && time.Since(SearchStartTime).Milliseconds() > AllowedTime {
 		fmt.Printf("stopping search after %d\n", time.Since(SearchStartTime).Milliseconds())
 		SearchStop = true
-		return 0, true
+		return 0
 	}
 
 	isPv := beta > alpha+1
@@ -180,7 +170,7 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	}
 
 	if depth <= 0 {
-		return QuiescenceSearch(b, alpha, beta, c, rd-depth), false
+		return QuiescenceSearch(b, alpha, beta, c)
 	}
 
 	// Check for two-fold repetition or 50 move rule. Edge case check from Blunder:
@@ -188,24 +178,14 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	possibleCheckmate := check && rd == depth
 	if !isRoot && (b.IsTwoFold() || (b.plyCnt50 >= 100 && !possibleCheckmate)) {
 		// Don't store repetition positions in TT since their value depends on game history
-		return 0, false
+		return 0
 	}
 
-	legalMoves := b.GenerateLegalMoves()
-	if len(legalMoves) == 0 {
-		if b.IsCheck(b.turn) {
-			return -WIN_VAL, false
-		} else {
-			return 0, false
-		}
-	}
-
-	timeout := false
 	bestMove := Move{}
 
 	res, score := ProbeTT(b, alpha, beta, uint8(depth), &bestMove)
 	if res && !isRoot {
-		return score, false
+		return score
 	}
 
 	// Compute static eval to be used for pruning checks
@@ -228,7 +208,7 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		if depth <= RFP_MAX_DEPTH && bestMove.from != 0 && bestMove.movetype != CAPTURE && beta > -WIN_VAL-100 {
 			margin := RFP_MULT * depth
 			if staticEval-margin >= beta {
-				return staticEval - margin, false
+				return staticEval - margin
 			}
 		}
 
@@ -244,9 +224,9 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 			razorMargin := RAZORING_MULT * depth
 			if staticEval+razorMargin <= alpha {
 				// Try qsearch to verify if position is really bad
-				qScore := QuiescenceSearch(b, alpha, beta, c, 4)
+				qScore := QuiescenceSearch(b, alpha, beta, c)
 				if qScore < alpha {
-					return qScore, false
+					return qScore
 				}
 			}
 		}
@@ -265,18 +245,17 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		if depth >= NMP_MIN_DEPTH && doNull && notJustPawnsAndKing != 0 {
 			b.MakeNullMove()
 			R := 3 + depth/6
-			score, timeout = Pvs(b, depth-1-R, rd, -beta, -beta+1, ReverseColor(c), false, &childPV)
-			score *= -1
+			score = -Pvs(b, depth-1-R, rd, -beta, -beta+1, ReverseColor(c), false, &childPV)
 			b.UndoNullMove()
 
 			childPV = []Move{}
 
-			if SearchStop || timeout {
-				return 0, true
+			if SearchStop {
+				return 0
 			}
 
 			if score >= beta {
-				return score, false
+				return score
 			}
 		}
 	}
@@ -297,6 +276,15 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	bestScore := -WIN_VAL - 1
 	bestMove = Move{}
 	ttFlag := UPPER
+
+	legalMoves := b.GenerateLegalMoves()
+	if len(legalMoves) == 0 {
+		if b.IsCheck(b.turn) {
+			return -WIN_VAL
+		} else {
+			return 0
+		}
+	}
 
 	for mvCnt := 0; mvCnt < len(legalMoves); mvCnt++ {
 		// BEST MOVE SELECTION (MOVE ORDERING)
@@ -324,8 +312,7 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 
 		score := 0
 		if mvCnt == 0 {
-			score, timeout = Pvs(b, depth-1, rd, -beta, -alpha, ReverseColor(c), true, &childPV)
-			score *= -1
+			score = -Pvs(b, depth-1, rd, -beta, -alpha, ReverseColor(c), true, &childPV)
 		} else {
 			// LATE MOVE REDUCTION (LMR)
 			// Motivation: Because of move ordering, we can save time by reducing search depth of moves that are
@@ -339,41 +326,25 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 			R := 0
 
 			if depth >= LMR_DEPTH_LIMIT && isQuiet && !isPv && !check {
-				R = LMR_TABLE[depth][mvCnt+1]
+				R = Max(LMR_TABLE[depth][mvCnt+1], 0)
 			}
 
-			// INTERNAL ITERATIVE REDUCTION (IIR)
-			// Motivation: If there is no TT move, we hope we can safely reduce the depth of node since we
-			//             did not look at this position in prior searches. We can do IIR on PV nodes and
-			//             expected cut nodes.
-			// Conditions:
-			//    1. TT move not found
-			//    2. Depth is greater than some limit (usually 5)
-			//    3. Expected cut node - if we are doing an LMR, we can expect this will be a cut node
-			if pvMove.from == 0 && depth >= IIR_DEPTH_LIMIT && R != 0 {
-				depth -= IIR_DEPTH_REDUCTION
-			}
-
-			score, timeout = Pvs(b, depth-1-R, rd, -alpha-1, -alpha, ReverseColor(c), true, &childPV)
-			score *= -1
+			score = -Pvs(b, depth-1-R, rd, -alpha-1, -alpha, ReverseColor(c), true, &childPV)
 
 			if score > alpha && R > 0 {
-				score, timeout = Pvs(b, depth-1, rd, -alpha-1, -alpha, ReverseColor(c), true, &childPV)
-				score *= -1
+				score = -Pvs(b, depth-1, rd, -alpha-1, -alpha, ReverseColor(c), true, &childPV)
 				if score > alpha {
-					score, timeout = Pvs(b, depth-1, rd, -beta, -alpha, ReverseColor(c), true, &childPV)
-					score *= -1
+					score = -Pvs(b, depth-1, rd, -beta, -alpha, ReverseColor(c), true, &childPV)
 				}
 			} else if score > alpha && score < beta {
-				score, timeout = Pvs(b, depth-1, rd, -beta, -alpha, ReverseColor(c), true, &childPV)
-				score *= -1
+				score = -Pvs(b, depth-1, rd, -beta, -alpha, ReverseColor(c), true, &childPV)
 			}
 		}
 
 		b.Undo()
 
-		if timeout || SearchStop {
-			return 0, true
+		if SearchStop {
+			return 0
 		}
 
 		if score > bestScore {
@@ -406,11 +377,11 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		childPV = []Move{}
 	}
 
-	if !timeout && !SearchStop {
+	if !SearchStop {
 		StoreEntry(b, bestScore, ttFlag, bestMove, uint8(depth))
 	}
 
-	return bestScore, timeout
+	return bestScore
 }
 
 func storeKillerMove(move Move, depth int) {
@@ -450,69 +421,6 @@ func InitializeLMRTable() {
 
 // SearchWithTime searches for the best move given a time constraint
 func SearchWithTime(b *Board, movetime int64) Move {
-	if UseOpeningBook {
-		// Initialize opening book
-		book := NewOpeningBook()
-
-		// Check if we can use a book move
-		if bookMove, variation := book.LookupPosition(b, b.turn); bookMove != "" {
-			// Convert UCI string to Move
-			move := FromUCI(bookMove, b)
-			if variation != "" {
-				fmt.Printf("info string Book move: %s (%s)\n", bookMove, variation)
-			} else {
-				fmt.Printf("info string Book move: %s\n", bookMove)
-			}
-			return move
-		}
-	}
-
-	// Check tablebase if we're in an endgame position
-	if UseTablebase && IsTablebasePosition(b) {
-		if score, bestMove, found := ProbeTablebase(b.ToFEN()); found {
-			if bestMove != "" {
-				// Check if this is a drawing position with multiple moves
-				if strings.HasPrefix(bestMove, "draw:") {
-					// Get the list of drawing moves
-					drawingMoves := strings.Split(strings.TrimPrefix(bestMove, "draw:"), ",")
-
-					// Search these moves to find the best one
-					bestScore := -WIN_VAL - 1
-					var bestDrawingMove Move
-					line := []Move{}
-					strLine := ""
-
-					searchStart := time.Now()
-					// Try each drawing move
-					for _, moveStr := range drawingMoves {
-						move := FromUCI(moveStr, b)
-						b.MakeMove(move)
-						score, _ := Pvs(b, 6, 6, -WIN_VAL-1, WIN_VAL+1, b.turn, true, &line)
-						score *= -1 // Negate score since we evaluated from opponent's perspective
-						b.Undo()
-
-						if score > bestScore {
-							bestScore = score
-							bestDrawingMove = move
-							strLine = bestDrawingMove.ToUCI()
-							for _, m := range line {
-								strLine += " " + m.ToUCI()
-							}
-						}
-					}
-
-					fmt.Printf("info depth 6 nodes %d time %d score cp %d pv %s\n", NodesSearched, time.Since(searchStart).Milliseconds(), bestScore*COLOR_SIGN[b.turn], strLine)
-					return bestDrawingMove
-				}
-
-				// Not a drawing position, use the tablebase move directly
-				move := FromUCI(bestMove, b)
-				fmt.Printf("info depth 99 nodes 1 time 1 score cp %d pv %s\n", score, bestMove)
-				return move
-			}
-		}
-	}
-
 	fmt.Printf("searching for movetime %d\n", movetime)
 
 	SearchStartTime = time.Now()
@@ -552,12 +460,11 @@ func SearchWithTime(b *Board, movetime int64) Move {
 		}
 
 		score := 0
-		timeout := false
 
 		// Aspiration window search with exponentially-widening research on fail
 		for {
-			score, timeout = Pvs(b, i, i, alpha, beta, b.turn, true, &line)
-			if timeout || SearchStop {
+			score = Pvs(b, i, i, alpha, beta, b.turn, true, &line)
+			if SearchStop {
 				fmt.Printf("returning prev best move after %d\n", time.Since(SearchStartTime).Milliseconds())
 				return prevBest
 			}
@@ -590,19 +497,10 @@ func SearchWithTime(b *Board, movetime int64) Move {
 		fmt.Printf("info depth %d nodes %d time %d score cp %d nps %d pv%s\n", i, NodesSearched, timeTaken, score, nps, strLine)
 
 		if score == WIN_VAL || score == -WIN_VAL {
-			ClearTT()
 			return line[0]
 		}
 
 		prevBest = line[0]
-
-		// Check for stop signal after completing a depth
-		select {
-		case <-StopChannel:
-			return prevBest
-		default:
-			// Continue to next depth
-		}
 	}
 	return prevBest
 }

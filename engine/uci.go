@@ -186,8 +186,6 @@ func UciLoop() {
 			fmt.Println("id name Maelstrom v3.0.0")
 			fmt.Println("id author saisree27")
 			fmt.Println("option name Hash type spin default 256 min 1 max 4096")
-			fmt.Println("option name UseBook type check default false")
-			fmt.Println("option name UseLichessTB type check default false")
 			fmt.Println("uciok")
 		} else if command == "isready" {
 			fmt.Println("readyok")
@@ -215,14 +213,6 @@ func UciLoop() {
 			if len(words) >= 5 && words[1] == "name" && words[2] == "Hash" && words[3] == "value" {
 				ttSize, _ = strconv.ParseInt(words[4], 10, 64)
 				InitializeTT(int(ttSize))
-			}
-
-			if words[1] == "name" && words[2] == "UseBook" && words[3] == "value" {
-				UseOpeningBook, _ = strconv.ParseBool(words[4])
-			}
-
-			if words[1] == "name" && words[2] == "UseLichessTB" && words[3] == "value" {
-				UseTablebase, _ = strconv.ParseBool(words[4])
 			}
 		} else if command == "d" {
 			// Debug command to print current position

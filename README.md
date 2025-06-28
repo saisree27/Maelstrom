@@ -31,8 +31,6 @@ Maelstrom often plays on Lichess [here](https://lichess.org/@/Maelstrom-Chess). 
  - NNUE Evaluation using a (768->128)x2 -> 1 architecture using a SIMD SCReLU activation function, trained on Lc0/SF data. The current release (v2.1.0) uses HCE evaluation based off PeSTO, mobility scores, bishop pair and king pawn shield.
  - UCI protocol implementation, so you can run the engine using a UCI-supported GUI such as [CuteChess](https://github.com/cutechess/cutechess/releases).
  - Time management
- - Custom opening book (by default opening book is off, but can be enabled with `setoption name UseBook value true`)
- - Integration with lichess 7-man tablebase (by default integration is off, but can be enabled with `setoption name UseLichessTB value true`)
 
 ## Releases
 Checkout and download binaries and source code from the Releases page.
