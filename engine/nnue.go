@@ -28,7 +28,7 @@ import (
 const WEIGHTS_FILENAME = "network.bin"
 
 const INPUT_LAYER_SIZE = 768
-const HIDDEN_LAYER_SIZE = 128
+const HIDDEN_LAYER_SIZE = 256
 const OUTPUT_LAYER_SIZE = 1
 
 // Quantization constants
