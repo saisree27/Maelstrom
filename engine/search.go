@@ -15,6 +15,7 @@ const MVV_LVA_BONUS = 1000000
 const PROMOTION_BONUS = 800000
 const FIRST_KILLER_MOVE_BONUS = 600000
 const SECOND_KILLER_MOVE_BONUS = 590000
+const HISTORY_MAX_BONUS = 16384
 
 const RFP_MULT = 120
 const RFP_MAX_DEPTH = 9
@@ -286,12 +287,19 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		}
 	}
 
+	var quietsSearched []Move
+
 	for mvCnt := 0; mvCnt < len(legalMoves); mvCnt++ {
 		// BEST MOVE SELECTION (MOVE ORDERING)
 		// Motivation: If we select good moves to search first, we can prune later moves.
 		move := selectMove(mvCnt, legalMoves, b, pvMove, depth)
 
-		isQuiet := move.movetype != CAPTURE && move.movetype != PROMOTION && move.movetype != EN_PASSANT
+		isQuiet := move.movetype == QUIET || move.movetype == K_CASTLE || move.movetype == Q_CASTLE
+
+		if isQuiet {
+			quietsSearched = append(quietsSearched, move)
+		}
+
 		lmrDepth := Max(depth-LMR_TABLE[depth][mvCnt+1], 0)
 
 		if !isRoot && !isPv && bestScore > -WIN_VAL+100 {
@@ -354,11 +362,20 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 
 		if score >= beta {
 			ttFlag = LOWER
-			storeKillerMove(move, depth)
-			incrementHistoryTable(move, depth, b.turn)
+			if isQuiet {
+				storeKillerMove(move, depth)
+
+				// History bonus using history gravity formula
+				bonus := 300*depth - 250
+				updateHistory(move, b.turn, bonus)
+
+				// Malus for all quiet moves we searched prior
+				for idx := 0; idx < len(quietsSearched)-1; idx++ {
+					move = quietsSearched[idx]
+					updateHistory(move, b.turn, -bonus)
+				}
+			}
 			break
-		} else {
-			decrementHistoryTable(move, b.turn)
 		}
 
 		if score > alpha {
@@ -368,10 +385,6 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 			*line = (*line)[:0]
 			*line = append(*line, move)
 			*line = append(*line, childPV...)
-
-			incrementHistoryTable(move, depth, b.turn)
-		} else {
-			decrementHistoryTable(move, b.turn)
 		}
 
 		childPV = []Move{}
@@ -385,29 +398,25 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 }
 
 func storeKillerMove(move Move, depth int) {
-	if move.movetype == QUIET && KillerMovesTable[depth][0].ToUCI() != move.ToUCI() {
+	if KillerMovesTable[depth][0] != move {
 		KillerMovesTable[depth][1] = KillerMovesTable[depth][0]
 		KillerMovesTable[depth][0] = move
 	}
 }
 
-func incrementHistoryTable(move Move, depth int, color Color) {
-	if move.movetype == QUIET {
-		HistoryTable[color][move.from][move.to] += depth * depth
+func updateHistory(move Move, color Color, bonus int) {
+	if bonus > HISTORY_MAX_BONUS {
+		bonus = HISTORY_MAX_BONUS
+	} else if bonus < -HISTORY_MAX_BONUS {
+		bonus = -HISTORY_MAX_BONUS
 	}
 
-	if HistoryTable[color][move.from][move.to] > SECOND_KILLER_MOVE_BONUS {
-		HistoryTable[color][move.from][move.to] /= 2
-	}
-}
-
-func decrementHistoryTable(move Move, color Color) {
-	if move.movetype == QUIET {
-		if HistoryTable[color][move.from][move.to] > 0 {
-			HistoryTable[color][move.from][move.to]--
-		}
+	absBonus := bonus
+	if absBonus < 0 {
+		absBonus *= -1
 	}
 
+	HistoryTable[color][move.from][move.to] += bonus - HistoryTable[color][move.from][move.to]*absBonus/HISTORY_MAX_BONUS
 }
 
 func InitializeLMRTable() {
