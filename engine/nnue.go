@@ -25,7 +25,7 @@ import (
 //  y = O(concat(a + a^)) + c
 // where O is the output layer weights and c is the output layer biases
 
-const WEIGHTS_FILENAME = "hl_128_screlu_wdl_0_800.bin"
+const WEIGHTS_FILENAME = "network.bin"
 
 const INPUT_LAYER_SIZE = 768
 const HIDDEN_LAYER_SIZE = 128
@@ -286,25 +286,26 @@ func GetProjectRootPath() (string, error) {
 		return "", fmt.Errorf("could not get caller info")
 	}
 	dir := filepath.Dir(filename)
-	for !fileExists(filepath.Join(dir, "go.mod")) && dir != filepath.Dir(dir) {
+	for !folderExists(filepath.Join(dir, "nn_weights")) && dir != filepath.Dir(dir) {
 		dir = filepath.Dir(dir)
 	}
-	if !fileExists(filepath.Join(dir, "go.mod")) {
-		return "", fmt.Errorf("project root not found")
+	if !folderExists(filepath.Join(dir, "nn_weights")) {
+		return "", fmt.Errorf("nn_weights folder not found")
 	}
 	return dir, nil
 }
 
-func fileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
+func folderExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.IsDir()
 }
 func InitializeNNUE() {
 	root, err := GetProjectRootPath()
 	if err != nil {
-		log.Fatalf("Failed to find project root: %v", err)
+		log.Fatalf("Failed to find nn_weights folder: %v", err)
 	}
 	path := filepath.Join(root, "nn_weights", WEIGHTS_FILENAME)
+	fmt.Printf("loading NNUE weights from file %v\n", path)
 	nnue, err := LoadNNUEFromFile(path)
 	if err != nil {
 		log.Fatalf("Failed to load NNUE: %v", err)
