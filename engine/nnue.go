@@ -2,16 +2,17 @@ package engine
 
 import (
 	"bytes"
+	_ "embed"
 	"encoding/binary"
 	"fmt"
 	"log"
 	"maelstrom/engine/screlu"
 	"math/rand"
-	"os"
-	"path/filepath"
-	"runtime"
 	"time"
 )
+
+//go:embed nn_weights/network.bin
+var embeddedWeights []byte
 
 // NETWORK ARCHITECTURE:
 // 768 -> (1024)x2 -> 1 (Perspective Network)
@@ -24,8 +25,6 @@ import (
 // The inference will then be:
 //  y = O(concat(a + a^)) + c
 // where O is the output layer weights and c is the output layer biases
-
-const WEIGHTS_FILENAME = "network.bin"
 
 const INPUT_LAYER_SIZE = 768
 const HIDDEN_LAYER_SIZE = 256
@@ -238,12 +237,7 @@ func NewRandomNNUE() NNUE {
 	return network
 }
 
-func LoadNNUEFromFile(path string) (*NNUE, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file: %w", err)
-	}
-
+func LoadNNUEFromBytes(data []byte) (*NNUE, error) {
 	reader := bytes.NewReader(data)
 	nnue := &NNUE{}
 
@@ -280,33 +274,9 @@ func LoadNNUEFromFile(path string) (*NNUE, error) {
 
 var GlobalNNUE NNUE
 
-func GetProjectRootPath() (string, error) {
-	_, filename, _, ok := runtime.Caller(0)
-	if !ok {
-		return "", fmt.Errorf("could not get caller info")
-	}
-	dir := filepath.Dir(filename)
-	for !folderExists(filepath.Join(dir, "nn_weights")) && dir != filepath.Dir(dir) {
-		dir = filepath.Dir(dir)
-	}
-	if !folderExists(filepath.Join(dir, "nn_weights")) {
-		return "", fmt.Errorf("nn_weights folder not found")
-	}
-	return dir, nil
-}
-
-func folderExists(path string) bool {
-	info, err := os.Stat(path)
-	return err == nil && info.IsDir()
-}
 func InitializeNNUE() {
-	root, err := GetProjectRootPath()
-	if err != nil {
-		log.Fatalf("Failed to find nn_weights folder: %v", err)
-	}
-	path := filepath.Join(root, "nn_weights", WEIGHTS_FILENAME)
-	fmt.Printf("loading NNUE weights from file %v\n", path)
-	nnue, err := LoadNNUEFromFile(path)
+	fmt.Println("loading NNUE weights from embedded data")
+	nnue, err := LoadNNUEFromBytes(embeddedWeights)
 	if err != nil {
 		log.Fatalf("Failed to load NNUE: %v", err)
 	}

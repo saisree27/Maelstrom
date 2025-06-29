@@ -184,7 +184,7 @@ func UciLoop() {
 
 		if command == "uci" {
 			fmt.Println("id name Maelstrom v3.0.0")
-			fmt.Println("id author saisree27")
+			fmt.Println("id author Saigautam Bonam")
 			fmt.Println("option name Hash type spin default 256 min 1 max 4096")
 			fmt.Println("uciok")
 		} else if command == "isready" {
