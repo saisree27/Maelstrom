@@ -6,7 +6,7 @@
 
   ![](https://github.com/saisree27/Maelstrom/actions/workflows/go.yml/badge.svg)
   ![](https://img.shields.io/github/v/release/saisree27/Maelstrom)
-  ![](https://img.shields.io/github/commits-since/saisree27/Maelstrom/v2.1.0)
+  ![](https://img.shields.io/github/commits-since/saisree27/Maelstrom/v3.0.0)
 
 </div>
 
@@ -34,6 +34,14 @@ Maelstrom often plays on Lichess [here](https://lichess.org/@/Maelstrom-Chess). 
 
 ## Releases
 Checkout and download binaries and source code from the Releases page.
+
+## ELO Progression
+Table summarizing ELO progression tests documented in release notes as well as rating by CCRL.
+|                     |   STC ELO   |  LTC ELO  | Estimated ELO (vs. Stash) | CCRL Blitz |
+|:-------------------:|:-----------:|:---------:|:------------:|:------------:|
+| Maelstrom v3.0.0    | +343 +/- 65.5 | +515.5 +/- 119.7 | (vs. Stash 21.2) ~2730 STC, ~2800 LTC |              |
+| Maelstrom v2.1.0    | +249 +/- 46.1 | +190.8 +/- 70.1  | |              |
+| Maelstrom v2.0.0    |              |                 | |     2109     |
 
 ## Building from Source
 Requirements:
