@@ -35,13 +35,13 @@ Maelstrom often plays on Lichess [here](https://lichess.org/@/Maelstrom-Chess). 
 ## Releases
 Checkout and download binaries and source code from the Releases page.
 
-## ELO Progression
-Table summarizing ELO progression tests documented in release notes as well as rating by CCRL.
-|                     |   STC ELO   |  LTC ELO  | Estimated ELO (vs. Stash) | CCRL Blitz |
+## Elo Progression
+Table summarizing Elo progression tests documented in release notes as well as rating by CCRL. Time controls I used for testing: STC 8s+0.08s, LTC 40s+0.4s.
+|                     |   STC Elo |  LTC Elo | Estimated Elo (vs. Stash) | CCRL Blitz |
 |:-------------------:|:-----------:|:---------:|:------------:|:------------:|
 | Maelstrom v3.0.0    | +343 +/- 65.5 | +515.5 +/- 119.7 | (vs. Stash 21.2) ~2730 STC, ~2800 LTC |              |
 | Maelstrom v2.1.0    | +249 +/- 46.1 | +190.8 +/- 70.1  | |              |
-| Maelstrom v2.0.0    |              |                 | |     2109     |
+| Maelstrom v2.0.0    |              |                 | |     [2109](https://computerchess.org.uk/ccrl/404/cgi/engine_details.cgi?print=Details&each_game=1&eng=Maelstrom%202.0.0%2064-bit#Maelstrom_2_0_0_64-bit)     |
 
 ## Building from Source
 Requirements:
@@ -68,7 +68,7 @@ SPRT command:
 cutechess-cli -engine proto=uci cmd={BINARY_TO_TEST} name={TEST_NAME} -engine proto=uci cmd={EXISTING_VERISON_BINARY} name={EXISTING_NAME} -each tc=8+0.08 option.Hash=32 -games 2 -rounds 1000 -repeat -concurrency 8 -openings file={PATH_TO_EPD} format=epd order=random -pgnout {PATH_TO_PGN} -sprt elo0=0 elo1=5 alpha=0.05 beta=0.1 -ratinginterval 10
 ```
 
-## References
+## References and Acknowledgements
 - Definitely the most helpful reference in developing this engine for me has been the [Chess Programming wiki](https://www.chessprogramming.org/Main_Page)! If you're interested in developing your own chess engine or move library, this website has everything.
 - Engine references that helped me improve the engine:
   - [Blunder](https://github.com/deanmchris/blunder)
@@ -79,6 +79,8 @@ cutechess-cli -engine proto=uci cmd={BINARY_TO_TEST} name={TEST_NAME} -engine pr
   - [Stormphrax](https://github.com/Ciekce/Stormphrax)
   - [Viridithas](https://github.com/cosmobobak/viridithas)
   - [Alexandria](https://github.com/PGG106/Alexandria)
-  - and many more open-source engines, these are just the ones I can name off the top of my head
-- [bullet](https://github.com/jw1912/bullet) for allowing me to easily train the NNUE
-- Engine Programmers and Stockfish discord servers for their huge knowledge base/resources and advice
+  - [Stash](https://gitlab.com/mhouppin/stash-bot)
+  - and many more open-source engines, these are just the ones I can name off the top of my head!
+- [bullet](https://github.com/jw1912/bullet) for allowing me to easily train the NNUE.
+- Engine Programmers and Stockfish discord servers for their huge knowledge base/resources and advice.
+- Huge thanks to Gabor Szots and the folks at CCRL for rating the engine!
