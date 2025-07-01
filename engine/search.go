@@ -17,18 +17,6 @@ const FIRST_KILLER_MOVE_BONUS = 600000
 const SECOND_KILLER_MOVE_BONUS = 590000
 const HISTORY_MAX_BONUS = 16384
 
-const RFP_MULT = 120
-const RFP_MAX_DEPTH = 9
-const RAZORING_MULT = 220
-const RAZORING_MAX_DEPTH = 2
-const FUTILITY_BASE = 50
-const FUTILITY_MULT = 150
-const FUTILITY_DEPTH_LIMIT = 8
-const IIR_DEPTH_LIMIT = 4
-const IIR_DEPTH_REDUCTION = 1
-const LMR_DEPTH_LIMIT = 3
-const NMP_MIN_DEPTH = 3
-
 var MVV_LVA_TABLE = [7][7]int{
 	{15, 13, 14, 12, 11, 10, 0}, // victim P, attacker P, B, N, R, Q, K, Empty
 	{35, 33, 34, 32, 31, 30, 0}, // victim B, attacker P, B, N, R, Q, K, Empty
@@ -206,8 +194,8 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		//    2. Not in PV node
 		//    3. TT move exists and is not a capture
 		// More info: https://www.chessprogramming.org/Reverse_Futility_Pruning
-		if depth <= RFP_MAX_DEPTH && bestMove.from != 0 && bestMove.movetype != CAPTURE && beta > -WIN_VAL-100 {
-			margin := RFP_MULT * depth
+		if depth <= Params.RFP_MAX_DEPTH && bestMove.from != 0 && bestMove.movetype != CAPTURE && beta > -WIN_VAL-100 {
+			margin := Params.RFP_MULT * depth
 			if staticEval-margin >= beta {
 				return beta + (staticEval-beta)/2
 			}
@@ -221,8 +209,8 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		//    1. Not a PV node
 		// 	  2. Not searching for mate
 		// More info: https://www.chessprogramming.org/Razoring
-		if depth <= RAZORING_MAX_DEPTH && alpha < WIN_VAL/10 && beta > -WIN_VAL/10 {
-			razorMargin := RAZORING_MULT * depth
+		if depth <= Params.RAZORING_MAX_DEPTH && alpha < WIN_VAL/10 && beta > -WIN_VAL/10 {
+			razorMargin := Params.RAZORING_MULT * depth
 			if staticEval+razorMargin <= alpha {
 				// Try qsearch to verify if position is really bad
 				qScore := QuiescenceSearch(b, alpha, beta, c)
@@ -243,7 +231,7 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		// 	  3. Not in PV node
 		// More info: https://www.chessprogramming.org/Null_Move_Pruning
 		notJustPawnsAndKing := b.colors[c] ^ (b.GetColorPieces(PAWN, c) | b.GetColorPieces(KING, c))
-		if depth >= NMP_MIN_DEPTH && doNull && notJustPawnsAndKing != 0 {
+		if depth >= Params.NMP_MIN_DEPTH && doNull && notJustPawnsAndKing != 0 {
 			b.MakeNullMove()
 			R := 3 + depth/6
 			score = -Pvs(b, depth-1-R, rd, -beta, -beta+1, ReverseColor(c), false, &childPV)
@@ -269,8 +257,8 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	//    1. TT move not found
 	//    2. Depth is greater than some limit
 	//    3. Is in a PV node
-	if bestMove.from == 0 && depth >= IIR_DEPTH_LIMIT && isPv {
-		depth -= IIR_DEPTH_REDUCTION
+	if bestMove.from == 0 && depth >= Params.IIR_MIN_DEPTH && isPv {
+		depth -= Params.IIR_DEPTH_REDUCTION
 	}
 
 	pvMove := bestMove
@@ -303,7 +291,7 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		lmrDepth := Max(depth-LMR_TABLE[depth][mvCnt+1], 0)
 
 		if !isRoot && !isPv && bestScore > -WIN_VAL+100 {
-			margin := FUTILITY_MULT*lmrDepth + FUTILITY_BASE
+			margin := Params.FUTILITY_MULT*lmrDepth + Params.FUTILITY_BASE
 			// FUTILITY PRUNING
 			// Motivation: We want to discard moves which have no potential of raising alpha. We use a margin to estimate
 			//             the potential value of a move (based on depth).
@@ -311,7 +299,7 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 			//    1. Quiet, seemingly unimportant move (means not a PV node)
 			//    2. Ensure we are not searching for mate
 			// https://www.chessprogramming.org/Futility_Pruning
-			if isQuiet && !check && lmrDepth <= FUTILITY_DEPTH_LIMIT && staticEval+margin <= alpha {
+			if isQuiet && !check && lmrDepth <= Params.FUTILITY_MAX_DEPTH && staticEval+margin <= alpha {
 				continue
 			}
 		}
@@ -333,7 +321,7 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 			// https://www.chessprogramming.org/Late_Move_Reductions
 			R := 0
 
-			if depth >= LMR_DEPTH_LIMIT && isQuiet && !isPv && !check {
+			if depth >= Params.LMR_MIN_DEPTH && isQuiet && !isPv && !check {
 				R = Max(LMR_TABLE[depth][mvCnt+1], 0)
 			}
 
