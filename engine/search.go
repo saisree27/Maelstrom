@@ -459,9 +459,6 @@ func SearchPosition(b *Board) Move {
 		// Aspiration window search with exponentially-widening research on fail
 		for {
 			score = Pvs(b, depth, depth, alpha, beta, b.turn, true, &line)
-
-			Timer.CheckID(depth)
-
 			if Timer.Stop {
 				fmt.Printf("returning prev best move after %d\n", Timer.Delta())
 				return prevBest
@@ -499,6 +496,12 @@ func SearchPosition(b *Board) Move {
 		}
 
 		prevBest = line[0]
+
+		Timer.CheckID(depth)
+		if Timer.Stop {
+			fmt.Printf("returning prev best move after %d\n", Timer.Delta())
+			return prevBest
+		}
 	}
 	return prevBest
 }

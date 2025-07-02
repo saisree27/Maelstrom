@@ -124,7 +124,7 @@ func (t *TimeManager) CheckID(depth int) {
 		t.Stop = true
 	}
 
-	if t.maxDepth > 0 && depth > int(t.maxDepth) {
+	if t.maxDepth > 0 && depth >= int(t.maxDepth) {
 		t.Stop = true
 	}
 }
