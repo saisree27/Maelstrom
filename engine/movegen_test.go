@@ -355,7 +355,7 @@ func TestAllMovesMakeUnmake(t *testing.T) {
 	for _, m := range moves {
 		b.MakeMove(m)
 
-		_, _ = Perft(&b, 4)
+		Perft(&b, 4)
 		b.Undo()
 
 		newStats := fmt.Sprintf("Castling: %t %t %t %t, En passant: %q, Turn: %d, History: %d, Occupied: %d, Empty: %d, White: %d, Black: %d, Hash: %d\n", b.oo, b.ooo, b.OO, b.OOO, SQUARE_TO_STRING_MAP[b.enPassant], b.turn, len(b.history), b.occupied, b.empty, b.colors[WHITE], b.colors[BLACK], b.zobrist)
