@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -186,6 +187,17 @@ func UciLoop() {
 			fmt.Println("id name Maelstrom v3.0.0")
 			fmt.Println("id author Saigautam Bonam")
 			fmt.Println("option name Hash type spin default 256 min 1 max 4096")
+
+			if TUNING_EXPOSE_UCI {
+				val := reflect.ValueOf(Params)
+				typ := val.Type()
+
+				for i := 0; i < val.NumField(); i++ {
+					name := typ.Field(i).Name
+					defaultVal := val.Field(i).Int()
+					fmt.Printf("option name %s type spin default %d min 0 max 10000\n", name, defaultVal)
+				}
+			}
 			fmt.Println("uciok")
 		} else if command == "isready" {
 			fmt.Println("readyok")
@@ -210,9 +222,21 @@ func UciLoop() {
 			processGo(command, &b)
 		} else if strings.Contains(command, "setoption") {
 			words := strings.Split(command, " ")
-			if len(words) >= 5 && words[1] == "name" && words[2] == "Hash" && words[3] == "value" {
-				ttSize, _ = strconv.ParseInt(words[4], 10, 64)
-				InitializeTT(int(ttSize))
+			if len(words) >= 5 && words[1] == "name" && words[3] == "value" {
+				paramName := words[2]
+				paramValue, err := strconv.Atoi(words[4])
+				if err != nil {
+					fmt.Println("info string invalid value")
+					return
+				}
+
+				pVal := reflect.ValueOf(&Params).Elem()
+				pField := pVal.FieldByName(paramName)
+				if pField.IsValid() && pField.CanSet() && pField.Kind() == reflect.Int {
+					pField.SetInt(int64(paramValue))
+				} else if paramName == "Hash" {
+					InitializeTT(paramValue)
+				}
 			}
 		} else if command == "d" {
 			// Debug command to print current position
