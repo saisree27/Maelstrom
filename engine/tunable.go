@@ -27,3 +27,5 @@ var Params = SearchParams{
 	LMR_MIN_DEPTH:       2,
 	NMP_MIN_DEPTH:       2,
 }
+
+var TUNING_EXPOSE_UCI = false

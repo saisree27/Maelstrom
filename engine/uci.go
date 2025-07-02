@@ -187,13 +187,16 @@ func UciLoop() {
 			fmt.Println("id name Maelstrom v3.0.0")
 			fmt.Println("id author Saigautam Bonam")
 			fmt.Println("option name Hash type spin default 256 min 1 max 4096")
-			val := reflect.ValueOf(Params)
-			typ := val.Type()
 
-			for i := 0; i < val.NumField(); i++ {
-				name := typ.Field(i).Name
-				defaultVal := val.Field(i).Int()
-				fmt.Printf("option name %s type spin default %d min 0 max 10000\n", name, defaultVal)
+			if TUNING_EXPOSE_UCI {
+				val := reflect.ValueOf(Params)
+				typ := val.Type()
+
+				for i := 0; i < val.NumField(); i++ {
+					name := typ.Field(i).Name
+					defaultVal := val.Field(i).Int()
+					fmt.Printf("option name %s type spin default %d min 0 max 10000\n", name, defaultVal)
+				}
 			}
 			fmt.Println("uciok")
 		} else if command == "isready" {
