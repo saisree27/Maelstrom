@@ -205,6 +205,8 @@ func UciLoop() {
 			b = Board{}
 			b.InitStartPos()
 			ClearTT()
+			ClearHistory()
+			ClearKillers()
 		} else if command == "quit" {
 			os.Exit(0)
 		} else if command == "stop" {

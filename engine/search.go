@@ -407,6 +407,27 @@ func updateHistory(move Move, color Color, bonus int) {
 	HistoryTable[color][move.from][move.to] += bonus - HistoryTable[color][move.from][move.to]*absBonus/HISTORY_MAX_BONUS
 }
 
+func ClearKillers() {
+	for i := 0; i < len(KillerMovesTable); i++ {
+		KillerMovesTable[i][0] = Move{}
+		KillerMovesTable[i][1] = Move{}
+	}
+}
+
+func ClearHistory() {
+	HistoryTable = [2][64][64]int{}
+}
+
+func HalfHistory() {
+	for c := 0; c < 2; c++ {
+		for from := 0; from < 64; from++ {
+			for to := 0; to < 64; to++ {
+				HistoryTable[c][from][to] /= 2
+			}
+		}
+	}
+}
+
 func InitializeLMRTable() {
 	for depth := 1; depth <= 100; depth++ {
 		for moveCnt := 1; moveCnt <= 100; moveCnt++ {
@@ -439,6 +460,7 @@ func SearchWithTime(b *Board, movetime int64) Move {
 
 	// Set prevBest to first legal move in case search is stopped immediately
 	prevBest := legalMoves[0]
+	HalfHistory()
 
 	for i := 1; i <= 100; i++ {
 		NodesSearched = 0
