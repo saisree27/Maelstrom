@@ -60,6 +60,10 @@ func QuiescenceSearch(b *Board, alpha int, beta int, c Color) int {
 
 	for mvCnt, _ := range moves {
 		move := selectMove(mvCnt, moves, b, Move{}, 0)
+		if move.movetype != CAPTURE_AND_PROMOTION && see(b, move) < 0 {
+			continue
+		}
+
 		b.MakeMove(move)
 		score := -QuiescenceSearch(b, -beta, -alpha, ReverseColor(c))
 		b.Undo()
