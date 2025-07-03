@@ -181,6 +181,9 @@ func TestPerftNNUE(t *testing.T) {
 
 	fmt.Println("\n4: 23527")
 	RunPerfTestsNNUECheck(t, "8/8/2k5/5q2/5n2/8/5K2/8 b - - 0 1", 4, 23527)
+
+	fmt.Println("\n6: 3821001")
+	RunPerfTestsNNUECheck(t, "2K2r2/4P3/8/8/8/8/8/3k4 w - - 0 1", 6, 3821001)
 }
 
 func TestEvalConsistencyAfterUpdate(t *testing.T) {
