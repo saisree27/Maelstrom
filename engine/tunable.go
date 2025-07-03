@@ -1,6 +1,6 @@
 package engine
 
-type SearchParams struct {
+type TunableParameters struct {
 	RFP_MULT            int
 	RFP_MAX_DEPTH       int
 	RAZORING_MULT       int
@@ -12,9 +12,12 @@ type SearchParams struct {
 	IIR_DEPTH_REDUCTION int
 	LMR_MIN_DEPTH       int
 	NMP_MIN_DEPTH       int
+	TIME_DIVISOR        int64
+	INC_FRACTION        int64
+	HARD_LIMIT_MULT     int64
 }
 
-var Params = SearchParams{
+var Params = TunableParameters{
 	RFP_MULT:            132,
 	RFP_MAX_DEPTH:       9,
 	RAZORING_MULT:       228,
@@ -26,6 +29,9 @@ var Params = SearchParams{
 	IIR_DEPTH_REDUCTION: 1,
 	LMR_MIN_DEPTH:       2,
 	NMP_MIN_DEPTH:       2,
+	TIME_DIVISOR:        25,
+	INC_FRACTION:        2,
+	HARD_LIMIT_MULT:     2,
 }
 
 var TUNING_EXPOSE_UCI = false

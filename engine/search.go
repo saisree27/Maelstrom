@@ -34,25 +34,14 @@ var HistoryTable = [2][64][64]int{}
 
 var NodesSearched = 0
 
-// Global variables for PVS to keep track of search time
-// Defaults to 10 sec/search but these values are changed in searchWithTime
-var SearchStartTime time.Time = time.Now()
-var AllowedTime int64 = 10000
-var SearchStop = false
-
 func QuiescenceSearch(b *Board, alpha int, beta int, c Color) int {
 	NodesSearched++
 
-	// Check for stop signal
-	select {
-	case <-StopChannel:
-		SearchStop = true
-		return 0
-	default:
-		// Continue search
+	if NodesSearched%2047 == 0 {
+		Timer.CheckPVS()
 	}
 
-	if SearchStop {
+	if Timer.Stop {
 		return 0
 	}
 
@@ -75,7 +64,7 @@ func QuiescenceSearch(b *Board, alpha int, beta int, c Color) int {
 		score := -QuiescenceSearch(b, -beta, -alpha, ReverseColor(c))
 		b.Undo()
 
-		if SearchStop {
+		if Timer.Stop {
 			return 0
 		}
 
@@ -132,22 +121,11 @@ func selectMove(idx int, moves []Move, b *Board, pv Move, depth int) Move {
 func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool, line *[]Move) int {
 	NodesSearched++
 
-	// Check for stop signal
-	select {
-	case <-StopChannel:
-		SearchStop = true
-		return 0
-	default:
-		// Continue search
+	if NodesSearched%2047 == 0 {
+		Timer.CheckPVS()
 	}
 
-	if SearchStop {
-		return 0
-	}
-
-	if NodesSearched%2047 == 0 && time.Since(SearchStartTime).Milliseconds() > AllowedTime {
-		fmt.Printf("stopping search after %d\n", time.Since(SearchStartTime).Milliseconds())
-		SearchStop = true
+	if Timer.Stop {
 		return 0
 	}
 
@@ -239,7 +217,7 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 
 			childPV = []Move{}
 
-			if SearchStop {
+			if Timer.Stop {
 				return 0
 			}
 
@@ -339,7 +317,7 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 
 		b.Undo()
 
-		if SearchStop {
+		if Timer.Stop {
 			return 0
 		}
 
@@ -378,7 +356,7 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		childPV = []Move{}
 	}
 
-	if !SearchStop {
+	if !Timer.Stop {
 		StoreEntry(b, bestScore, ttFlag, bestMove, uint8(depth))
 	}
 
@@ -407,6 +385,27 @@ func updateHistory(move Move, color Color, bonus int) {
 	HistoryTable[color][move.from][move.to] += bonus - HistoryTable[color][move.from][move.to]*absBonus/HISTORY_MAX_BONUS
 }
 
+func ClearKillers() {
+	for i := 0; i < len(KillerMovesTable); i++ {
+		KillerMovesTable[i][0] = Move{}
+		KillerMovesTable[i][1] = Move{}
+	}
+}
+
+func ClearHistory() {
+	HistoryTable = [2][64][64]int{}
+}
+
+func HalfHistory() {
+	for c := 0; c < 2; c++ {
+		for from := 0; from < 64; from++ {
+			for to := 0; to < 64; to++ {
+				HistoryTable[c][from][to] /= 2
+			}
+		}
+	}
+}
+
 func InitializeLMRTable() {
 	for depth := 1; depth <= 100; depth++ {
 		for moveCnt := 1; moveCnt <= 100; moveCnt++ {
@@ -416,13 +415,9 @@ func InitializeLMRTable() {
 	}
 }
 
-// SearchWithTime searches for the best move given a time constraint
-func SearchWithTime(b *Board, movetime int64) Move {
-	fmt.Printf("searching for movetime %d\n", movetime)
-
-	SearchStartTime = time.Now()
-	AllowedTime = movetime
-	SearchStop = false
+func SearchPosition(b *Board) Move {
+	Timer.StartSearch()
+	Timer.PrintConditions()
 
 	line := []Move{}
 	legalMoves := b.GenerateLegalMoves()
@@ -440,7 +435,10 @@ func SearchWithTime(b *Board, movetime int64) Move {
 	// Set prevBest to first legal move in case search is stopped immediately
 	prevBest := legalMoves[0]
 
-	for i := 1; i <= 100; i++ {
+	// Half the history heuristic values after each search
+	HalfHistory()
+
+	for depth := 1; depth <= 100; depth++ {
 		NodesSearched = 0
 		searchStart := time.Now()
 
@@ -451,7 +449,7 @@ func SearchWithTime(b *Board, movetime int64) Move {
 		alphaWindowSize := -25
 		betaWindowSize := 25
 
-		if i > 5 {
+		if depth > 5 {
 			alpha = prevScore + alphaWindowSize
 			beta = prevScore + betaWindowSize
 		}
@@ -460,9 +458,9 @@ func SearchWithTime(b *Board, movetime int64) Move {
 
 		// Aspiration window search with exponentially-widening research on fail
 		for {
-			score = Pvs(b, i, i, alpha, beta, b.turn, true, &line)
-			if SearchStop {
-				fmt.Printf("returning prev best move after %d\n", time.Since(SearchStartTime).Milliseconds())
+			score = Pvs(b, depth, depth, alpha, beta, b.turn, true, &line)
+			if Timer.Stop {
+				fmt.Printf("returning prev best move after %d\n", Timer.Delta())
 				return prevBest
 			}
 
@@ -491,13 +489,19 @@ func SearchWithTime(b *Board, movetime int64) Move {
 		}
 
 		nps := NodesSearched * 1000000000 / Max(int(timeTakenNanoSeconds), 1)
-		fmt.Printf("info depth %d nodes %d time %d score cp %d nps %d pv%s\n", i, NodesSearched, timeTaken, score, nps, strLine)
+		fmt.Printf("info depth %d nodes %d time %d score cp %d nps %d pv%s\n", depth, NodesSearched, timeTaken, score, nps, strLine)
 
 		if score == WIN_VAL || score == -WIN_VAL {
 			return line[0]
 		}
 
 		prevBest = line[0]
+
+		Timer.CheckID(depth)
+		if Timer.Stop {
+			fmt.Printf("returning prev best move after %d\n", Timer.Delta())
+			return prevBest
+		}
 	}
 	return prevBest
 }

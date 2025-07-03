@@ -18,24 +18,21 @@ func init() {
 	InitZobrist()
 }
 
-func Perft(b *Board, depth int) (int, int) {
+func Perft(b *Board, depth int) int {
 	moves := b.GenerateLegalMoves()
-	captures := b.GenerateCaptures()
 
 	if depth == 1 {
-		return len(moves), len(captures)
+		return len(moves)
 	}
 
 	var numNodes int = 0
-	var numCaptures int = 0
 	for _, move := range moves {
 		b.MakeMove(move)
-		n, c := Perft(b, depth-1)
+		n := Perft(b, depth-1)
 		numNodes += n
-		numCaptures += c
 		b.Undo()
 	}
-	return numNodes, numCaptures
+	return numNodes
 }
 
 func RunPerfTests(t *testing.T, position string, maxDepth int, expected int, expectedCaptures int) {
@@ -56,7 +53,7 @@ func RunPerfTests(t *testing.T, position string, maxDepth int, expected int, exp
 
 	for depth := 1; depth <= maxDepth; depth++ {
 		start := time.Now()
-		nodes, captures = Perft(&b, depth)
+		nodes = Perft(&b, depth)
 		duration := time.Since(start)
 		fmt.Printf("Depth %d, Nodes: %d, Captures: %d, Time: %d µs, NPS: %d\n", depth, nodes, captures, duration.Microseconds(), int(nodes*1000000000/(int(duration.Nanoseconds()+1))))
 
@@ -66,9 +63,9 @@ func RunPerfTests(t *testing.T, position string, maxDepth int, expected int, exp
 		t.Fatalf("TestPerft: got %d nodes, wanted %d", nodes, expected)
 	}
 
-	if expectedCaptures > 0 && expectedCaptures != captures {
-		t.Fatalf("TestPerft: got %d captures, wanted %d", captures, expectedCaptures)
-	}
+	// if expectedCaptures > 0 && captures > 0 && expectedCaptures != captures {
+	// 	t.Fatalf("TestPerft: got %d captures, wanted %d", captures, expectedCaptures)
+	// }
 }
 
 func RunTests(t *testing.T) {

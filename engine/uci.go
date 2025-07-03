@@ -7,15 +7,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"sync"
 )
-
-// Global channel to signal search stop
-var StopChannel chan struct{}
-var SearchMutex sync.Mutex
-var IsSearching bool
-var UseOpeningBook bool = false
-var UseTablebase bool = false
 
 func processPosition(command string) Board {
 	b := Board{}
@@ -52,23 +44,10 @@ func processPosition(command string) Board {
 }
 
 func processGo(command string, b *Board) {
-	SearchMutex.Lock()
-	if IsSearching {
-		SearchMutex.Unlock()
-		return
-	}
-	IsSearching = true
-	SearchMutex.Unlock()
-
-	// Create a new stop channel for this search
-	StopChannel = make(chan struct{})
-
 	words := strings.Split(command, " ")
 
-	var wtime, btime, winc, binc, depth, movetime int64
+	var wtime, btime, winc, binc, depth, movetime, nodes, movestogo int64
 	var infinite bool
-	movetimeSet := false
-	movesToGo := int64(-1)
 
 	for i := 0; i < len(words); i++ {
 		switch words[i] {
@@ -79,9 +58,13 @@ func processGo(command string, b *Board) {
 				depth, _ = strconv.ParseInt(words[i+1], 10, 64)
 				i++
 			}
+		case "nodes":
+			if i+1 < len(words) {
+				nodes, _ = strconv.ParseInt(words[i+1], 10, 64)
+				i++
+			}
 		case "movetime":
 			if i+1 < len(words) {
-				movetimeSet = true
 				movetime, _ = strconv.ParseInt(words[i+1], 10, 64)
 				i++
 			}
@@ -107,66 +90,18 @@ func processGo(command string, b *Board) {
 			}
 		case "movestogo":
 			if i+1 < len(words) {
-				movesToGo, _ = strconv.ParseInt(words[i+1], 10, 64)
+				movestogo, _ = strconv.ParseInt(words[i+1], 10, 64)
 				i++
 			}
 		}
 	}
 
+	Timer.Calculate(b.turn, wtime, btime, winc, binc, movestogo, depth, nodes, movetime, infinite)
+
 	// Start search in a goroutine
 	go func() {
-		var bestMove Move
-
-		if infinite {
-			movetime = 1000000000 // Use a very large time for infinite search
-		} else if depth > 0 {
-			movetime = 1000000000 // Use a very large time when searching to a specific depth
-		} else if movetimeSet {
-			// Use specified movetime
-		} else if movesToGo > 0 {
-			if b.turn == WHITE {
-				movetime = wtime/movesToGo - 400
-			} else {
-				movetime = btime/movesToGo - 400
-			}
-		} else {
-			// Calculate time based on remaining time and increment
-			if b.turn == WHITE {
-				if winc >= 0 {
-					movetime = wtime/25 + winc - 200
-				} else {
-					movetime = wtime / 30
-				}
-
-				// Just to ensure engine doesn't flag when playing on lichess
-				if movetime > wtime-500 {
-					fmt.Println("shortening movetime to avoid flagging")
-					movetime = wtime - 500
-				}
-			} else {
-				if binc >= 0 {
-					movetime = btime/25 + binc - 200
-				} else {
-					movetime = btime / 30
-				}
-
-				// Just to ensure engine doesn't flag when playing on lichess
-				if movetime > btime-500 {
-					fmt.Println("shortening movetime to avoid flagging")
-					movetime = btime - 500
-				}
-			}
-		}
-
-		bestMove = SearchWithTime(b, movetime)
-
-		// Only output bestmove if we're still searching (i.e., not stopped)
-		SearchMutex.Lock()
-		if IsSearching {
-			fmt.Println("bestmove " + bestMove.ToUCI())
-		}
-		IsSearching = false
-		SearchMutex.Unlock()
+		bestMove := SearchPosition(b)
+		fmt.Println("bestmove " + bestMove.ToUCI())
 	}()
 }
 
@@ -205,14 +140,12 @@ func UciLoop() {
 			b = Board{}
 			b.InitStartPos()
 			ClearTT()
+			ClearHistory()
+			ClearKillers()
 		} else if command == "quit" {
 			os.Exit(0)
 		} else if command == "stop" {
-			SearchMutex.Lock()
-			if IsSearching && StopChannel != nil {
-				close(StopChannel)
-			}
-			SearchMutex.Unlock()
+			Timer.Stop = true
 		} else if command == "ponderhit" {
 			// Currently we don't support pondering, so treat it like a regular move
 			continue
