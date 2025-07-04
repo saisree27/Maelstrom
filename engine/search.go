@@ -16,6 +16,7 @@ const PROMOTION_BONUS = 800000
 const FIRST_KILLER_MOVE_BONUS = 600000
 const SECOND_KILLER_MOVE_BONUS = 590000
 const HISTORY_MAX_BONUS = 16384
+const BAD_CAPTURE_BONUS = 1000
 
 var MVV_LVA_TABLE = [7][7]int{
 	{15, 13, 14, 12, 11, 10, 0}, // victim P, attacker P, B, N, R, Q, K, Empty
@@ -89,8 +90,20 @@ func moveScore(b *Board, mv Move, pv Move, depth int) int {
 	}
 
 	if mv.movetype == CAPTURE || mv.movetype == CAPTURE_AND_PROMOTION {
-		score := MVV_LVA_TABLE[PieceToPieceType(mv.captured)][PieceToPieceType(mv.piece)]
-		return MVV_LVA_BONUS + score
+		// SEE + MVV/LVA move ordering
+		// Rank bad SEE captures below quiets
+		if mv.movetype == CAPTURE {
+			seeScore := see(b, mv)
+			if seeScore < 0 {
+				return Max(BAD_CAPTURE_BONUS+seeScore, 1)
+			} else {
+				score := MVV_LVA_TABLE[PieceToPieceType(mv.captured)][PieceToPieceType(mv.piece)]
+				return MVV_LVA_BONUS + score + seeScore
+			}
+		} else {
+			score := MVV_LVA_TABLE[PieceToPieceType(mv.captured)][PieceToPieceType(mv.piece)]
+			return MVV_LVA_BONUS + score
+		}
 	} else if mv.movetype == PROMOTION {
 		return PROMOTION_BONUS // Promotions are valuable
 	} else {
