@@ -58,7 +58,7 @@ func QuiescenceSearch(b *Board, alpha int, beta int, c Color) int {
 
 	moves := b.GenerateCaptures()
 
-	for mvCnt, _ := range moves {
+	for mvCnt := range moves {
 		move := selectMove(mvCnt, moves, b, Move{}, 0)
 		if move.movetype != CAPTURE_AND_PROMOTION && see(b, move) < 0 {
 			continue
@@ -267,6 +267,10 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		isQuiet := move.movetype == QUIET || move.movetype == K_CASTLE || move.movetype == Q_CASTLE
 
 		if isQuiet {
+			// SEE pruning of quiet moves
+			if !isPv && bestScore > -WIN_VAL+100 && depth <= Params.SEE_QUIET_PRUNING_MAX_DEPTH && see(b, move) < -Params.SEE_QUIET_PRUNING_MULT*depth {
+				continue
+			}
 			quietsSearched = append(quietsSearched, move)
 		}
 

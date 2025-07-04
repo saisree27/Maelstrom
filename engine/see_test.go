@@ -35,12 +35,12 @@ func TestSee(t *testing.T) {
 		b := Board{}
 		b.InitFEN(fen + " 0 1")
 		move := FromUCI(uci, &b)
-		if move.movetype == QUIET || move.movetype == PROMOTION || move.movetype == K_CASTLE || move.movetype == Q_CASTLE || move.movetype == CAPTURE_AND_PROMOTION {
-			fmt.Println("skipping since move isn't a capture")
+
+		if move.promote != EMPTY {
+			fmt.Println("skip promotion")
 			continue
 		}
 
-		b.PrintFromBitBoards()
 		res := see(&b, move)
 
 		fmt.Printf("\n\n")

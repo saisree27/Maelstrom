@@ -78,6 +78,8 @@ func FromUCI(uci string, b *Board) Move {
 			m.movetype = CAPTURE
 		}
 		m.captured = b.squares[to]
+	} else {
+		m.captured = EMPTY
 	}
 
 	if (from == E1 && to == G1 && m.piece == W_K) || (from == E8 && to == G8 && m.piece == B_K) {
@@ -93,6 +95,7 @@ func FromUCI(uci string, b *Board) Move {
 
 	if m.piece == W_P && !(oneSquare || twoSquares) && m.movetype == QUIET {
 		m.movetype = EN_PASSANT
+		m.captured = B_P
 	}
 
 	oneSquare = int(to-from) == int(SOUTH)
@@ -100,6 +103,7 @@ func FromUCI(uci string, b *Board) Move {
 
 	if m.piece == B_P && !(oneSquare || twoSquares) && m.movetype == QUIET {
 		m.movetype = EN_PASSANT
+		m.captured = W_P
 	}
 
 	return m

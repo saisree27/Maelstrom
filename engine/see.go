@@ -16,8 +16,6 @@ var SEE_PIECE_VALUES = [6]int{
 //	capture the square the move went to. Once we do this until there are no more captures left to that square,
 //	we'll have a decent idea how much this capture gains/loses material.
 //
-//	NOTE - currently doesn't work for quiet moves, promotions, or promotions which capture a piece
-//
 // Pseudocode implementation from https://www.chessprogramming.org/SEE_-_The_Swap_Algorithm
 func see(b *Board, move Move) int {
 	gain := [32]int{}
@@ -28,11 +26,15 @@ func see(b *Board, move Move) int {
 	attadef := b.AllAttackersOf(move.to, occ)
 
 	stm := ReverseColor(b.turn)
-	target := PieceToPieceType(move.captured)
+	initial_gain := 0
+	if move.captured != EMPTY {
+		initial_gain += SEE_PIECE_VALUES[PieceToPieceType(move.captured)]
+	}
+
 	attacker := PieceToPieceType(move.piece)
 	seen := u64(0)
 
-	gain[d] = SEE_PIECE_VALUES[target]
+	gain[d] = initial_gain
 
 	for fromSet != 0 {
 		d++
