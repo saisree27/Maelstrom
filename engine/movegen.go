@@ -575,7 +575,7 @@ func (b *Board) GenerateCaptures() []Move {
 			unpinnedPawns := pawns & ^pinned
 			for unpinnedPawns != 0 {
 				lsb := Square(PopLSB(&unpinnedPawns))
-				move := Move{from: lsb, to: b.enPassant, movetype: EN_PASSANT, captured: b.squares[b.enPassant], colorMoved: player, piece: b.squares[lsb]}
+				move := Move{from: lsb, to: b.enPassant, movetype: EN_PASSANT, captured: ternary(player == WHITE, B_P, W_P), colorMoved: player, piece: b.squares[lsb]}
 
 				b.MakeMoveNoUpdate(move)
 				if !b.IsCheck(player) {
@@ -590,10 +590,31 @@ func (b *Board) GenerateCaptures() []Move {
 			pinnedPawns := pawns & pinned & LINE[b.enPassant][playerKing]
 			if pinnedPawns != 0 {
 				sq := Square(BitScanForward(pinnedPawns))
-				m = append(m, Move{from: sq, to: b.enPassant, movetype: EN_PASSANT, captured: b.squares[b.enPassant], colorMoved: player, piece: b.squares[sq]})
+				m = append(m, Move{from: sq, to: b.enPassant, movetype: EN_PASSANT, captured: ternary(player == WHITE, B_P, W_P), colorMoved: player, piece: b.squares[sq]})
 			}
 		}
 	}
 
 	return m
+}
+
+func (b *Board) AllAttackersOf(sq Square, occ u64) u64 {
+	allAttackers := u64(0)
+	allAttackers |= (b.pieces[W_Q] | b.pieces[W_R] | b.pieces[B_Q] | b.pieces[B_R]) & RookAttacks(sq, occ)
+	allAttackers |= (b.pieces[W_Q] | b.pieces[W_B] | b.pieces[B_Q] | b.pieces[B_B]) & BishopAttacks(sq, occ)
+	allAttackers |= (b.pieces[W_N] | b.pieces[B_N]) & KnightAttacks(sq)
+	allAttackers |= (b.pieces[W_K] | b.pieces[B_K]) & KingAttacks(sq)
+
+	// reverse the attack colors so we can get pawn attacks FROM a square
+	allAttackers |= b.pieces[W_P] & BLACK_PAWN_ATTACKS_LOOKUP[sq]
+	allAttackers |= b.pieces[B_P] & WHITE_PAWN_ATTACKS_LOOKUP[sq]
+
+	return allAttackers
+}
+
+func (b *Board) XRayAttacks(sq Square, occ u64) u64 {
+	allAttackers := u64(0)
+	allAttackers |= (b.pieces[W_Q] | b.pieces[W_R] | b.pieces[B_Q] | b.pieces[B_R]) & RookAttacks(sq, occ)
+	allAttackers |= (b.pieces[W_Q] | b.pieces[W_B] | b.pieces[B_Q] | b.pieces[B_B]) & BishopAttacks(sq, occ)
+	return allAttackers
 }

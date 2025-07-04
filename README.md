@@ -80,6 +80,7 @@ cutechess-cli -engine proto=uci cmd={BINARY_TO_TEST} name={TEST_NAME} -engine pr
   - [Viridithas](https://github.com/cosmobobak/viridithas)
   - [Alexandria](https://github.com/PGG106/Alexandria)
   - [Stash](https://gitlab.com/mhouppin/stash-bot)
+  - [Starzix](https://github.com/zzzzz151/Starzix)
   - and many more open-source engines, these are just the ones I can name off the top of my head!
 - [bullet](https://github.com/jw1912/bullet) for allowing me to easily train the NNUE.
 - Engine Programmers and Stockfish discord servers for their huge knowledge base/resources and advice.
