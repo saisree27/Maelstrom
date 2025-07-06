@@ -35,6 +35,8 @@ var HistoryTable = [2][64][64]int{}
 
 var NodesSearched = 0
 
+var PonderMove Move
+
 func QuiescenceSearch(b *Board, alpha int, beta int, c Color) int {
 	NodesSearched++
 
@@ -189,7 +191,7 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		//    2. Not in PV node
 		//    3. TT move exists and is not a capture
 		// More info: https://www.chessprogramming.org/Reverse_Futility_Pruning
-		if depth <= Params.RFP_MAX_DEPTH && bestMove.from != 0 && bestMove.movetype != CAPTURE && beta > -WIN_VAL-100 {
+		if depth <= Params.RFP_MAX_DEPTH && bestMove.from != bestMove.to && bestMove.movetype != CAPTURE && beta > -WIN_VAL-100 {
 			margin := Params.RFP_MULT * depth
 			if staticEval-margin >= beta {
 				return beta + (staticEval-beta)/2
@@ -252,7 +254,7 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	//    1. TT move not found
 	//    2. Depth is greater than some limit
 	//    3. Is in a PV node
-	if bestMove.from == 0 && depth >= Params.IIR_MIN_DEPTH && isPv {
+	if bestMove.from == bestMove.to && depth >= Params.IIR_MIN_DEPTH && isPv {
 		depth -= Params.IIR_DEPTH_REDUCTION
 	}
 
@@ -438,7 +440,14 @@ func InitializeLMRTable() {
 
 func SearchPosition(b *Board) Move {
 	Timer.StartSearch()
-	Timer.PrintConditions()
+
+	if IS_PONDERING {
+		fmt.Println("pondering")
+	}
+
+	if !IS_PONDERING {
+		Timer.PrintConditions()
+	}
 
 	line := []Move{}
 	legalMoves := b.GenerateLegalMoves()
@@ -481,7 +490,9 @@ func SearchPosition(b *Board) Move {
 		for {
 			score = Pvs(b, depth, depth, alpha, beta, b.turn, true, &line)
 			if Timer.Stop {
-				fmt.Printf("returning prev best move after %d\n", Timer.Delta())
+				if !IS_PONDERING {
+					fmt.Printf("returning prev best move after %d\n", Timer.Delta())
+				}
 				return prevBest
 			}
 
@@ -510,17 +521,31 @@ func SearchPosition(b *Board) Move {
 		}
 
 		nps := NodesSearched * 1000000000 / Max(int(timeTakenNanoSeconds), 1)
-		fmt.Printf("info depth %d nodes %d time %d score cp %d nps %d pv%s\n", depth, NodesSearched, timeTaken, score, nps, strLine)
+
+		if !IS_PONDERING {
+			fmt.Printf("info depth %d nodes %d time %d score cp %d nps %d pv%s\n", depth, NodesSearched, timeTaken, score, nps, strLine)
+		}
 
 		if score == WIN_VAL || score == -WIN_VAL {
-			return line[0]
+			// Don't return out of search early if pondering
+			if !IS_PONDERING {
+				return line[0]
+			}
 		}
 
 		prevBest = line[0]
 
+		if len(line) > 1 {
+			PonderMove = line[1]
+		} else {
+			PonderMove = Move{}
+		}
+
 		Timer.CheckID(depth)
 		if Timer.Stop {
-			fmt.Printf("returning prev best move after %d\n", Timer.Delta())
+			if !IS_PONDERING {
+				fmt.Printf("returning prev best move after %d\n", Timer.Delta())
+			}
 			return prevBest
 		}
 	}
