@@ -16,7 +16,7 @@ const PROMOTION_BONUS = 800000
 const FIRST_KILLER_MOVE_BONUS = 600000
 const SECOND_KILLER_MOVE_BONUS = 590000
 const HISTORY_MAX_BONUS = 16384
-const BAD_CAPTURE_BONUS = 1000
+const BAD_CAPTURE_BONUS = -32768
 
 var MVV_LVA_TABLE = [7][7]int{
 	{15, 13, 14, 12, 11, 10, 0}, // victim P, attacker P, B, N, R, Q, K, Empty
@@ -91,20 +91,19 @@ func moveScore(b *Board, mv Move, pv Move, depth int) int {
 		return PV_MOVE_BONUS
 	}
 
-	if mv.movetype == CAPTURE || mv.movetype == CAPTURE_AND_PROMOTION {
+	if mv.movetype == CAPTURE || mv.movetype == CAPTURE_AND_PROMOTION || mv.movetype == EN_PASSANT {
+		mvvLvaScore := MVV_LVA_TABLE[PieceToPieceType(mv.captured)][PieceToPieceType(mv.piece)]
 		// SEE + MVV/LVA move ordering
 		// Rank bad SEE captures below quiets
-		if mv.movetype == CAPTURE {
-			seeScore := see(b, mv)
-			if seeScore < 0 {
-				return Max(BAD_CAPTURE_BONUS+seeScore, 1)
+		if mv.movetype != CAPTURE_AND_PROMOTION {
+			if see(b, mv) < 0 {
+				// Bad SEE capture
+				return BAD_CAPTURE_BONUS + mvvLvaScore
 			} else {
-				score := MVV_LVA_TABLE[PieceToPieceType(mv.captured)][PieceToPieceType(mv.piece)]
-				return MVV_LVA_BONUS + score + seeScore
+				return MVV_LVA_BONUS + mvvLvaScore
 			}
 		} else {
-			score := MVV_LVA_TABLE[PieceToPieceType(mv.captured)][PieceToPieceType(mv.piece)]
-			return MVV_LVA_BONUS + score
+			return MVV_LVA_BONUS + mvvLvaScore
 		}
 	} else if mv.movetype == PROMOTION {
 		return PROMOTION_BONUS // Promotions are valuable
@@ -151,6 +150,8 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	isPv := beta > alpha+1
 	isRoot := depth == rd
 	check := b.IsCheck(c)
+
+	// CHECK EXTENSION
 	if check && depth < 100 {
 		depth++
 	}
@@ -280,29 +281,36 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		move := selectMove(mvCnt, legalMoves, b, pvMove, depth)
 
 		isQuiet := move.movetype == QUIET || move.movetype == K_CASTLE || move.movetype == Q_CASTLE
-
-		if isQuiet {
-			// SEE pruning of quiet moves
-			if !isPv && bestScore > -WIN_VAL+100 && depth <= Params.SEE_QUIET_PRUNING_MAX_DEPTH && see(b, move) < -Params.SEE_QUIET_PRUNING_MULT*depth {
-				continue
-			}
-			quietsSearched = append(quietsSearched, move)
-		}
-
 		lmrDepth := Max(depth-LMR_TABLE[depth][mvCnt+1], 0)
 
 		if !isRoot && !isPv && bestScore > -WIN_VAL+100 {
-			margin := Params.FUTILITY_MULT*lmrDepth + Params.FUTILITY_BASE
 			// FUTILITY PRUNING
-			// Motivation: We want to discard moves which have no potential of raising alpha. We use a margin to estimate
+			// Motivation: We want to discard moves which have no potential of raising alpha. We use a futilityMargin to estimate
 			//             the potential value of a move (based on depth).
 			// Conditions:
 			//    1. Quiet, seemingly unimportant move (means not a PV node)
 			//    2. Ensure we are not searching for mate
 			// https://www.chessprogramming.org/Futility_Pruning
-			if isQuiet && !check && lmrDepth <= Params.FUTILITY_MAX_DEPTH && staticEval+margin <= alpha {
+			futilityMargin := Params.FUTILITY_MULT*lmrDepth + Params.FUTILITY_BASE
+			if isQuiet && !check && lmrDepth <= Params.FUTILITY_MAX_DEPTH && staticEval+futilityMargin <= alpha {
 				continue
 			}
+
+			// SEE QUIET PRUNING
+			seeMargin := -Params.SEE_QUIET_PRUNING_MULT * lmrDepth * lmrDepth
+			if isQuiet && see(b, move) < seeMargin {
+				continue
+			}
+
+			// SEE CAPTURE PRUNING
+			seeMargin = -Params.SEE_CAPTURE_PRUNING_MULT * depth
+			if (move.movetype == CAPTURE || move.movetype == EN_PASSANT) && see(b, move) < seeMargin {
+				continue
+			}
+		}
+
+		if isQuiet {
+			quietsSearched = append(quietsSearched, move)
 		}
 
 		b.MakeMove(move)
@@ -535,10 +543,17 @@ func SearchPosition(b *Board) Move {
 
 		prevBest = line[0]
 
-		if len(line) > 1 {
-			PonderMove = line[1]
-		} else {
-			PonderMove = Move{}
+		if IS_PONDERING {
+			if len(line) > 1 {
+				PonderMove = line[1]
+			} else {
+				PonderMove = Move{}
+
+				// Attempt to get ponder move from TT
+				b.MakeMove(prevBest)
+				ProbeTT(b, -WIN_VAL-1, WIN_VAL+1, 1, &PonderMove)
+				b.Undo()
+			}
 		}
 
 		Timer.CheckID(depth)

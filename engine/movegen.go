@@ -469,7 +469,7 @@ func (b *Board) GenerateLegalMoves() []Move {
 			unpinnedPawns := pawns & ^pinned
 			for unpinnedPawns != 0 {
 				lsb := Square(PopLSB(&unpinnedPawns))
-				move := Move{from: lsb, to: b.enPassant, movetype: EN_PASSANT, captured: b.squares[b.enPassant], colorMoved: player, piece: b.squares[lsb]}
+				move := Move{from: lsb, to: b.enPassant, movetype: EN_PASSANT, captured: ternary(player == WHITE, B_P, W_P), colorMoved: player, piece: b.squares[lsb]}
 
 				b.MakeMoveNoUpdate(move)
 				if !b.IsCheck(player) {
@@ -484,7 +484,7 @@ func (b *Board) GenerateLegalMoves() []Move {
 			pinnedPawns := pawns & pinned & LINE[b.enPassant][playerKing]
 			if pinnedPawns != 0 {
 				sq := Square(BitScanForward(pinnedPawns))
-				m = append(m, Move{from: sq, to: b.enPassant, movetype: EN_PASSANT, captured: b.squares[b.enPassant], colorMoved: player, piece: b.squares[sq]})
+				m = append(m, Move{from: sq, to: b.enPassant, movetype: EN_PASSANT, captured: ternary(player == WHITE, B_P, W_P), colorMoved: player, piece: b.squares[sq]})
 			}
 		}
 	}

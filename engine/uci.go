@@ -137,6 +137,7 @@ func processGo(command string, b Board) {
 		bestMove := SearchPosition(&b)
 
 		if PONDERING_ENABLED && PonderMove.to != PonderMove.from {
+			fmt.Println("debug ponder move - " + PonderMove.ToUCI())
 			fmt.Println("bestmove " + bestMove.ToUCI() + " ponder " + PonderMove.ToUCI())
 			return
 		}
