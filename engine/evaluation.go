@@ -35,5 +35,16 @@ func EvaluateNNUE(b *Board) int {
 		eval = WIN_VAL
 	}
 
+	eval = materialScaling(b, eval)
 	return eval
+}
+
+func materialScaling(b *Board, eval int) int {
+	material := PopCount(b.pieces[W_P]|b.pieces[B_P]) * SEE_PIECE_VALUES[0]
+	material += PopCount(b.pieces[W_N]|b.pieces[B_N]) * SEE_PIECE_VALUES[1]
+	material += PopCount(b.pieces[W_B]|b.pieces[B_B]) * SEE_PIECE_VALUES[2]
+	material += PopCount(b.pieces[W_R]|b.pieces[B_R]) * SEE_PIECE_VALUES[3]
+	material += PopCount(b.pieces[W_Q]|b.pieces[B_Q]) * SEE_PIECE_VALUES[4]
+
+	return eval * (700 + material/32) / 1024
 }

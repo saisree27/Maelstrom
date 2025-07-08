@@ -1,11 +1,11 @@
 package engine
 
 var SEE_PIECE_VALUES = [6]int{
-	100,
-	300,
-	300,
-	500,
-	900,
+	Params.SEE_PAWN_VALUE,
+	Params.SEE_KNIGHT_VALUE,
+	Params.SEE_BISHOP_VALUE,
+	Params.SEE_ROOK_VALUE,
+	Params.SEE_QUEEN_VALUE,
 	WIN_VAL,
 }
 

@@ -12,6 +12,11 @@ type TunableParameters struct {
 	IIR_DEPTH_REDUCTION         int
 	LMR_MIN_DEPTH               int
 	NMP_MIN_DEPTH               int
+	SEE_PAWN_VALUE              int
+	SEE_KNIGHT_VALUE            int
+	SEE_BISHOP_VALUE            int
+	SEE_ROOK_VALUE              int
+	SEE_QUEEN_VALUE             int
 	SEE_QUIET_PRUNING_MAX_DEPTH int
 	SEE_QUIET_PRUNING_MULT      int
 	SEE_CAPTURE_PRUNING_MULT    int
@@ -32,6 +37,11 @@ var Params = TunableParameters{
 	IIR_DEPTH_REDUCTION:      1,
 	LMR_MIN_DEPTH:            2,
 	NMP_MIN_DEPTH:            2,
+	SEE_PAWN_VALUE:           100,
+	SEE_KNIGHT_VALUE:         300,
+	SEE_BISHOP_VALUE:         300,
+	SEE_ROOK_VALUE:           500,
+	SEE_QUEEN_VALUE:          900,
 	SEE_QUIET_PRUNING_MULT:   20,
 	SEE_CAPTURE_PRUNING_MULT: 100,
 	TIME_DIVISOR:             25,
@@ -39,4 +49,4 @@ var Params = TunableParameters{
 	HARD_LIMIT_MULT:          2,
 }
 
-var TUNING_EXPOSE_UCI = false
+var TUNING_EXPOSE_UCI = true
