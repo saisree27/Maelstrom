@@ -229,9 +229,9 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		// 	  3. Not in PV node
 		// More info: https://www.chessprogramming.org/Null_Move_Pruning
 		notJustPawnsAndKing := b.colors[c] ^ (b.GetColorPieces(PAWN, c) | b.GetColorPieces(KING, c))
-		if depth >= Params.NMP_MIN_DEPTH && doNull && notJustPawnsAndKing != 0 {
+		if depth >= Params.NMP_MIN_DEPTH && doNull && notJustPawnsAndKing != 0 && staticEval >= beta {
 			b.MakeNullMove()
-			R := 3 + depth/6
+			R := 4 + depth/3 + Min((staticEval-beta)/200, 3)
 			score = -Pvs(b, depth-1-R, rd, -beta, -beta+1, ReverseColor(c), false, &childPV)
 			b.UndoNullMove()
 
