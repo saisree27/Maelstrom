@@ -28,20 +28,22 @@ Maelstrom often plays on Lichess [here](https://lichess.org/@/Maelstrom-Chess). 
  - Check extensions
  - Futility pruning
  - Quiescence search
- - NNUE Evaluation using a (768->256)x2 -> 1 architecture using a SIMD SCReLU activation function, trained on Lc0/SF data. The prior release (v2.1.0) uses HCE evaluation based off PeSTO, mobility scores, bishop pair and king pawn shield.
- - UCI protocol implementation, so you can run the engine using a UCI-supported GUI such as [CuteChess](https://github.com/cutechess/cutechess/releases).
- - Time management
+ - Static Exchange Evaluation (SEE) pruning and move ordering
+ - NNUE Evaluation using a (768->256)x2 -> 1 architecture using a SIMD SCReLU activation function, trained on Lc0/SF data
+ - UCI protocol implementation, so you can run the engine using a UCI-supported GUI such as [CuteChess](https://github.com/cutechess/cutechess/releases)
+ - Time management with soft/hard bounds
 
 ## Releases
 Checkout and download binaries and source code from the Releases page.
 
 ## Elo Progression
 Table summarizing Elo progression tests documented in release notes as well as rating by CCRL. Time controls I used for testing: STC 8s+0.08s, LTC 40s+0.4s.
-|                     |   STC Elo |  LTC Elo | Estimated Elo (vs. Stash) | CCRL Blitz |
+|        Version      |   STC Elo |  LTC Elo | Estimated Elo (vs. Stash) | CCRL Blitz |
 |:-------------------:|:-----------:|:---------:|:------------:|:------------:|
-| Maelstrom v3.0.0    | +343 +/- 65.5 | +515.5 +/- 119.7 | (vs. Stash 21.2) ~2730 STC, ~2800 LTC |              |
-| Maelstrom v2.1.0    | +249 +/- 46.1 | +190.8 +/- 70.1  | |              |
-| Maelstrom v2.0.0    |              |                 | |     [2109](https://computerchess.org.uk/ccrl/404/cgi/engine_details.cgi?print=Details&each_game=1&eng=Maelstrom%202.0.0%2064-bit#Maelstrom_2_0_0_64-bit)     |
+| v3.1.0    | 258.7 +/- 51.8 | +165.7 +/- 37.6 | ~3040 |              |
+| v3.0.0    | +343 +/- 65.5 | +515.5 +/- 119.7 | ~2820 |              |
+| v2.1.0    | +249 +/- 46.1 | +190.8 +/- 70.1  | |              |
+| v2.0.0    |              |                 | |     [2109](https://computerchess.org.uk/ccrl/404/cgi/engine_details.cgi?print=Details&each_game=1&eng=Maelstrom%202.0.0%2064-bit#Maelstrom_2_0_0_64-bit)     |
 
 ## Building from Source
 Requirements:

@@ -32,7 +32,7 @@ func (uci *UCIManager) Initialize() {
 	uci.SearchThread = Searcher{}
 
 	// For SPSA tuning, ExposeTunableParameters needs to be true
-	uci.ExposeTunableParameters = true
+	uci.ExposeTunableParameters = false
 
 	// Initialize
 	InitializeEverythingExceptTTable()
@@ -214,7 +214,6 @@ func (uci *UCIManager) processGo(command string) {
 		bestMove := uci.SearchThread.SearchPosition()
 
 		if uci.PonderingEnabled && uci.SearchThread.Info.PonderMove.to != uci.SearchThread.Info.PonderMove.from {
-			fmt.Println("debug ponder move - " + uci.SearchThread.Info.PonderMove.ToUCI())
 			fmt.Println("bestmove " + bestMove.ToUCI() + " ponder " + uci.SearchThread.Info.PonderMove.ToUCI())
 			return
 		}

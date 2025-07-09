@@ -408,12 +408,6 @@ func InitializeLMRTable() {
 func (s *Searcher) SearchPosition() Move {
 	Timer.StartSearch()
 
-	if s.Info.IsPondering {
-		fmt.Println("pondering")
-	} else {
-		Timer.PrintConditions()
-	}
-
 	line := []Move{}
 	legalMoves := s.Position.GenerateLegalMoves()
 	prevScore := 0
@@ -456,9 +450,6 @@ func (s *Searcher) SearchPosition() Move {
 		for {
 			score = s.Pvs(depth, alpha, beta, true, &line)
 			if Timer.Stop {
-				if !s.Info.IsPondering {
-					fmt.Printf("returning prev best move after %d\n", Timer.Delta())
-				}
 				return prevBest
 			}
 
@@ -517,9 +508,6 @@ func (s *Searcher) SearchPosition() Move {
 
 		Timer.CheckID(&s.Info, depth)
 		if Timer.Stop {
-			if !s.Info.IsPondering {
-				fmt.Printf("returning prev best move after %d\n", Timer.Delta())
-			}
 			return prevBest
 		}
 	}
