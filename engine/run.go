@@ -28,24 +28,25 @@ func Run(command string, position string, depth int) {
 }
 
 func RunSearch(position string, depth int) {
-	b := Board{}
+	s := Searcher{}
+	s.Position = NewBoard()
 
-	if position == "startpos" {
-		b.InitStartPos()
-	} else {
+	if position != "startpos" {
 		fen := position
-		b.InitFEN(fen)
+		s.Position.InitFEN(fen)
+	} else {
+		s.Position.InitStartPos()
 	}
 
-	b.PrintFromBitBoards()
+	s.Position.PrintFromBitBoards()
 
 	for i := 1; i <= depth; i++ {
 		line := []Move{}
 
 		fmt.Printf("Depth %d: ", i)
 
-		score := Pvs(&b, i, i, -WIN_VAL-1, WIN_VAL+1, b.turn, true, &line)
-		score *= COLOR_SIGN[b.turn]
+		score := s.Pvs(i, -WIN_VAL-1, WIN_VAL+1, true, &line)
+		score *= COLOR_SIGN[s.Position.turn]
 
 		if Timer.Stop {
 			break

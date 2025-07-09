@@ -10,45 +10,35 @@ var COLOR_SIGN = [2]int{
 	WHITE: 1, BLACK: -1,
 }
 
-const PV_MOVE_BONUS = 2000000
-const MVV_LVA_BONUS = 1000000
-const PROMOTION_BONUS = 800000
-const FIRST_KILLER_MOVE_BONUS = 600000
-const SECOND_KILLER_MOVE_BONUS = 590000
-const HISTORY_MAX_BONUS = 16384
-const BAD_CAPTURE_BONUS = -32768
-
-var MVV_LVA_TABLE = [7][7]int{
-	{15, 13, 14, 12, 11, 10, 0}, // victim P, attacker P, B, N, R, Q, K, Empty
-	{35, 33, 34, 32, 31, 30, 0}, // victim B, attacker P, B, N, R, Q, K, Empty
-	{25, 23, 24, 22, 21, 20, 0}, // victim N, attacker P, B, N, R, Q, K, Empty
-	{45, 43, 44, 42, 41, 40, 0}, // victim R, attacker P, B, N, R, Q, K, Empty
-	{55, 53, 54, 52, 51, 50, 0}, // victim Q, attacker P, B, N, R, Q, K, Empty
-	{0, 0, 0, 0, 0, 0, 0},       // victim K, attacker P, B, N, R, Q, K, Empty
-	{0, 0, 0, 0, 0, 0, 0},       // victim Empty, attacker P, B, N, R, Q, K, Empty
-}
-
 var LMR_TABLE = [101][101]int{}
 
-var KillerMovesTable = [101][2]Move{}
-var HistoryTable = [2][64][64]int{}
+type SearchInfo struct {
+	NodesSearched    int
+	PonderMove       Move
+	RootDepth        int
+	IsPondering      bool
+	PonderingEnabled bool
+}
 
-var NodesSearched = 0
+type Searcher struct {
+	Position    *Board
+	KillerMoves [101][2]Move
+	History     [2][64][64]int
+	Info        SearchInfo
+}
 
-var PonderMove Move
+func (s *Searcher) QuiescenceSearch(alpha int, beta int) int {
+	s.Info.NodesSearched++
 
-func QuiescenceSearch(b *Board, alpha int, beta int, c Color) int {
-	NodesSearched++
-
-	if NodesSearched%2047 == 0 {
-		Timer.CheckPVS()
+	if s.Info.NodesSearched%2047 == 0 {
+		Timer.CheckPVS(&s.Info)
 	}
 
 	if Timer.Stop {
 		return 0
 	}
 
-	eval := EvaluateNNUE(b) * COLOR_SIGN[c]
+	eval := EvaluateNNUE(s.Position) * COLOR_SIGN[s.Position.turn]
 
 	// Beta cutoff
 	if eval >= beta {
@@ -59,17 +49,17 @@ func QuiescenceSearch(b *Board, alpha int, beta int, c Color) int {
 		alpha = eval
 	}
 
-	moves := b.GenerateCaptures()
+	moves := s.Position.GenerateCaptures()
 
 	for mvCnt := range moves {
-		move := selectMove(mvCnt, moves, b, Move{}, 0)
-		if move.movetype != CAPTURE_AND_PROMOTION && see(b, move) < 0 {
+		move := s.SelectMove(mvCnt, moves, Move{}, 0)
+		if move.movetype != CAPTURE_AND_PROMOTION && s.SEE(move) < 0 {
 			continue
 		}
 
-		b.MakeMove(move)
-		score := -QuiescenceSearch(b, -beta, -alpha, ReverseColor(c))
-		b.Undo()
+		s.Position.MakeMove(move)
+		score := -s.QuiescenceSearch(-beta, -alpha)
+		s.Position.Undo()
 
 		if Timer.Stop {
 			return 0
@@ -86,61 +76,11 @@ func QuiescenceSearch(b *Board, alpha int, beta int, c Color) int {
 	return alpha
 }
 
-func moveScore(b *Board, mv Move, pv Move, depth int) int {
-	if mv == pv {
-		return PV_MOVE_BONUS
-	}
+func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, line *[]Move) int {
+	s.Info.NodesSearched++
 
-	if mv.movetype == CAPTURE || mv.movetype == CAPTURE_AND_PROMOTION || mv.movetype == EN_PASSANT {
-		mvvLvaScore := MVV_LVA_TABLE[PieceToPieceType(mv.captured)][PieceToPieceType(mv.piece)]
-		// SEE + MVV/LVA move ordering
-		// Rank bad SEE captures below quiets
-		if mv.movetype != CAPTURE_AND_PROMOTION {
-			if see(b, mv) < 0 {
-				// Bad SEE capture
-				return BAD_CAPTURE_BONUS + mvvLvaScore
-			} else {
-				return MVV_LVA_BONUS + mvvLvaScore
-			}
-		} else {
-			return MVV_LVA_BONUS + mvvLvaScore
-		}
-	} else if mv.movetype == PROMOTION {
-		return PROMOTION_BONUS // Promotions are valuable
-	} else {
-		// Quiet moves
-		if mv == KillerMovesTable[depth][0] {
-			return FIRST_KILLER_MOVE_BONUS // First killer move
-		} else if mv == KillerMovesTable[depth][1] {
-			return SECOND_KILLER_MOVE_BONUS // Second killer move
-		} else {
-			return HistoryTable[b.turn][mv.from][mv.to]
-		}
-	}
-}
-
-// Selection-based move ordering. This is more efficient than sorting
-// all moves by score since we will likely have cutoffs early in the mvoe list.
-func selectMove(idx int, moves []Move, b *Board, pv Move, depth int) Move {
-	bestScore := moveScore(b, moves[idx], pv, depth)
-	bestIndex := idx
-	for j := idx + 1; j < len(moves); j++ {
-		score := moveScore(b, moves[j], pv, depth)
-		if score > bestScore {
-			bestScore = score
-			bestIndex = j
-		}
-	}
-
-	moves[idx], moves[bestIndex] = moves[bestIndex], moves[idx]
-	return moves[idx]
-}
-
-func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool, line *[]Move) int {
-	NodesSearched++
-
-	if NodesSearched%2047 == 0 {
-		Timer.CheckPVS()
+	if s.Info.NodesSearched%2047 == 0 {
+		Timer.CheckPVS(&s.Info)
 	}
 
 	if Timer.Stop {
@@ -148,8 +88,9 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	}
 
 	isPv := beta > alpha+1
-	isRoot := depth == rd
-	check := b.IsCheck(c)
+	isRoot := depth == s.Info.RootDepth
+	stm := s.Position.turn
+	check := s.Position.IsCheck(stm)
 
 	// CHECK EXTENSION
 	if check && depth < 100 {
@@ -157,26 +98,26 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	}
 
 	if depth <= 0 {
-		return QuiescenceSearch(b, alpha, beta, c)
+		return s.QuiescenceSearch(alpha, beta)
 	}
 
 	// Check for two-fold repetition or 50 move rule. Edge case check from Blunder:
 	// ensure that mate in 1 is not possible when checking for 50-move rule.
-	possibleCheckmate := check && rd == depth
-	if !isRoot && (b.IsTwoFold() || (b.plyCnt50 >= 100 && !possibleCheckmate)) {
+	possibleCheckmate := check && isRoot
+	if !isRoot && (s.Position.IsTwoFold() || (s.Position.plyCnt50 >= 100 && !possibleCheckmate)) {
 		// Don't store repetition positions in TT since their value depends on game history
 		return 0
 	}
 
 	bestMove := Move{}
 
-	res, score := ProbeTT(b, alpha, beta, uint8(depth), &bestMove)
+	res, score := ProbeTT(s.Position, alpha, beta, uint8(depth), &bestMove)
 	if res && !isRoot {
 		return score
 	}
 
 	// Compute static eval to be used for pruning checks
-	staticEval := EvaluateNNUE(b) * COLOR_SIGN[c]
+	staticEval := EvaluateNNUE(s.Position) * COLOR_SIGN[stm]
 
 	// Pre-allocate PV line for child nodes
 	childPV := []Move{}
@@ -211,7 +152,7 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 			razorMargin := Params.RAZORING_MULT * depth
 			if staticEval+razorMargin <= alpha {
 				// Try qsearch to verify if position is really bad
-				qScore := QuiescenceSearch(b, alpha, beta, c)
+				qScore := s.QuiescenceSearch(alpha, beta)
 				if qScore < alpha {
 					return qScore
 				}
@@ -228,12 +169,12 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		//    2. Side to move does not have just king and pawns
 		// 	  3. Not in PV node
 		// More info: https://www.chessprogramming.org/Null_Move_Pruning
-		notJustPawnsAndKing := b.colors[c] ^ (b.GetColorPieces(PAWN, c) | b.GetColorPieces(KING, c))
+		notJustPawnsAndKing := s.Position.colors[stm] ^ (s.Position.GetColorPieces(PAWN, stm) | s.Position.GetColorPieces(KING, stm))
 		if depth >= Params.NMP_MIN_DEPTH && doNull && notJustPawnsAndKing != 0 && staticEval >= beta {
-			b.MakeNullMove()
+			s.Position.MakeNullMove()
 			R := 4 + depth/3 + Min((staticEval-beta)/200, 3)
-			score = -Pvs(b, depth-1-R, rd, -beta, -beta+1, ReverseColor(c), false, &childPV)
-			b.UndoNullMove()
+			score = -s.Pvs(depth-1-R, -beta, -beta+1, false, &childPV)
+			s.Position.UndoNullMove()
 
 			childPV = []Move{}
 
@@ -264,9 +205,9 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	bestMove = Move{}
 	ttFlag := UPPER
 
-	legalMoves := b.GenerateLegalMoves()
+	legalMoves := s.Position.GenerateLegalMoves()
 	if len(legalMoves) == 0 {
-		if b.IsCheck(b.turn) {
+		if s.Position.IsCheck(stm) {
 			return -WIN_VAL
 		} else {
 			return 0
@@ -278,7 +219,7 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	for mvCnt := 0; mvCnt < len(legalMoves); mvCnt++ {
 		// BEST MOVE SELECTION (MOVE ORDERING)
 		// Motivation: If we select good moves to search first, we can prune later moves.
-		move := selectMove(mvCnt, legalMoves, b, pvMove, depth)
+		move := s.SelectMove(mvCnt, legalMoves, pvMove, depth)
 
 		isQuiet := move.movetype == QUIET || move.movetype == K_CASTLE || move.movetype == Q_CASTLE
 		lmrDepth := Max(depth-LMR_TABLE[depth][mvCnt+1], 0)
@@ -298,13 +239,13 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 
 			// SEE QUIET PRUNING
 			seeMargin := -Params.SEE_QUIET_PRUNING_MULT * lmrDepth * lmrDepth
-			if isQuiet && see(b, move) < seeMargin {
+			if isQuiet && s.SEE(move) < seeMargin {
 				continue
 			}
 
 			// SEE CAPTURE PRUNING
 			seeMargin = -Params.SEE_CAPTURE_PRUNING_MULT * depth
-			if (move.movetype == CAPTURE || move.movetype == EN_PASSANT) && see(b, move) < seeMargin {
+			if (move.movetype == CAPTURE || move.movetype == EN_PASSANT) && s.SEE(move) < seeMargin {
 				continue
 			}
 		}
@@ -313,11 +254,11 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 			quietsSearched = append(quietsSearched, move)
 		}
 
-		b.MakeMove(move)
+		s.Position.MakeMove(move)
 
 		score := 0
 		if mvCnt == 0 {
-			score = -Pvs(b, depth-1, rd, -beta, -alpha, ReverseColor(c), true, &childPV)
+			score = -s.Pvs(depth-1, -beta, -alpha, true, &childPV)
 		} else {
 			// LATE MOVE REDUCTION (LMR)
 			// Motivation: Because of move ordering, we can save time by reducing search depth of moves that are
@@ -334,19 +275,19 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 				R = Max(LMR_TABLE[depth][mvCnt+1], 0)
 			}
 
-			score = -Pvs(b, depth-1-R, rd, -alpha-1, -alpha, ReverseColor(c), true, &childPV)
+			score = -s.Pvs(depth-1-R, -alpha-1, -alpha, true, &childPV)
 
 			if score > alpha && R > 0 {
-				score = -Pvs(b, depth-1, rd, -alpha-1, -alpha, ReverseColor(c), true, &childPV)
+				score = -s.Pvs(depth-1, -alpha-1, -alpha, true, &childPV)
 				if score > alpha {
-					score = -Pvs(b, depth-1, rd, -beta, -alpha, ReverseColor(c), true, &childPV)
+					score = -s.Pvs(depth-1, -beta, -alpha, true, &childPV)
 				}
 			} else if score > alpha && score < beta {
-				score = -Pvs(b, depth-1, rd, -beta, -alpha, ReverseColor(c), true, &childPV)
+				score = -s.Pvs(depth-1, -beta, -alpha, true, &childPV)
 			}
 		}
 
-		b.Undo()
+		s.Position.Undo()
 
 		if Timer.Stop {
 			return 0
@@ -360,16 +301,16 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 		if score >= beta {
 			ttFlag = LOWER
 			if isQuiet {
-				storeKillerMove(move, depth)
+				s.storeKillerMove(move, depth)
 
 				// History bonus using history gravity formula
 				bonus := 300*depth - 250
-				updateHistory(move, b.turn, bonus)
+				s.updateHistory(move, s.Position.turn, bonus)
 
 				// Malus for all quiet moves we searched prior
 				for idx := 0; idx < len(quietsSearched)-1; idx++ {
 					move = quietsSearched[idx]
-					updateHistory(move, b.turn, -bonus)
+					s.updateHistory(move, s.Position.turn, -bonus)
 				}
 			}
 			break
@@ -388,20 +329,20 @@ func Pvs(b *Board, depth int, rd int, alpha int, beta int, c Color, doNull bool,
 	}
 
 	if !Timer.Stop {
-		StoreEntry(b, bestScore, ttFlag, bestMove, uint8(depth))
+		StoreEntry(s.Position, bestScore, ttFlag, bestMove, uint8(depth))
 	}
 
 	return bestScore
 }
 
-func storeKillerMove(move Move, depth int) {
-	if KillerMovesTable[depth][0] != move {
-		KillerMovesTable[depth][1] = KillerMovesTable[depth][0]
-		KillerMovesTable[depth][0] = move
+func (s *Searcher) storeKillerMove(move Move, depth int) {
+	if s.KillerMoves[depth][0] != move {
+		s.KillerMoves[depth][1] = s.KillerMoves[depth][0]
+		s.KillerMoves[depth][0] = move
 	}
 }
 
-func updateHistory(move Move, color Color, bonus int) {
+func (s *Searcher) updateHistory(move Move, color Color, bonus int) {
 	if bonus > HISTORY_MAX_BONUS {
 		bonus = HISTORY_MAX_BONUS
 	} else if bonus < -HISTORY_MAX_BONUS {
@@ -413,25 +354,25 @@ func updateHistory(move Move, color Color, bonus int) {
 		absBonus *= -1
 	}
 
-	HistoryTable[color][move.from][move.to] += bonus - HistoryTable[color][move.from][move.to]*absBonus/HISTORY_MAX_BONUS
+	s.History[color][move.from][move.to] += bonus - s.History[color][move.from][move.to]*absBonus/HISTORY_MAX_BONUS
 }
 
-func ClearKillers() {
-	for i := 0; i < len(KillerMovesTable); i++ {
-		KillerMovesTable[i][0] = Move{}
-		KillerMovesTable[i][1] = Move{}
+func (s *Searcher) ClearKillers() {
+	for i := 0; i < len(s.KillerMoves); i++ {
+		s.KillerMoves[i][0] = Move{}
+		s.KillerMoves[i][1] = Move{}
 	}
 }
 
-func ClearHistory() {
-	HistoryTable = [2][64][64]int{}
+func (s *Searcher) ClearHistory() {
+	s.History = [2][64][64]int{}
 }
 
-func HalfHistory() {
+func (s *Searcher) HalfHistory() {
 	for c := 0; c < 2; c++ {
 		for from := 0; from < 64; from++ {
 			for to := 0; to < 64; to++ {
-				HistoryTable[c][from][to] /= 2
+				s.History[c][from][to] /= 2
 			}
 		}
 	}
@@ -446,19 +387,17 @@ func InitializeLMRTable() {
 	}
 }
 
-func SearchPosition(b *Board) Move {
+func (s *Searcher) SearchPosition() Move {
 	Timer.StartSearch()
 
-	if IS_PONDERING {
+	if s.Info.IsPondering {
 		fmt.Println("pondering")
-	}
-
-	if !IS_PONDERING {
+	} else {
 		Timer.PrintConditions()
 	}
 
 	line := []Move{}
-	legalMoves := b.GenerateLegalMoves()
+	legalMoves := s.Position.GenerateLegalMoves()
 	prevScore := 0
 
 	if len(legalMoves) == 1 {
@@ -474,10 +413,11 @@ func SearchPosition(b *Board) Move {
 	prevBest := legalMoves[0]
 
 	// Half the history heuristic values after each search
-	HalfHistory()
+	s.HalfHistory()
 
 	for depth := 1; depth <= 100; depth++ {
-		NodesSearched = 0
+		s.Info.NodesSearched = 0
+		s.Info.RootDepth = depth
 		searchStart := time.Now()
 
 		// Aspiration windows
@@ -496,9 +436,9 @@ func SearchPosition(b *Board) Move {
 
 		// Aspiration window search with exponentially-widening research on fail
 		for {
-			score = Pvs(b, depth, depth, alpha, beta, b.turn, true, &line)
+			score = s.Pvs(depth, alpha, beta, true, &line)
 			if Timer.Stop {
-				if !IS_PONDERING {
+				if !s.Info.IsPondering {
 					fmt.Printf("returning prev best move after %d\n", Timer.Delta())
 				}
 				return prevBest
@@ -528,37 +468,37 @@ func SearchPosition(b *Board) Move {
 			strLine += " " + move.ToUCI()
 		}
 
-		nps := NodesSearched * 1000000000 / Max(int(timeTakenNanoSeconds), 1)
+		nps := s.Info.NodesSearched * 1000000000 / Max(int(timeTakenNanoSeconds), 1)
 
-		if !IS_PONDERING {
-			fmt.Printf("info depth %d nodes %d time %d score cp %d nps %d pv%s\n", depth, NodesSearched, timeTaken, score, nps, strLine)
+		if !s.Info.IsPondering {
+			fmt.Printf("info depth %d nodes %d time %d score cp %d nps %d pv%s\n", depth, s.Info.NodesSearched, timeTaken, score, nps, strLine)
 		}
 
 		if score == WIN_VAL || score == -WIN_VAL {
 			// Don't return out of search early if pondering
-			if !IS_PONDERING {
+			if !s.Info.IsPondering {
 				return line[0]
 			}
 		}
 
 		prevBest = line[0]
 
-		if IS_PONDERING {
+		if s.Info.PonderingEnabled {
 			if len(line) > 1 {
-				PonderMove = line[1]
+				s.Info.PonderMove = line[1]
 			} else {
-				PonderMove = Move{}
+				s.Info.PonderMove = Move{}
 
 				// Attempt to get ponder move from TT
-				b.MakeMove(prevBest)
-				ProbeTT(b, -WIN_VAL-1, WIN_VAL+1, 1, &PonderMove)
-				b.Undo()
+				s.Position.MakeMove(prevBest)
+				ProbeTT(s.Position, -WIN_VAL-1, WIN_VAL+1, 1, &s.Info.PonderMove)
+				s.Position.Undo()
 			}
 		}
 
-		Timer.CheckID(depth)
+		Timer.CheckID(&s.Info, depth)
 		if Timer.Stop {
-			if !IS_PONDERING {
+			if !s.Info.IsPondering {
 				fmt.Printf("returning prev best move after %d\n", Timer.Delta())
 			}
 			return prevBest

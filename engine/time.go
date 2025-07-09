@@ -103,24 +103,24 @@ func (t *TimeManager) Delta() int64 {
 }
 
 // Only called during PVS, checks hard limit timeout and nodes
-func (t *TimeManager) CheckPVS() {
+func (t *TimeManager) CheckPVS(info *SearchInfo) {
 	if t.Delta() > t.hardLimit {
 		t.Stop = true
 	}
 
-	if t.maxNodes > 0 && NodesSearched > int(t.maxNodes) {
+	if t.maxNodes > 0 && info.NodesSearched > int(t.maxNodes) {
 		t.Stop = true
 	}
 }
 
 // Called during iterative deepening, checks soft limit, nodes, current depth
 // TODO: add soft time bound scaling based on ID statistics
-func (t *TimeManager) CheckID(depth int) {
+func (t *TimeManager) CheckID(info *SearchInfo, depth int) {
 	if t.Delta() > t.softLimit {
 		t.Stop = true
 	}
 
-	if t.maxNodes > 0 && NodesSearched > int(t.maxNodes) {
+	if t.maxNodes > 0 && info.NodesSearched > int(t.maxNodes) {
 		t.Stop = true
 	}
 

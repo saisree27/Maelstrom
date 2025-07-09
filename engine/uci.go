@@ -9,11 +9,88 @@ import (
 	"strings"
 )
 
-var PONDERING_ENABLED = false
-var IS_PONDERING = false
-var PONDER_HIT = false
+type UCIManager struct {
+	Version                 string
+	Author                  string
+	SearchThread            Searcher
+	HashSize                int64
+	PonderingEnabled        bool
+	PonderHit               bool
+	TunableParams           *TunableParameters
+	ExposeTunableParameters bool
+}
 
-func processPosition(command string) Board {
+func (uci *UCIManager) Initialize() {
+	fmt.Println("initializing...")
+
+	// Set default UCI options
+	uci.HashSize = int64(256)
+	uci.PonderingEnabled = false
+	uci.TunableParams = &Params
+	uci.Version = "v3.1.0"
+	uci.Author = "Saigautam Bonam"
+	uci.SearchThread = Searcher{}
+
+	// For SPSA tuning, ExposeTunableParameters needs to be true
+	uci.ExposeTunableParameters = true
+
+	// Initialize
+	InitializeEverythingExceptTTable()
+	InitializeTT(int(uci.HashSize))
+	uci.SearchThread.Position = NewBoard()
+
+	fmt.Println("done, ready for UCI commands")
+}
+
+func (uci *UCIManager) UCI() {
+	fmt.Printf("id name Maelstrom %s\n", uci.Version)
+	fmt.Printf("id author %s\n", uci.Author)
+	fmt.Printf("option name Hash type spin default %d min 1 max 4096\n", uci.HashSize)
+	fmt.Printf("option name Ponder type check default %t\n", uci.PonderingEnabled)
+
+	if uci.ExposeTunableParameters {
+		val := reflect.ValueOf(*uci.TunableParams)
+		typ := val.Type()
+
+		for i := 0; i < val.NumField(); i++ {
+			name := typ.Field(i).Name
+			defaultVal := val.Field(i).Int()
+			fmt.Printf("option name %s type spin default %d min 0 max 10000\n", name, defaultVal)
+		}
+	}
+	fmt.Println("uciok")
+}
+
+func (uci *UCIManager) IsReady() {
+	fmt.Println("readyok")
+}
+
+func (uci *UCIManager) UCINewGame() {
+	uci.SearchThread.Position = NewBoard()
+	uci.SearchThread.ClearHistory()
+	uci.SearchThread.ClearKillers()
+	ClearTT()
+}
+
+func (uci *UCIManager) Stop() {
+	Timer.Stop = true
+}
+
+func (uci *UCIManager) PonderHitUpdate() {
+	uci.PonderHit = true
+	Timer.Stop = true
+}
+
+func (uci *UCIManager) Position(position string) {
+	Timer.Stop = true
+	*uci.SearchThread.Position = uci.processPosition(position)
+}
+
+func (uci *UCIManager) Go(options string) {
+	uci.processGo(options)
+}
+
+func (uci *UCIManager) processPosition(command string) Board {
 	b := Board{}
 	words := strings.Split(command, " ")
 	length := len(words)
@@ -47,7 +124,7 @@ func processPosition(command string) Board {
 	return b
 }
 
-func processGo(command string, b Board) {
+func (uci *UCIManager) processGo(command string) {
 	words := strings.Split(command, " ")
 
 	var wtime, btime, winc, binc, depth, movetime, nodes, movestogo int64
@@ -104,7 +181,7 @@ func processGo(command string, b Board) {
 		}
 	}
 
-	Timer.Calculate(b.turn, wtime, btime, winc, binc, movestogo, depth, nodes, movetime, infinite)
+	Timer.Calculate(uci.SearchThread.Position.turn, wtime, btime, winc, binc, movestogo, depth, nodes, movetime, infinite)
 
 	// Start search in a goroutine
 	go func() {
@@ -115,30 +192,30 @@ func processGo(command string, b Board) {
 		// - stop ...
 		// When ponderhit is sent, switch to normal search with reduced movetime
 		// When stop is sent, stop search, print bestmove and return
-		if PONDERING_ENABLED && shouldPonder && PonderMove.to != PonderMove.from {
+		if uci.PonderingEnabled && shouldPonder && uci.SearchThread.Info.PonderMove.to != uci.SearchThread.Info.PonderMove.from {
 			// Start ponder
-			IS_PONDERING = true
-			SearchPosition(&b)
-			IS_PONDERING = false
+			uci.SearchThread.Info.IsPondering = true
+			uci.SearchThread.SearchPosition()
+			uci.SearchThread.Info.IsPondering = false
 
-			if PONDER_HIT {
-				Timer.Calculate(b.turn, wtime, btime, winc, binc, movestogo, depth, nodes, movetime, false)
+			if uci.PonderHit {
+				Timer.Calculate(uci.SearchThread.Position.turn, wtime, btime, winc, binc, movestogo, depth, nodes, movetime, false)
 				// Reduce time spent since we got a ponderhit
 				Timer.softLimit /= 2
 				Timer.hardLimit /= 2
 
-				PONDER_HIT = false
+				uci.PonderHit = false
 			} else {
 				fmt.Println("bestmove")
 				return
 			}
 		}
 
-		bestMove := SearchPosition(&b)
+		bestMove := uci.SearchThread.SearchPosition()
 
-		if PONDERING_ENABLED && PonderMove.to != PonderMove.from {
-			fmt.Println("debug ponder move - " + PonderMove.ToUCI())
-			fmt.Println("bestmove " + bestMove.ToUCI() + " ponder " + PonderMove.ToUCI())
+		if uci.PonderingEnabled && uci.SearchThread.Info.PonderMove.to != uci.SearchThread.Info.PonderMove.from {
+			fmt.Println("debug ponder move - " + uci.SearchThread.Info.PonderMove.ToUCI())
+			fmt.Println("bestmove " + bestMove.ToUCI() + " ponder " + uci.SearchThread.Info.PonderMove.ToUCI())
 			return
 		}
 
@@ -146,89 +223,72 @@ func processGo(command string, b Board) {
 	}()
 }
 
-func UciLoop() {
-	fmt.Println("initializing...")
-	ttSize := int64(256)
-	InitializeEverythingExceptTTable()
-	InitializeTT(int(ttSize))
-	fmt.Println("done, ready for UCI commands")
+func (uci *UCIManager) SetOption(option string) {
+	words := strings.Split(option, " ")
+	if len(words) >= 5 && words[1] == "name" && words[3] == "value" {
+		paramName := words[2]
+		if paramName == "Hash" {
+			uci.HashSize, _ = strconv.ParseInt(words[4], 10, 64)
+			InitializeTT(int(uci.HashSize))
+			return
+		} else if paramName == "Ponder" {
+			ponder, _ := strconv.ParseBool(words[4])
+			uci.PonderingEnabled = ponder
+			uci.SearchThread.Info.PonderingEnabled = ponder
+			return
+		}
+		paramValue, err := strconv.Atoi(words[4])
+		if err != nil {
+			fmt.Println("info string invalid value")
+			return
+		}
 
-	b := Board{}
+		pVal := reflect.ValueOf(uci.TunableParams).Elem()
+		pField := pVal.FieldByName(paramName)
+		if pField.IsValid() && pField.CanSet() && pField.Kind() == reflect.Int {
+			pField.SetInt(int64(paramValue))
+		}
+	}
+
+}
+
+func (uci *UCIManager) DebugPosition() {
+	uci.SearchThread.Position.PrintFromBitBoards()
+}
+
+func (uci *UCIManager) StaticEvaluate() {
+	eval := EvaluateNNUE(uci.SearchThread.Position)
+	fmt.Println(eval)
+}
+
+func (uci *UCIManager) UciLoop() {
 	scanner := bufio.NewScanner(os.Stdin)
 
 	for scanner.Scan() {
 		command := scanner.Text()
 
 		if command == "uci" {
-			fmt.Println("id name Maelstrom v3.1.0")
-			fmt.Println("id author Saigautam Bonam")
-			fmt.Println("option name Hash type spin default 256 min 1 max 4096")
-			fmt.Println("option name Ponder type check default false")
-
-			if TUNING_EXPOSE_UCI {
-				val := reflect.ValueOf(Params)
-				typ := val.Type()
-
-				for i := 0; i < val.NumField(); i++ {
-					name := typ.Field(i).Name
-					defaultVal := val.Field(i).Int()
-					fmt.Printf("option name %s type spin default %d min 0 max 10000\n", name, defaultVal)
-				}
-			}
-			fmt.Println("uciok")
+			uci.UCI()
 		} else if command == "isready" {
-			fmt.Println("readyok")
+			uci.IsReady()
 		} else if command == "ucinewgame" {
-			b = Board{}
-			b.InitStartPos()
-			ClearTT()
-			ClearHistory()
-			ClearKillers()
+			uci.UCINewGame()
 		} else if command == "quit" {
 			os.Exit(0)
 		} else if command == "stop" {
-			Timer.Stop = true
+			uci.Stop()
 		} else if command == "ponderhit" {
-			PONDER_HIT = true
-			// Stop any pondering
-			Timer.Stop = true
+			uci.PonderHitUpdate()
 		} else if strings.Contains(command, "position") {
-			// Stop any pondering
-			Timer.Stop = true
-			b = processPosition(command)
+			uci.Position(command)
 		} else if strings.Contains(command, "go") {
-			processGo(command, b)
+			uci.Go(command)
 		} else if strings.Contains(command, "setoption") {
-			words := strings.Split(command, " ")
-			if len(words) >= 5 && words[1] == "name" && words[3] == "value" {
-				paramName := words[2]
-				if paramName == "Hash" {
-					ttSize, _ = strconv.ParseInt(words[4], 10, 64)
-					InitializeTT(int(ttSize))
-					continue
-				} else if paramName == "Ponder" {
-					ponder, _ := strconv.ParseBool(words[4])
-					PONDERING_ENABLED = ponder
-					continue
-				}
-				paramValue, err := strconv.Atoi(words[4])
-				if err != nil {
-					fmt.Println("info string invalid value")
-					return
-				}
-
-				pVal := reflect.ValueOf(&Params).Elem()
-				pField := pVal.FieldByName(paramName)
-				if pField.IsValid() && pField.CanSet() && pField.Kind() == reflect.Int {
-					pField.SetInt(int64(paramValue))
-				}
-			}
+			uci.SetOption(command)
 		} else if command == "d" {
-			// Debug command to print current position
-			b.PrintFromBitBoards()
+			uci.DebugPosition()
 		} else if command == "eval" {
-			eval := EvaluateNNUE(&b)
-			fmt.Println(eval)
+			uci.StaticEvaluate()
 		}
 	}
 }

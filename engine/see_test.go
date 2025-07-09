@@ -17,6 +17,7 @@ func TestSee(t *testing.T) {
 	}
 	defer file.Close()
 
+	s := Searcher{}
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -32,16 +33,16 @@ func TestSee(t *testing.T) {
 		fmt.Println("Score:", score)
 		fmt.Println()
 
-		b := Board{}
-		b.InitFEN(fen + " 0 1")
-		move := FromUCI(uci, &b)
+		s.Position = NewBoard()
+		s.Position.InitFEN(fen + " 0 1")
+		move := FromUCI(uci, s.Position)
 
 		if move.promote != EMPTY {
 			fmt.Println("skip promotion")
 			continue
 		}
 
-		res := see(&b, move)
+		res := s.SEE(move)
 
 		fmt.Printf("\n\n")
 		if res != score {

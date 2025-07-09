@@ -48,5 +48,3 @@ var Params = TunableParameters{
 	INC_FRACTION:             2,
 	HARD_LIMIT_MULT:          2,
 }
-
-var TUNING_EXPOSE_UCI = true

@@ -45,12 +45,7 @@ type prev struct {
 }
 
 func NewBoard() *Board {
-	b := Board{}
-	b.turn = WHITE
-	b.enPassant = EMPTY_SQ
-	b.OO, b.OOO, b.oo, b.ooo = true, true, true, true
-	b.InitStartPos()
-	return &b
+	return &Board{}
 }
 
 func (b *Board) InitStartPos() {

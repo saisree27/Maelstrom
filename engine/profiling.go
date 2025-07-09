@@ -27,7 +27,10 @@ func SearchWithProfiling(b *Board, movetime int64) Move {
 
 	// Run the search
 	Timer.SetMoveTime(movetime)
-	move := SearchPosition(b)
+
+	s := Searcher{}
+	s.Position = b
+	move := s.SearchPosition()
 
 	// Write memory profile
 	memFile, err := os.Create("mem.prof")

@@ -5,5 +5,7 @@ import (
 )
 
 func main() {
-	engine.UciLoop()
+	uci := engine.UCIManager{}
+	uci.Initialize()
+	uci.UciLoop()
 }
