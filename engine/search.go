@@ -38,7 +38,18 @@ func (s *Searcher) QuiescenceSearch(alpha int, beta int) int {
 		return 0
 	}
 
-	eval := EvaluateNNUE(s.Position) * COLOR_SIGN[s.Position.turn]
+	eval := -2 * WIN_VAL
+
+	// Probe TT in QS, see if we can get a TT cutoff or just get static eval
+	res, score := ProbeTT(s.Position, alpha, beta, uint8(0), &Move{}, &eval)
+	if res {
+		return score
+	}
+
+	// If we didn't get static eval from TT
+	if eval < -WIN_VAL {
+		eval = EvaluateNNUE(s.Position) * COLOR_SIGN[s.Position.turn]
+	}
 
 	// Beta cutoff
 	if eval >= beta {
@@ -111,13 +122,20 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, line *[]Move
 
 	bestMove := Move{}
 
-	res, score := ProbeTT(s.Position, alpha, beta, uint8(depth), &bestMove)
+	staticEval := -2 * WIN_VAL
+
+	// Probe TT:
+	// - Try to get PV move, static eval
+	// - If conditions are met, we can return score from TT
+	res, score := ProbeTT(s.Position, alpha, beta, uint8(depth), &bestMove, &staticEval)
 	if res && !isRoot {
 		return score
 	}
 
 	// Compute static eval to be used for pruning checks
-	staticEval := EvaluateNNUE(s.Position) * COLOR_SIGN[stm]
+	if staticEval < -WIN_VAL {
+		staticEval = EvaluateNNUE(s.Position) * COLOR_SIGN[stm]
+	}
 
 	// Pre-allocate PV line for child nodes
 	childPV := []Move{}
@@ -329,7 +347,7 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, line *[]Move
 	}
 
 	if !Timer.Stop {
-		StoreEntry(s.Position, bestScore, ttFlag, bestMove, uint8(depth))
+		StoreEntry(s.Position, bestScore, ttFlag, bestMove, uint8(depth), staticEval)
 	}
 
 	return bestScore
@@ -490,8 +508,9 @@ func (s *Searcher) SearchPosition() Move {
 				s.Info.PonderMove = Move{}
 
 				// Attempt to get ponder move from TT
+				staticEval := 0
 				s.Position.MakeMove(prevBest)
-				ProbeTT(s.Position, -WIN_VAL-1, WIN_VAL+1, 1, &s.Info.PonderMove)
+				ProbeTT(s.Position, -WIN_VAL-1, WIN_VAL+1, 1, &s.Info.PonderMove, &staticEval)
 				s.Position.Undo()
 			}
 		}

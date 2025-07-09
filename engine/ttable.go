@@ -14,13 +14,13 @@ const (
 )
 
 type TTEntry struct {
-	hash     u64
-	score    int32
-	bestMove Move
-	depth    uint8
-	bd       bound
-	age      uint8
-	_        [1]byte
+	hash       u64
+	score      int32
+	bestMove   Move
+	depth      uint8
+	bd         bound
+	age        uint8
+	staticEval int32
 }
 
 type TranspositionTable struct {
@@ -57,7 +57,7 @@ func ClearTT() {
 	TT.age = 0
 }
 
-func StoreEntry(b *Board, score int, bd bound, mv Move, depth uint8) {
+func StoreEntry(b *Board, score int, bd bound, mv Move, depth uint8, staticEval int) {
 	entryIndex := b.zobrist % TT.count
 	entry := &TT.entries[entryIndex]
 
@@ -66,17 +66,18 @@ func StoreEntry(b *Board, score int, bd bound, mv Move, depth uint8) {
 	// 2. Newer entry
 	if entry.depth <= depth || entry.depth != TT.age {
 		*entry = TTEntry{
-			bestMove: mv,
-			hash:     b.zobrist,
-			bd:       bd,
-			score:    int32(score),
-			depth:    depth,
-			age:      TT.age,
+			bestMove:   mv,
+			hash:       b.zobrist,
+			bd:         bd,
+			score:      int32(score),
+			depth:      depth,
+			age:        TT.age,
+			staticEval: int32(staticEval),
 		}
 	}
 }
 
-func ProbeTT(b *Board, alpha int, beta int, depth uint8, m *Move) (bool, int) {
+func ProbeTT(b *Board, alpha int, beta int, depth uint8, m *Move, staticEval *int) (bool, int) {
 	entryIndex := b.zobrist % TT.count
 	entry := &TT.entries[entryIndex]
 
@@ -86,6 +87,7 @@ func ProbeTT(b *Board, alpha int, beta int, depth uint8, m *Move) (bool, int) {
 
 		// Get the PV-move
 		*m = entry.bestMove
+		*staticEval = int(entry.staticEval)
 		if entry.depth >= depth {
 			score := int(entry.score)
 			if entry.bd == LOWER && score >= beta {
