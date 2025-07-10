@@ -6,7 +6,7 @@
 
   ![](https://github.com/saisree27/Maelstrom/actions/workflows/go.yml/badge.svg)
   ![](https://img.shields.io/github/v/release/saisree27/Maelstrom)
-  ![](https://img.shields.io/github/commits-since/saisree27/Maelstrom/v3.1.0)
+  ![](https://img.shields.io/github/commits-since/saisree27/Maelstrom/v3.1.1)
 
 </div>
 
@@ -38,13 +38,19 @@ Maelstrom often plays on Lichess [here](https://lichess.org/@/Maelstrom-Chess). 
 Checkout and download binaries and source code from the Releases page.
 
 ## Elo Progression
-Table summarizing Elo progression tests documented in release notes as well as rating by CCRL. Time controls I used for testing: STC 8s+0.08s, LTC 40s+0.4s.
-|        Version      |   STC Elo |  LTC Elo | Estimated Elo (vs. Stash) | CCRL Blitz |
-|:-------------------:|:-----------:|:---------:|:------------:|:------------:|
-| v3.1.0    | +258.7 +/- 51.8 | +165.7 +/- 37.6 | ~3040 |              |
-| v3.0.0    | +343 +/- 65.5 | +515.5 +/- 119.7 | ~2820 |              |
-| v2.1.0    | +249 +/- 46.1 | +190.8 +/- 70.1  | |              |
-| v2.0.0    |              |                 | |     [2109](https://computerchess.org.uk/ccrl/404/cgi/engine_details.cgi?print=Details&each_game=1&eng=Maelstrom%202.0.0%2064-bit#Maelstrom_2_0_0_64-bit)     |
+Table summarizing Elo progression (with specific tests documented in release notes) as well as rating by CCRL. 
+
+<div align="center">
+
+|        Version      |  Estimated Elo  | CCRL Blitz |
+|:-------------------:|:------------:|:------------:|
+| v3.1.1    | ~3070 |              |
+| v3.1.0    | ~3040 |              |
+| v3.0.0    |  ~2820 |              |
+| v2.1.0    | ~2300 |              |
+| v2.0.0    |  - |     [2109](https://computerchess.org.uk/ccrl/404/cgi/engine_details.cgi?print=Details&each_game=1&eng=Maelstrom%202.0.0%2064-bit#Maelstrom_2_0_0_64-bit)     |
+
+</div>
 
 ## Building from Source
 Requirements:
