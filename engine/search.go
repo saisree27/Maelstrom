@@ -3,7 +3,7 @@ package engine
 import (
 	"fmt"
 	"math"
-	"time"
+	"strings"
 )
 
 var COLOR_SIGN = [2]int{
@@ -126,10 +126,10 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, line *[]Move
 
 	// Probe TT:
 	// - Try to get PV move, static eval
-	// - If conditions are met, we can return score from TT
-	res, score := ProbeTT(s.Position, alpha, beta, uint8(depth), &bestMove, &staticEval)
-	if res && !isRoot {
-		return score
+	// - If conditions are met, we can return ttScore from TT
+	res, ttScore := ProbeTT(s.Position, alpha, beta, uint8(depth), &bestMove, &staticEval)
+	if res && !isRoot && !isPv {
+		return ttScore
 	}
 
 	// Compute static eval to be used for pruning checks
@@ -151,7 +151,7 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, line *[]Move
 		//    2. Not in PV node
 		//    3. TT move exists and is not a capture
 		// More info: https://www.chessprogramming.org/Reverse_Futility_Pruning
-		if depth <= Params.RFP_MAX_DEPTH && bestMove.from != bestMove.to && bestMove.movetype != CAPTURE && beta > -WIN_VAL-100 {
+		if depth <= Params.RFP_MAX_DEPTH && !bestMove.IsEmpty() && bestMove.movetype != CAPTURE && beta > -WIN_VAL-100 {
 			margin := Params.RFP_MULT * depth
 			if staticEval-margin >= beta {
 				return beta + (staticEval-beta)/2
@@ -191,7 +191,7 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, line *[]Move
 		if depth >= Params.NMP_MIN_DEPTH && doNull && notJustPawnsAndKing != 0 && staticEval >= beta {
 			s.Position.MakeNullMove()
 			R := 4 + depth/3 + Min((staticEval-beta)/200, 3)
-			score = -s.Pvs(depth-1-R, -beta, -beta+1, false, &childPV)
+			score := -s.Pvs(depth-1-R, -beta, -beta+1, false, &childPV)
 			s.Position.UndoNullMove()
 
 			childPV = []Move{}
@@ -214,7 +214,7 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, line *[]Move
 	//    1. TT move not found
 	//    2. Depth is greater than some limit
 	//    3. Is in a PV node
-	if bestMove.from == bestMove.to && depth >= Params.IIR_MIN_DEPTH && isPv {
+	if bestMove.IsEmpty() && depth >= Params.IIR_MIN_DEPTH && isPv {
 		depth -= Params.IIR_DEPTH_REDUCTION
 	}
 
@@ -223,10 +223,11 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, line *[]Move
 	bestMove = Move{}
 	ttFlag := UPPER
 
-	legalMoves := s.Position.GenerateLegalMoves()
-	if len(legalMoves) == 0 {
-		if s.Position.IsCheck(stm) {
-			return -WIN_VAL
+	moves := s.Position.GenerateLegalMoves()
+	if len(moves) == 0 {
+		if check {
+			// Calculate mate distance
+			return -WIN_VAL + (s.Info.RootDepth - depth + 1)
 		} else {
 			return 0
 		}
@@ -234,10 +235,10 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, line *[]Move
 
 	var quietsSearched []Move
 
-	for mvCnt := 0; mvCnt < len(legalMoves); mvCnt++ {
+	for mvCnt := 0; mvCnt < len(moves); mvCnt++ {
 		// BEST MOVE SELECTION (MOVE ORDERING)
 		// Motivation: If we select good moves to search first, we can prune later moves.
-		move := s.SelectMove(mvCnt, legalMoves, pvMove, depth)
+		move := s.SelectMove(mvCnt, moves, pvMove, depth)
 
 		isQuiet := move.movetype == QUIET || move.movetype == K_CASTLE || move.movetype == Q_CASTLE
 		lmrDepth := Max(depth-LMR_TABLE[depth][mvCnt+1], 0)
@@ -405,8 +406,13 @@ func InitializeLMRTable() {
 	}
 }
 
+func (s *Searcher) ResetInfo() {
+	s.Info.NodesSearched = 0
+}
+
 func (s *Searcher) SearchPosition() Move {
 	Timer.StartSearch()
+	s.ResetInfo()
 
 	line := []Move{}
 	legalMoves := s.Position.GenerateLegalMoves()
@@ -428,16 +434,15 @@ func (s *Searcher) SearchPosition() Move {
 	s.HalfHistory()
 
 	for depth := 1; depth <= 100; depth++ {
-		s.Info.NodesSearched = 0
 		s.Info.RootDepth = depth
-		searchStart := time.Now()
+		IncrementTTAge()
 
 		// Aspiration windows
 		alpha := -WIN_VAL - 1
 		beta := WIN_VAL + 1
 
-		alphaWindowSize := -25
-		betaWindowSize := 25
+		alphaWindowSize := -Params.ASPIRATION_WINDOW_SIZE
+		betaWindowSize := Params.ASPIRATION_WINDOW_SIZE
 
 		if depth > 5 {
 			alpha = prevScore + alphaWindowSize
@@ -467,26 +472,32 @@ func (s *Searcher) SearchPosition() Move {
 		}
 
 		prevScore = score
-		timeTaken := time.Since(searchStart).Milliseconds()
-		timeTakenNanoSeconds := time.Since(searchStart).Nanoseconds()
 
-		IncrementTTAge()
-
-		strLine := ""
-		for _, move := range line {
-			strLine += " " + move.ToUCI()
-		}
-
-		nps := s.Info.NodesSearched * 1000000000 / Max(int(timeTakenNanoSeconds), 1)
+		delta := Max(int(Timer.Delta()), 1)
+		nps := s.Info.NodesSearched * 1000 / delta
 
 		if !s.Info.IsPondering {
-			fmt.Printf("info depth %d nodes %d time %d score cp %d nps %d pv%s\n", depth, s.Info.NodesSearched, timeTaken, score, nps, strLine)
-		}
+			// HANDLE MATE SCORES:
+			if score >= WIN_VAL-101 || score <= -WIN_VAL+101 {
+				dist := 0
+				if score > 0 {
+					dist = WIN_VAL - score
+				} else {
+					dist = WIN_VAL + score
+				}
+				// Convert to moves from plies
+				dist = dist/2 + 1
+				if score < 0 {
+					dist *= -1
+				}
 
-		if score == WIN_VAL || score == -WIN_VAL {
-			// Don't return out of search early if pondering
-			if !s.Info.IsPondering {
-				return line[0]
+				fmt.Printf("info depth %d nodes %d time %d score mate %d nps %d pv %s\n", depth, s.Info.NodesSearched, delta, dist, nps, strings.Trim(fmt.Sprint(line), "[]"))
+
+				if dist < 3 {
+					return line[0]
+				}
+			} else {
+				fmt.Printf("info depth %d nodes %d time %d score cp %d nps %d pv %s\n", depth, s.Info.NodesSearched, delta, score, nps, strings.Trim(fmt.Sprint(line), "[]"))
 			}
 		}
 

@@ -25,6 +25,10 @@ func (m Move) ToUCI() string {
 	return s
 }
 
+func (m Move) String() string {
+	return m.ToUCI()
+}
+
 func FromUCI(uci string, b *Board) Move {
 	// parse UCI string into Move
 	// should only be necessary for testing, as UCI gives fen position
@@ -107,4 +111,8 @@ func FromUCI(uci string, b *Board) Move {
 	}
 
 	return m
+}
+
+func (m Move) IsEmpty() bool {
+	return m.from == m.to || m.null
 }

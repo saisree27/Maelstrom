@@ -1,6 +1,7 @@
 package engine
 
 type TunableParameters struct {
+	ASPIRATION_WINDOW_SIZE      int
 	RFP_MULT                    int
 	RFP_MAX_DEPTH               int
 	RAZORING_MULT               int
@@ -26,6 +27,7 @@ type TunableParameters struct {
 }
 
 var Params = TunableParameters{
+	ASPIRATION_WINDOW_SIZE:   25,
 	RFP_MULT:                 132,
 	RFP_MAX_DEPTH:            9,
 	RAZORING_MULT:            228,
