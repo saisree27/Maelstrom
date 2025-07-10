@@ -435,7 +435,6 @@ func (s *Searcher) SearchPosition() Move {
 
 	for depth := 1; depth <= 100; depth++ {
 		s.Info.RootDepth = depth
-		IncrementTTAge()
 
 		// Aspiration windows
 		alpha := -WIN_VAL - 1
@@ -522,5 +521,7 @@ func (s *Searcher) SearchPosition() Move {
 			return prevBest
 		}
 	}
+
+	IncrementTTAge()
 	return prevBest
 }
