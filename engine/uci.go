@@ -27,7 +27,7 @@ func (uci *UCIManager) Initialize() {
 	uci.HashSize = int64(256)
 	uci.PonderingEnabled = false
 	uci.TunableParams = &Params
-	uci.Version = "v3.1.1"
+	uci.Version = "v3.2.0"
 	uci.Author = "Saigautam Bonam"
 	uci.SearchThread = Searcher{}
 

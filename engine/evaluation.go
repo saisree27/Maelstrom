@@ -19,12 +19,15 @@ func EvaluateNNUE(b *Board) int {
 		return 0
 	}
 
+	GlobalNNUE.ApplyLazyUpdates(b)
+
+	accs := b.accumulatorStack[b.accumulatorIdx]
 	eval := 0
 	stm := b.turn
 	if stm == WHITE {
-		eval = int(Forward(&GlobalNNUE, &b.accumulators.white, &b.accumulators.black))
+		eval = int(Forward(&GlobalNNUE, &accs.white, &accs.black))
 	} else {
-		eval = -int(Forward(&GlobalNNUE, &b.accumulators.black, &b.accumulators.white))
+		eval = -int(Forward(&GlobalNNUE, &accs.black, &accs.white))
 	}
 
 	if eval < -WIN_VAL {

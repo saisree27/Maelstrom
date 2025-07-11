@@ -11,22 +11,22 @@ func TestAccumulatorUpdateMatchesRecompute(t *testing.T) {
 	b := Board{}
 	b.InitStartPos()
 
-	// Initialize accumulators
-	b.accumulators = GlobalNNUE.RecomputeAccumulators(&b)
-
 	// Make moves
 	b.MakeMoveFromUCI("b1a3")
 	b.MakeMoveFromUCI("b8a6")
+	b.Undo()
+	b.MakeMoveFromUCI("e7e5")
+	GlobalNNUE.ApplyLazyUpdates(&b)
 
 	// Recompute from scratch
 	expected := GlobalNNUE.RecomputeAccumulators(&b)
 
 	for i := 0; i < HIDDEN_LAYER_SIZE; i++ {
-		if b.accumulators.white.values[i] != expected.white.values[i] {
-			t.Errorf("White accumulator mismatch at %d: got %d, expected %d", i, b.accumulators.white.values[i], expected.white.values[i])
+		if b.accumulatorStack[b.accumulatorIdx].white.values[i] != expected.white.values[i] {
+			t.Errorf("White accumulator mismatch at %d: got %d, expected %d", i, b.accumulatorStack[b.accumulatorIdx].white.values[i], expected.white.values[i])
 		}
-		if b.accumulators.black.values[i] != expected.black.values[i] {
-			t.Errorf("Black accumulator mismatch at %d: got %d, expected %d", i, b.accumulators.black.values[i], expected.black.values[i])
+		if b.accumulatorStack[b.accumulatorIdx].black.values[i] != expected.black.values[i] {
+			t.Errorf("Black accumulator mismatch at %d: got %d, expected %d", i, b.accumulatorStack[b.accumulatorIdx].black.values[i], expected.black.values[i])
 		}
 	}
 }
@@ -60,16 +60,17 @@ func PerftWithNNUECheck(b *Board, depth int, t *testing.T) int {
 	var numNodes int = 0
 	for _, move := range moves {
 		b.MakeMove(move)
+		GlobalNNUE.ApplyLazyUpdates(b)
 
 		expected := GlobalNNUE.RecomputeAccumulators(b)
 		for i := 0; i < HIDDEN_LAYER_SIZE; i++ {
-			if b.accumulators.white.values[i] != expected.white.values[i] {
+			if b.accumulatorStack[b.accumulatorIdx].white.values[i] != expected.white.values[i] {
 				fmt.Println(move.ToUCI())
 				b.PrintFromBitBoards()
-				t.Fatalf("MakeMove - White accumulator mismatch at %d: got %d, expected %d", i, b.accumulators.white.values[i], expected.white.values[i])
+				t.Fatalf("MakeMove - White accumulator mismatch at %d: got %d, expected %d", i, b.accumulatorStack[b.accumulatorIdx].white.values[i], expected.white.values[i])
 			}
-			if b.accumulators.black.values[i] != expected.black.values[i] {
-				t.Fatalf("MakeMove - Black accumulator mismatch at %d: got %d, expected %d", i, b.accumulators.black.values[i], expected.black.values[i])
+			if b.accumulatorStack[b.accumulatorIdx].black.values[i] != expected.black.values[i] {
+				t.Fatalf("MakeMove - Black accumulator mismatch at %d: got %d, expected %d", i, b.accumulatorStack[b.accumulatorIdx].black.values[i], expected.black.values[i])
 			}
 		}
 
@@ -80,11 +81,11 @@ func PerftWithNNUECheck(b *Board, depth int, t *testing.T) int {
 
 		expected = GlobalNNUE.RecomputeAccumulators(b)
 		for i := 0; i < HIDDEN_LAYER_SIZE; i++ {
-			if b.accumulators.white.values[i] != expected.white.values[i] {
-				t.Fatalf("Undo - White accumulator mismatch at %d: got %d, expected %d", i, b.accumulators.white.values[i], expected.white.values[i])
+			if b.accumulatorStack[b.accumulatorIdx].white.values[i] != expected.white.values[i] {
+				t.Fatalf("Undo - White accumulator mismatch at %d: got %d, expected %d", i, b.accumulatorStack[b.accumulatorIdx].white.values[i], expected.white.values[i])
 			}
-			if b.accumulators.black.values[i] != expected.black.values[i] {
-				t.Fatalf("Undo - Black accumulator mismatch at %d: got %d, expected %d", i, b.accumulators.black.values[i], expected.black.values[i])
+			if b.accumulatorStack[b.accumulatorIdx].black.values[i] != expected.black.values[i] {
+				t.Fatalf("Undo - Black accumulator mismatch at %d: got %d, expected %d", i, b.accumulatorStack[b.accumulatorIdx].black.values[i], expected.black.values[i])
 			}
 		}
 	}
@@ -192,13 +193,14 @@ func TestEvalConsistencyAfterUpdate(t *testing.T) {
 	b.InitStartPos()
 
 	// Save pre-move eval
-	beforeEval := Forward(&GlobalNNUE, &b.accumulators.white, &b.accumulators.black)
+	beforeEval := Forward(&GlobalNNUE, &b.accumulatorStack[b.accumulatorIdx].white, &b.accumulatorStack[b.accumulatorIdx].black)
 
 	// Apply accumulator update
 	b.MakeMoveFromUCI("e2e4")
+	GlobalNNUE.ApplyLazyUpdates(&b)
 
 	// Forward after incremental update
-	afterEval := Forward(&GlobalNNUE, &b.accumulators.white, &b.accumulators.black)
+	afterEval := Forward(&GlobalNNUE, &b.accumulatorStack[b.accumulatorIdx].white, &b.accumulatorStack[b.accumulatorIdx].black)
 
 	// Fully recompute and eval
 	recomputed := GlobalNNUE.RecomputeAccumulators(&b)
@@ -218,13 +220,14 @@ func TestEvalOppositeSide(t *testing.T) {
 	b := Board{}
 	b.InitStartPos()
 	b.MakeMoveFromUCI("e2e4")
+	GlobalNNUE.ApplyLazyUpdates(&b)
 
-	blackPerspectiveEval := Forward(&GlobalNNUE, &b.accumulators.white, &b.accumulators.black)
+	blackPerspectiveEval := Forward(&GlobalNNUE, &b.accumulatorStack[b.accumulatorIdx].white, &b.accumulatorStack[b.accumulatorIdx].black)
 
 	// Manually change STM
 	b.turn = WHITE
 
-	whitePerspectiveEval := -Forward(&GlobalNNUE, &b.accumulators.white, &b.accumulators.black)
+	whitePerspectiveEval := -Forward(&GlobalNNUE, &b.accumulatorStack[b.accumulatorIdx].white, &b.accumulatorStack[b.accumulatorIdx].black)
 	expected := -blackPerspectiveEval
 
 	if whitePerspectiveEval != expected {

@@ -40,8 +40,26 @@ type Accumulator struct {
 }
 
 type AccumulatorPair struct {
-	white Accumulator
-	black Accumulator
+	white        Accumulator
+	black        Accumulator
+	dirty        bool
+	updateBuffer AccumulatorUpdate
+}
+
+type AccumulatorUpdate struct {
+	from       Square
+	to         Square
+	capt       Square
+	from2      Square
+	to2        Square
+	fromType   PieceType
+	toType     PieceType
+	fromType2  PieceType
+	toType2    PieceType
+	captType   PieceType
+	color      Color
+	captColor  Color
+	updateType uint8 // 0 for AddSub, 1 for AddSubSub, 2 for AddAddSubSub
 }
 
 type NNUE struct {
@@ -69,7 +87,10 @@ func (nnue *NNUE) RecomputeAccumulators(b *Board) AccumulatorPair {
 		whiteIndex := CalculateIndex(WHITE, sq, pieceType, pieceColor)
 		blackIndex := CalculateIndex(BLACK, sq, pieceType, pieceColor)
 
-		AccumulatorAdd(nnue, &pair, whiteIndex, blackIndex)
+		for i := 0; i < HIDDEN_LAYER_SIZE; i++ {
+			pair.white.values[i] += nnue.accumulator_weights[whiteIndex][i]
+			pair.black.values[i] += nnue.accumulator_weights[blackIndex][i]
+		}
 	}
 
 	for i := 0; i < HIDDEN_LAYER_SIZE; i++ {
@@ -80,59 +101,20 @@ func (nnue *NNUE) RecomputeAccumulators(b *Board) AccumulatorPair {
 	return pair
 }
 
-func AccumulatorAdd(network *NNUE, accs *AccumulatorPair, indexWhite int, indexBlack int) {
-	for i := 0; i < HIDDEN_LAYER_SIZE; i++ {
-		accs.white.values[i] += network.accumulator_weights[indexWhite][i]
-		accs.black.values[i] += network.accumulator_weights[indexBlack][i]
-	}
-}
-
-func AccumulatorSub(network *NNUE, accs *AccumulatorPair, indexWhite int, indexBlack int) {
-	for i := 0; i < HIDDEN_LAYER_SIZE; i++ {
-		accs.white.values[i] -= network.accumulator_weights[indexWhite][i]
-		accs.black.values[i] -= network.accumulator_weights[indexBlack][i]
-	}
-}
-
-func AccumulatorAddSub(network *NNUE, accs *AccumulatorPair, indexWhiteFrom int, indexBlackFrom int, indexWhiteTo int, indexBlackTo int) {
-	for i := 0; i < HIDDEN_LAYER_SIZE; i++ {
-		accs.white.values[i] += network.accumulator_weights[indexWhiteTo][i] - network.accumulator_weights[indexWhiteFrom][i]
-		accs.black.values[i] += network.accumulator_weights[indexBlackTo][i] - network.accumulator_weights[indexBlackFrom][i]
-	}
-}
-
-func AccumulatorAddSubSub(network *NNUE, accs *AccumulatorPair, indexWhiteFrom int, indexBlackFrom int, indexWhiteTo int, indexBlackTo int, indexWhiteCapt int, indexBlackCapt int) {
-	for i := 0; i < HIDDEN_LAYER_SIZE; i++ {
-		accs.white.values[i] += network.accumulator_weights[indexWhiteTo][i] - network.accumulator_weights[indexWhiteFrom][i] - network.accumulator_weights[indexWhiteCapt][i]
-		accs.black.values[i] += network.accumulator_weights[indexBlackTo][i] - network.accumulator_weights[indexBlackFrom][i] - network.accumulator_weights[indexBlackCapt][i]
-	}
-}
-
-func (nnue *NNUE) AddFeature(accs *AccumulatorPair, sq Square, pieceType PieceType, color Color) {
-	whiteIndex := CalculateIndex(WHITE, sq, pieceType, color)
-	blackIndex := CalculateIndex(BLACK, sq, pieceType, color)
-
-	AccumulatorAdd(nnue, accs, whiteIndex, blackIndex)
-}
-
-func (nnue *NNUE) SubFeature(accs *AccumulatorPair, sq Square, pieceType PieceType, color Color) {
-	whiteIndex := CalculateIndex(WHITE, sq, pieceType, color)
-	blackIndex := CalculateIndex(BLACK, sq, pieceType, color)
-
-	AccumulatorSub(nnue, accs, whiteIndex, blackIndex)
-}
-
-func (nnue *NNUE) AddSubFeature(accs *AccumulatorPair, from Square, to Square, fromType PieceType, toType PieceType, color Color) {
+func (nnue *NNUE) AddSubFeature(to_accs *AccumulatorPair, prev_accs *AccumulatorPair, from Square, to Square, fromType PieceType, toType PieceType, color Color) {
 	whiteFromIndex := CalculateIndex(WHITE, from, fromType, color)
 	whiteToIndex := CalculateIndex(WHITE, to, toType, color)
 
 	blackFromIndex := CalculateIndex(BLACK, from, fromType, color)
 	blackToIndex := CalculateIndex(BLACK, to, toType, color)
 
-	AccumulatorAddSub(nnue, accs, whiteFromIndex, blackFromIndex, whiteToIndex, blackToIndex)
+	for i := 0; i < HIDDEN_LAYER_SIZE; i++ {
+		to_accs.white.values[i] = prev_accs.white.values[i] + nnue.accumulator_weights[whiteToIndex][i] - nnue.accumulator_weights[whiteFromIndex][i]
+		to_accs.black.values[i] = prev_accs.black.values[i] + nnue.accumulator_weights[blackToIndex][i] - nnue.accumulator_weights[blackFromIndex][i]
+	}
 }
 
-func (nnue *NNUE) AddSubSubFeature(accs *AccumulatorPair, from Square, to Square, capt Square, fromType PieceType, toType PieceType, captType PieceType, color Color, captColor Color) {
+func (nnue *NNUE) AddSubSubFeature(to_accs *AccumulatorPair, prev_accs *AccumulatorPair, from Square, to Square, capt Square, fromType PieceType, toType PieceType, captType PieceType, color Color, captColor Color) {
 	whiteFromIndex := CalculateIndex(WHITE, from, fromType, color)
 	whiteToIndex := CalculateIndex(WHITE, to, toType, color)
 
@@ -142,10 +124,36 @@ func (nnue *NNUE) AddSubSubFeature(accs *AccumulatorPair, from Square, to Square
 	whiteCaptIndex := CalculateIndex(WHITE, capt, captType, captColor)
 	blackCaptIndex := CalculateIndex(BLACK, capt, captType, captColor)
 
-	AccumulatorAddSubSub(nnue, accs, whiteFromIndex, blackFromIndex, whiteToIndex, blackToIndex, whiteCaptIndex, blackCaptIndex)
+	for i := 0; i < HIDDEN_LAYER_SIZE; i++ {
+		to_accs.white.values[i] = prev_accs.white.values[i] + nnue.accumulator_weights[whiteToIndex][i] - nnue.accumulator_weights[whiteFromIndex][i] - nnue.accumulator_weights[whiteCaptIndex][i]
+		to_accs.black.values[i] = prev_accs.black.values[i] + nnue.accumulator_weights[blackToIndex][i] - nnue.accumulator_weights[blackFromIndex][i] - nnue.accumulator_weights[blackCaptIndex][i]
+	}
 }
 
-func (network *NNUE) UpdateAccumulatorOnMove(b *Board, move Move, stm Color) {
+func (nnue *NNUE) AddAddSubSubFeature(to_accs *AccumulatorPair, prev_accs *AccumulatorPair, from1 Square, to1 Square, fromType1 PieceType,
+	toType1 PieceType, from2 Square, to2 Square, fromType2 PieceType, toType2 PieceType, color Color) {
+	wf1 := CalculateIndex(WHITE, from1, fromType1, color)
+	wt1 := CalculateIndex(WHITE, to1, toType1, color)
+
+	bf1 := CalculateIndex(BLACK, from1, fromType1, color)
+	bt1 := CalculateIndex(BLACK, to1, toType1, color)
+
+	wf2 := CalculateIndex(WHITE, from2, fromType2, color)
+	wt2 := CalculateIndex(WHITE, to2, toType2, color)
+
+	bf2 := CalculateIndex(BLACK, from2, fromType2, color)
+	bt2 := CalculateIndex(BLACK, to2, toType2, color)
+
+	for i := 0; i < HIDDEN_LAYER_SIZE; i++ {
+		to_accs.white.values[i] = prev_accs.white.values[i] + nnue.accumulator_weights[wt1][i] + nnue.accumulator_weights[wt2][i] - nnue.accumulator_weights[wf1][i] - nnue.accumulator_weights[wf2][i]
+		to_accs.black.values[i] = prev_accs.black.values[i] + nnue.accumulator_weights[bt1][i] + nnue.accumulator_weights[bt2][i] - nnue.accumulator_weights[bf1][i] - nnue.accumulator_weights[bf2][i]
+	}
+}
+
+func StoreAccUpdatesOnMove(b *Board, move Move, stm Color) {
+	b.accumulatorStack[b.accumulatorIdx] = b.accumulatorStack[b.accumulatorIdx-1]
+	b.accumulatorStack[b.accumulatorIdx].dirty = true
+
 	from := move.from
 	to := move.to
 
@@ -176,9 +184,17 @@ func (network *NNUE) UpdateAccumulatorOnMove(b *Board, move Move, stm Color) {
 		capturedType := PieceToPieceType(capturedPiece)
 		capturedColor := ReverseColor(color)
 
-		network.AddSubSubFeature(&b.accumulators, from, to, captureSquare, pieceType, newPieceType, capturedType, color, capturedColor)
+		b.accumulatorStack[b.accumulatorIdx].updateBuffer = AccumulatorUpdate{
+			from: from, to: to, capt: captureSquare, fromType: pieceType,
+			toType: newPieceType, captType: capturedType, color: color, captColor: capturedColor,
+			updateType: 1,
+		}
 	} else {
-		network.AddSubFeature(&b.accumulators, from, to, pieceType, newPieceType, color)
+		b.accumulatorStack[b.accumulatorIdx].updateBuffer = AccumulatorUpdate{
+			from: from, to: to, fromType: pieceType,
+			toType: newPieceType, color: color,
+			updateType: 0,
+		}
 	}
 
 	// Handle castling
@@ -186,22 +202,66 @@ func (network *NNUE) UpdateAccumulatorOnMove(b *Board, move Move, stm Color) {
 		if color == WHITE {
 			// Subtract White rook from H1
 			// Add White rook to F1
-			network.AddSubFeature(&b.accumulators, H1, F1, ROOK, ROOK, WHITE)
+			b.accumulatorStack[b.accumulatorIdx].updateBuffer.from2 = H1
+			b.accumulatorStack[b.accumulatorIdx].updateBuffer.to2 = F1
+			b.accumulatorStack[b.accumulatorIdx].updateBuffer.fromType2 = ROOK
+			b.accumulatorStack[b.accumulatorIdx].updateBuffer.toType2 = ROOK
+			b.accumulatorStack[b.accumulatorIdx].updateBuffer.updateType = 2
 		} else {
 			// Subtract Black rook from H8
 			// Add Black rook to F8
-			network.AddSubFeature(&b.accumulators, H8, F8, ROOK, ROOK, BLACK)
+			b.accumulatorStack[b.accumulatorIdx].updateBuffer.from2 = H8
+			b.accumulatorStack[b.accumulatorIdx].updateBuffer.to2 = F8
+			b.accumulatorStack[b.accumulatorIdx].updateBuffer.fromType2 = ROOK
+			b.accumulatorStack[b.accumulatorIdx].updateBuffer.toType2 = ROOK
+			b.accumulatorStack[b.accumulatorIdx].updateBuffer.updateType = 2
 		}
 	} else if move.movetype == Q_CASTLE {
 		if color == WHITE {
 			// Subtract White rook from A1
 			// Add White rook to D1
-			network.AddSubFeature(&b.accumulators, A1, D1, ROOK, ROOK, WHITE)
+			b.accumulatorStack[b.accumulatorIdx].updateBuffer.from2 = A1
+			b.accumulatorStack[b.accumulatorIdx].updateBuffer.to2 = D1
+			b.accumulatorStack[b.accumulatorIdx].updateBuffer.fromType2 = ROOK
+			b.accumulatorStack[b.accumulatorIdx].updateBuffer.toType2 = ROOK
+			b.accumulatorStack[b.accumulatorIdx].updateBuffer.updateType = 2
 		} else {
 			// Subtract Black rook from A8
 			// Add Black rook to D8
-			network.AddSubFeature(&b.accumulators, A8, D8, ROOK, ROOK, BLACK)
+			b.accumulatorStack[b.accumulatorIdx].updateBuffer.from2 = A8
+			b.accumulatorStack[b.accumulatorIdx].updateBuffer.to2 = D8
+			b.accumulatorStack[b.accumulatorIdx].updateBuffer.fromType2 = ROOK
+			b.accumulatorStack[b.accumulatorIdx].updateBuffer.toType2 = ROOK
+			b.accumulatorStack[b.accumulatorIdx].updateBuffer.updateType = 2
 		}
+	}
+}
+
+func (n *NNUE) ApplyLazyUpdates(b *Board) {
+	currIndex := b.accumulatorIdx
+	for currIndex >= 0 && b.accumulatorStack[currIndex].dirty {
+		currIndex--
+	}
+
+	if currIndex < 0 {
+		return
+	}
+
+	for currIndex != b.accumulatorIdx {
+		update := b.accumulatorStack[currIndex+1].updateBuffer
+
+		if update.updateType == 0 {
+			n.AddSubFeature(&b.accumulatorStack[currIndex+1], &b.accumulatorStack[currIndex], update.from, update.to, update.fromType, update.toType, update.color)
+		} else if update.updateType == 1 {
+			n.AddSubSubFeature(&b.accumulatorStack[currIndex+1], &b.accumulatorStack[currIndex], update.from, update.to, update.capt, update.fromType, update.toType,
+				update.captType, update.color, update.captColor)
+		} else {
+			n.AddAddSubSubFeature(&b.accumulatorStack[currIndex+1], &b.accumulatorStack[currIndex], update.from, update.to, update.fromType, update.toType, update.from2,
+				update.to2, update.fromType2, update.toType2, update.color)
+		}
+
+		currIndex++
+		b.accumulatorStack[currIndex].dirty = false
 	}
 }
 

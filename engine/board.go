@@ -9,39 +9,40 @@ import (
 type u64 uint64
 
 type Board struct {
-	pieces       [14]u64         // Stores bitboards of all white and black pieces
-	squares      [64]Piece       // Stores all 64 squares (not used for move generation)
-	colors       [2]u64          // Stores bitboards of both colors
-	occupied     u64             // Bits are set when pieces are there
-	empty        u64             // Bits are clear when pieces are there
-	turn         Color           // Side to move
-	enPassant    Square          // En passant square. If not possible, stores EMPTY
-	OO           bool            // If kingside castling available for White
-	OOO          bool            // If queenside castling is available for White
-	oo           bool            // If kingside castling is available for Black
-	ooo          bool            // If queenside castling is available for Black
-	history      []prev          // Stores history for board
-	zobrist      u64             // Zobrist hash (TODO)
-	plyCnt       int             // Stores number of half moves played
-	plyCnt50     int             // Stores number of half moves played since a capture (for 50-move rule)
-	moveCount    int             // Stores which move currently we are at
-	whiteCastled bool            // Stores whether white has previously castled
-	blackCastled bool            // Stores whether black has previously castled
-	accumulators AccumulatorPair // Stores NNUE hidden layer accumulations
+	pieces           [14]u64               // Stores bitboards of all white and black pieces
+	squares          [64]Piece             // Stores all 64 squares (not used for move generation)
+	colors           [2]u64                // Stores bitboards of both colors
+	occupied         u64                   // Bits are set when pieces are there
+	empty            u64                   // Bits are clear when pieces are there
+	turn             Color                 // Side to move
+	enPassant        Square                // En passant square. If not possible, stores EMPTY
+	OO               bool                  // If kingside castling available for White
+	OOO              bool                  // If queenside castling is available for White
+	oo               bool                  // If kingside castling is available for Black
+	ooo              bool                  // If queenside castling is available for Black
+	history          []prev                // Stores history for board
+	zobrist          u64                   // Zobrist hash (TODO)
+	plyCnt           int                   // Stores number of half moves played
+	plyCnt50         int                   // Stores number of half moves played since a capture (for 50-move rule)
+	moveCount        int                   // Stores which move currently we are at
+	whiteCastled     bool                  // Stores whether white has previously castled
+	blackCastled     bool                  // Stores whether black has previously castled
+	accumulatorStack [1000]AccumulatorPair // Stores stack of NNUE accumulators
+	accumulatorIdx   int                   // Stores the index of current accumulator in the stack
 }
 
 type prev struct {
-	move         Move            // Stores previous move made
-	OO           bool            // White Kingside castling history
-	OOO          bool            // White Queenside castling history
-	oo           bool            // Black Kingside castling history
-	ooo          bool            // Black Queenside castling history
-	enPassant    Square          // En passant square history
-	hash         u64             // Zobrist hash of prev position
-	whiteCastled bool            // Stores whether white has previously castled
-	blackCastled bool            // Stores whether black has previously castled
-	plyCnt50     int             // Stores number of half moves played since a capture (for 50-move rule)
-	accumulators AccumulatorPair // Stores NNUE hidden layer accumulations
+	move               Move   // Stores previous move made
+	OO                 bool   // White Kingside castling history
+	OOO                bool   // White Queenside castling history
+	oo                 bool   // Black Kingside castling history
+	ooo                bool   // Black Queenside castling history
+	enPassant          Square // En passant square history
+	hash               u64    // Zobrist hash of prev position
+	whiteCastled       bool   // Stores whether white has previously castled
+	blackCastled       bool   // Stores whether black has previously castled
+	plyCnt50           int    // Stores number of half moves played since a capture (for 50-move rule)
+	prevAccumulatorIdx int    // Stores index of previous accumulator in the stack
 }
 
 func NewBoard() *Board {
@@ -78,7 +79,7 @@ func (b *Board) InitStartPos() {
 	b.ooo = true
 	b.zobrist ^= TURN_HASH
 
-	b.accumulators = GlobalNNUE.RecomputeAccumulators(b)
+	b.accumulatorStack[b.accumulatorIdx] = GlobalNNUE.RecomputeAccumulators(b)
 }
 
 func (b *Board) InitFEN(fen string) {
@@ -149,7 +150,7 @@ func (b *Board) InitFEN(fen string) {
 
 	b.plyCnt = b.moveCount * 2
 
-	b.accumulators = GlobalNNUE.RecomputeAccumulators(b)
+	b.accumulatorStack[b.accumulatorIdx] = GlobalNNUE.RecomputeAccumulators(b)
 }
 
 func (b *Board) GetColorPieces(p PieceType, c Color) u64 {
@@ -280,13 +281,15 @@ func (b *Board) MakeMove(mv Move) {
 		enPassant:    b.enPassant,
 		hash:         b.zobrist,
 		whiteCastled: b.whiteCastled, blackCastled: b.blackCastled,
-		plyCnt50:     b.plyCnt50,
-		accumulators: b.accumulators,
+		plyCnt50:           b.plyCnt50,
+		prevAccumulatorIdx: b.accumulatorIdx,
 	}
+
 	b.history = append(b.history, entry)
 	b.plyCnt50++
+	b.accumulatorIdx++
 
-	GlobalNNUE.UpdateAccumulatorOnMove(b, mv, b.turn)
+	StoreAccUpdatesOnMove(b, mv, b.turn)
 
 	if !mv.null {
 		switch mv.movetype {
@@ -477,7 +480,7 @@ func (b *Board) Undo() {
 	b.whiteCastled = prevEntry.whiteCastled
 	b.blackCastled = prevEntry.blackCastled
 	b.plyCnt50 = prevEntry.plyCnt50
-	b.accumulators = prevEntry.accumulators
+	b.accumulatorIdx = prevEntry.prevAccumulatorIdx
 
 	b.history = b.history[:len(b.history)-1]
 	b.plyCnt--
