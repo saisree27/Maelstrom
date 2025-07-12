@@ -42,7 +42,7 @@ func TestSee(t *testing.T) {
 			continue
 		}
 
-		res := s.SEE(move)
+		res := SEE(move, s.Position)
 
 		fmt.Printf("\n\n")
 		if res != score {

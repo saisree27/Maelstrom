@@ -17,8 +17,7 @@ var SEE_PIECE_VALUES = [6]int{
 //	we'll have a decent idea how much this capture gains/loses material.
 //
 // Pseudocode implementation from https://www.chessprogramming.org/SEE_-_The_Swap_Algorithm
-func (s *Searcher) SEE(move Move) int {
-	b := s.Position
+func SEE(move Move, b *Board) int {
 	gain := [32]int{}
 	d := 0
 	mayXRay := b.occupied & ^(b.pieces[W_K] | b.pieces[W_N] | b.pieces[B_K] | b.pieces[B_N]) // pawns, bishops, rooks. queens

@@ -61,11 +61,12 @@ func (s *Searcher) QuiescenceSearch(alpha int, beta int) int {
 	}
 
 	moves := s.Position.GenerateCaptures()
+	mp := NewMovePicker(s.Position, moves, Move{}, Move{}, Move{}, 0, &s.History, true)
 
-	for mvCnt := range moves {
-		move := s.SelectMove(mvCnt, moves, Move{}, 0)
-		if move.movetype != CAPTURE_AND_PROMOTION && s.SEE(move) < 0 {
-			continue
+	for {
+		move := mp.NextMove()
+		if move.IsEmpty() {
+			break
 		}
 
 		s.Position.MakeMove(move)
@@ -233,12 +234,20 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, line *[]Move
 		}
 	}
 
+	mp := NewMovePicker(s.Position, moves, pvMove, s.KillerMoves[depth][0], s.KillerMoves[depth][1], depth, &s.History, false)
+
 	var quietsSearched []Move
 
-	for mvCnt := 0; mvCnt < len(moves); mvCnt++ {
+	mvCnt := -1
+	for {
+		mvCnt++
 		// BEST MOVE SELECTION (MOVE ORDERING)
 		// Motivation: If we select good moves to search first, we can prune later moves.
-		move := s.SelectMove(mvCnt, moves, pvMove, depth)
+		// move := s.SelectMove(mvCnt, moves, pvMove, depth)
+		move := mp.NextMove()
+		if move.IsEmpty() {
+			break
+		}
 
 		isQuiet := move.movetype == QUIET || move.movetype == K_CASTLE || move.movetype == Q_CASTLE
 		lmrDepth := Max(depth-LMR_TABLE[depth][mvCnt+1], 0)
@@ -258,13 +267,13 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, line *[]Move
 
 			// SEE QUIET PRUNING
 			seeMargin := -Params.SEE_QUIET_PRUNING_MULT * lmrDepth * lmrDepth
-			if isQuiet && s.SEE(move) < seeMargin {
+			if isQuiet && SEE(move, s.Position) < seeMargin {
 				continue
 			}
 
 			// SEE CAPTURE PRUNING
 			seeMargin = -Params.SEE_CAPTURE_PRUNING_MULT * depth
-			if (move.movetype == CAPTURE || move.movetype == EN_PASSANT) && s.SEE(move) < seeMargin {
+			if (move.movetype == CAPTURE || move.movetype == EN_PASSANT) && SEE(move, s.Position) < seeMargin {
 				continue
 			}
 		}
