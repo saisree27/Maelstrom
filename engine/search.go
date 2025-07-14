@@ -60,8 +60,7 @@ func (s *Searcher) QuiescenceSearch(alpha int, beta int) int {
 		alpha = eval
 	}
 
-	moves := s.Position.GenerateCaptures()
-	mp := NewMovePicker(s.Position, moves, Move{}, Move{}, Move{}, 0, &s.History, true)
+	mp := NewMovePicker(s.Position, Move{}, Move{}, Move{}, 0, &s.History, true)
 
 	for {
 		move := mp.NextMove()
@@ -224,23 +223,12 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, line *[]Move
 	bestMove = Move{}
 	ttFlag := UPPER
 
-	moves := s.Position.GenerateLegalMoves()
-	if len(moves) == 0 {
-		if check {
-			// Calculate mate distance
-			return -WIN_VAL + (s.Info.RootDepth - depth + 1)
-		} else {
-			return 0
-		}
-	}
-
-	mp := NewMovePicker(s.Position, moves, pvMove, s.KillerMoves[depth][0], s.KillerMoves[depth][1], depth, &s.History, false)
+	mp := NewMovePicker(s.Position, pvMove, s.KillerMoves[depth][0], s.KillerMoves[depth][1], depth, &s.History, false)
 
 	var quietsSearched []Move
 
-	mvCnt := -1
+	mvCnt := 0
 	for {
-		mvCnt++
 		// BEST MOVE SELECTION (MOVE ORDERING)
 		// Motivation: If we select good moves to search first, we can prune later moves.
 		// move := s.SelectMove(mvCnt, moves, pvMove, depth)
@@ -248,9 +236,10 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, line *[]Move
 		if move.IsEmpty() {
 			break
 		}
+		mvCnt++
 
 		isQuiet := move.movetype == QUIET || move.movetype == K_CASTLE || move.movetype == Q_CASTLE
-		lmrDepth := Max(depth-LMR_TABLE[depth][mvCnt+1], 0)
+		lmrDepth := Max(depth-LMR_TABLE[depth][mvCnt], 0)
 
 		if !isRoot && !isPv && bestScore > -WIN_VAL+100 {
 			// FUTILITY PRUNING
@@ -285,7 +274,7 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, line *[]Move
 		s.Position.MakeMove(move)
 
 		score := 0
-		if mvCnt == 0 {
+		if mvCnt == 1 {
 			score = -s.Pvs(depth-1, -beta, -alpha, true, &childPV)
 		} else {
 			// LATE MOVE REDUCTION (LMR)
@@ -300,7 +289,7 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, line *[]Move
 			R := 0
 
 			if depth >= Params.LMR_MIN_DEPTH && isQuiet && !isPv && !check {
-				R = Max(LMR_TABLE[depth][mvCnt+1], 0)
+				R = Max(LMR_TABLE[depth][mvCnt], 0)
 			}
 
 			score = -s.Pvs(depth-1-R, -alpha-1, -alpha, true, &childPV)
@@ -354,6 +343,15 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, line *[]Move
 		}
 
 		childPV = []Move{}
+	}
+
+	if mvCnt == 0 {
+		if check {
+			// Calculate mate distance
+			return -WIN_VAL + (s.Info.RootDepth - depth + 1)
+		} else {
+			return 0
+		}
 	}
 
 	if !Timer.Stop {
@@ -501,7 +499,7 @@ func (s *Searcher) SearchPosition() Move {
 
 				fmt.Printf("info depth %d nodes %d time %d score mate %d nps %d pv %s\n", depth, s.Info.NodesSearched, delta, dist, nps, strings.Trim(fmt.Sprint(line), "[]"))
 
-				if dist < 3 {
+				if dist < 3 && dist > -3 {
 					return line[0]
 				}
 			} else {

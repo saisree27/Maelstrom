@@ -385,7 +385,7 @@ func (b *Board) PinnedPieces(kingSquare Square, c Color) (u64, u64) {
 	return pinned, checkers
 }
 
-func (b *Board) GenerateLegalMoves() []Move {
+func (b *Board) GenerateMoves(allowed u64, includePromotions bool, skipQuiets bool) []Move {
 	// Setup move list with pre-allocated capacity
 	m := make([]Move, 0, 48)
 
@@ -406,19 +406,20 @@ func (b *Board) GenerateLegalMoves() []Move {
 	attacks := b.GetAllAttacks(opponent, b.occupied, orthogonalThem, diagonalThem)
 
 	// Generate king moves first
-	b.KingMoves(&m, playerKing, attacks, playerPieces, player)
+	b.KingMoves(&m, playerKing, attacks|^allowed, playerPieces, player)
 
 	numCheckers := PopCount(checkers)
 	if numCheckers >= 2 {
 		return m // Only king moves in double check
 	}
 
-	// Get allowed squares (all squares in single check, only blocking squares in check)
-	allowed := u64(0xFFFFFFFFFFFFFFFF)
+	promotionAllowed := allowed | ternary(player == WHITE, RANKS[7], RANKS[0])
+
 	if numCheckers == 1 {
 		checkerSquare := Square(BitScanForward(checkers))
 		checkerPiece := b.squares[checkerSquare]
-		allowed = SQUARES_BETWEEN[playerKing][checkerSquare] | checkers
+		allowed &= SQUARES_BETWEEN[playerKing][checkerSquare] | checkers
+		promotionAllowed &= SQUARES_BETWEEN[playerKing][checkerSquare] | checkers
 
 		// Handle en passant capture of checking pawn
 		if b.enPassant != EMPTY_SQ {
@@ -453,13 +454,21 @@ func (b *Board) GenerateLegalMoves() []Move {
 
 	// Generate other piece moves
 	b.KnightMoves(&m, b.GetColorPieces(KNIGHT, player), pinned, playerPieces, player, allowed)
-	b.PawnMoves(&m, b.GetColorPieces(PAWN, player), pinned, b.occupied, opponentPieces, player, allowed)
+
+	if includePromotions {
+		b.PawnMoves(&m, b.GetColorPieces(PAWN, player), pinned, b.occupied, opponentPieces, player, promotionAllowed)
+	} else {
+		b.PawnMoves(&m, b.GetColorPieces(PAWN, player), pinned, b.occupied, opponentPieces, player, allowed)
+	}
+
 	b.BishopMoves(&m, b.GetColorPieces(BISHOP, player)|b.GetColorPieces(QUEEN, player), pinned, playerPieces, opponentPieces, player, allowed)
 	b.RookMoves(&m, b.GetColorPieces(ROOK, player)|b.GetColorPieces(QUEEN, player), pinned, playerPieces, opponentPieces, player, allowed)
 
 	// Only try castling if not in check
 	if numCheckers == 0 {
-		b.CastlingMoves(&m, playerKing, attacks, player)
+		if !skipQuiets {
+			b.CastlingMoves(&m, playerKing, attacks, player)
+		}
 
 		// Handle en passant when not in check
 		if b.enPassant != EMPTY_SQ {
@@ -492,110 +501,171 @@ func (b *Board) GenerateLegalMoves() []Move {
 	return m
 }
 
+func (b *Board) GenerateLegalMoves() []Move {
+	return b.GenerateMoves(u64(0xFFFFFFFFFFFFFFFF), true, false)
+}
+
 func (b *Board) GenerateCaptures() []Move {
-	// Setup move list with pre-allocated capacity
-	m := make([]Move, 0, 48)
+	return b.GenerateMoves(b.colors[ReverseColor(b.turn)], false, true)
+}
 
-	player := b.turn
-	opponent := ReverseColor(player)
+func (b *Board) GenerateNoisies() []Move {
+	return b.GenerateMoves(b.colors[ReverseColor(b.turn)], true, true)
+}
 
-	// Get player pieces and opponent pieces
-	playerPieces := b.colors[player]
-	opponentPieces := b.colors[opponent]
+func (b *Board) GenerateQuiets() []Move {
+	return b.GenerateMoves(^b.colors[ReverseColor(b.turn)], false, false)
+}
 
-	// Get allowed squares (for captures this is opponent pieces only)
-	allowed := opponentPieces
-
-	// Get player king and calculate pins/checkers
-	playerKing := Square(BitScanForward(b.GetColorPieces(KING, player)))
-	pinned, checkers := b.PinnedPieces(playerKing, player)
-
-	// Get attack map from opponent
-	orthogonalThem := b.GetColorPieces(ROOK, opponent) | b.GetColorPieces(QUEEN, opponent)
-	diagonalThem := b.GetColorPieces(BISHOP, opponent) | b.GetColorPieces(QUEEN, opponent)
-	attacks := b.GetAllAttacks(opponent, b.occupied, orthogonalThem, diagonalThem)
-
-	// Generate king moves first
-	b.KingMoves(&m, playerKing, attacks|^allowed, playerPieces, player)
-
-	numCheckers := PopCount(checkers)
-	if numCheckers >= 2 {
-		return m // Only king moves in double check
+func (b *Board) IsLegal(move Move) bool {
+	stm := b.turn
+	if move.IsEmpty() || move.colorMoved != stm {
+		return false
 	}
 
-	if numCheckers == 1 {
-		checkerSquare := Square(BitScanForward(checkers))
-		checkerPiece := b.squares[checkerSquare]
-		allowed &= SQUARES_BETWEEN[playerKing][checkerSquare] | checkers
+	if move.piece == EMPTY {
+		return false
+	}
 
-		// Handle en passant capture of checking pawn
-		if b.enPassant != EMPTY_SQ {
-			enPassantShift := b.enPassant + Square(PAWN_PUSH_DIRECTION[opponent])
-			if checkerSquare == enPassantShift && (checkerPiece == W_P || checkerPiece == B_P) {
-				pawns := COLOR_TO_PAWN_LOOKUP[opponent][b.enPassant] & b.GetColorPieces(PAWN, player)
+	// Ensure we aren't moving onto a square which contains one of our pieces
+	if b.squares[move.from] != move.piece || b.squares[move.to].GetColor() == stm {
+		return false
+	}
 
-				// Handle unpinned pawns
-				unpinnedPawns := pawns & ^pinned
-				for unpinnedPawns != 0 {
-					lsb := Square(PopLSB(&unpinnedPawns))
-					move := Move{from: lsb, to: b.enPassant, movetype: EN_PASSANT, captured: checkerPiece, colorMoved: player, piece: b.squares[lsb]}
+	if ((move.movetype != CAPTURE && move.movetype != CAPTURE_AND_PROMOTION) || move.movetype == EN_PASSANT) && b.squares[move.to] != EMPTY {
+		return false
+	}
 
-					b.MakeMove(move)
-					if !b.IsCheck(player) {
-						b.Undo()
-						m = append(m, move)
-					} else {
-						b.Undo()
-					}
-				}
+	if ((move.movetype == CAPTURE || move.movetype == CAPTURE_AND_PROMOTION) && move.movetype != EN_PASSANT) && b.squares[move.to] == EMPTY {
+		return false
+	}
 
-				// Handle pinned pawns
-				pinnedPawns := pawns & pinned & LINE[checkerSquare][playerKing]
-				if pinnedPawns != 0 {
-					sq := Square(BitScanForward(pinnedPawns))
-					m = append(m, Move{from: sq, to: b.enPassant, movetype: EN_PASSANT, captured: checkerPiece, colorMoved: player, piece: b.squares[sq]})
-				}
+	switch PieceToPieceType(move.piece) {
+	case PAWN:
+		pawnDir := ternary(stm == WHITE, NORTH, SOUTH)
+		// Ensure pawn double push is valid
+		if move.from.GoDirection(2*pawnDir) == move.to {
+			if b.squares[move.from.GoDirection(pawnDir)] != EMPTY {
+				return false
 			}
+			if stm == WHITE && SquareToRank(move.from) != R2 {
+				return false
+			}
+			if stm == BLACK && SquareToRank(move.from) != R7 {
+				return false
+			}
+		}
+
+		if move.movetype == EN_PASSANT {
+			if b.enPassant != move.to {
+				return false
+			}
+
+			if b.squares[move.to.GoDirection(-pawnDir)] != ternary(stm == WHITE, B_P, W_P) {
+				return false
+			}
+		}
+
+		if move.movetype == PROMOTION || move.movetype == CAPTURE_AND_PROMOTION {
+			if stm == WHITE && SquareToRank(move.from) != R7 {
+				return false
+			}
+			if stm == BLACK && SquareToRank(move.from) != R2 {
+				return false
+			}
+		}
+	case ROOK:
+		if SQUARES_BETWEEN[move.from][move.to]&b.occupied != 0 {
+			return false
+		}
+	case BISHOP:
+		if SQUARES_BETWEEN[move.from][move.to]&b.occupied != 0 {
+			return false
+		}
+	case QUEEN:
+		if SQUARES_BETWEEN[move.from][move.to]&b.occupied != 0 {
+			return false
+		}
+	case KING:
+		if move.movetype == K_CASTLE {
+			if b.IsCheck(stm) {
+				return false
+			}
+
+			if b.squares[move.from] != PieceTypeToPiece(stm, KING) || b.squares[ternary(stm == WHITE, H1, H8)] != PieceTypeToPiece(stm, ROOK) {
+				return false
+			}
+
+			if ternary(stm == WHITE, !b.OO, !b.oo) {
+				return false
+			}
+
+			if b.occupied&SQUARE_TO_BITBOARD[ternary(stm == WHITE, G1, G8)] != 0 || b.OpponentAttacksOf(ternary(stm == WHITE, G1, G8), b.occupied, stm) != 0 {
+				return false
+			}
+
+			if b.occupied&SQUARE_TO_BITBOARD[ternary(stm == WHITE, F1, F8)] != 0 || b.OpponentAttacksOf(ternary(stm == WHITE, F1, F8), b.occupied, stm) != 0 {
+				return false
+			}
+		}
+
+		if move.movetype == Q_CASTLE {
+			if b.IsCheck(stm) {
+				return false
+			}
+
+			if b.squares[move.from] != PieceTypeToPiece(stm, KING) || b.squares[ternary(stm == WHITE, A1, A8)] != PieceTypeToPiece(stm, ROOK) {
+				return false
+			}
+
+			if ternary(stm == WHITE, !b.OOO, !b.ooo) {
+				return false
+			}
+
+			if b.occupied&SQUARE_TO_BITBOARD[ternary(stm == WHITE, B1, B8)] != 0 {
+				return false
+			}
+
+			if b.occupied&SQUARE_TO_BITBOARD[ternary(stm == WHITE, C1, C8)] != 0 || b.OpponentAttacksOf(ternary(stm == WHITE, C1, C8), b.occupied, stm) != 0 {
+				return false
+			}
+
+			if b.occupied&SQUARE_TO_BITBOARD[ternary(stm == WHITE, D1, D8)] != 0 || b.OpponentAttacksOf(ternary(stm == WHITE, D1, D8), b.occupied, stm) != 0 {
+				return false
+			}
+		}
+
+		if b.OpponentAttacksOf(move.to, b.occupied, stm) != 0 {
+			return false
 		}
 	}
 
-	// Generate other piece moves
-	b.KnightMoves(&m, b.GetColorPieces(KNIGHT, player), pinned, playerPieces, player, allowed)
-	b.PawnMoves(&m, b.GetColorPieces(PAWN, player), pinned, b.occupied, opponentPieces, player, allowed)
-	b.BishopMoves(&m, b.GetColorPieces(BISHOP, player)|b.GetColorPieces(QUEEN, player), pinned, playerPieces, opponentPieces, player, allowed)
-	b.RookMoves(&m, b.GetColorPieces(ROOK, player)|b.GetColorPieces(QUEEN, player), pinned, playerPieces, opponentPieces, player, allowed)
+	// Check actual legality
+	b.MakeMoveNoUpdate(move)
+	if !b.IsCheck(stm) {
+		b.UndoNoUpdate(move)
+		return true
+	} else {
+		b.UndoNoUpdate(move)
+		return false
+	}
+}
 
-	// Only try castling if not in check
-	if numCheckers == 0 {
-		// Handle en passant when not in check
-		if b.enPassant != EMPTY_SQ {
-			pawns := COLOR_TO_PAWN_LOOKUP[opponent][b.enPassant] & b.GetColorPieces(PAWN, player)
+func (b *Board) OpponentAttacksOf(sq Square, occ u64, stm Color) u64 {
+	allAttackers := u64(0)
+	allAttackers |= (b.GetColorPieces(ROOK, ReverseColor(stm)) | b.GetColorPieces(QUEEN, ReverseColor(stm))) & RookAttacks(sq, occ)
+	allAttackers |= (b.GetColorPieces(BISHOP, ReverseColor(stm)) | b.GetColorPieces(QUEEN, ReverseColor(stm))) & BishopAttacks(sq, occ)
+	allAttackers |= (b.GetColorPieces(KNIGHT, ReverseColor(stm))) & KnightAttacks(sq)
+	allAttackers |= (b.GetColorPieces(KING, ReverseColor(stm))) & KingAttacks(sq)
 
-			// Handle unpinned pawns
-			unpinnedPawns := pawns & ^pinned
-			for unpinnedPawns != 0 {
-				lsb := Square(PopLSB(&unpinnedPawns))
-				move := Move{from: lsb, to: b.enPassant, movetype: EN_PASSANT, captured: ternary(player == WHITE, B_P, W_P), colorMoved: player, piece: b.squares[lsb]}
-
-				b.MakeMoveNoUpdate(move)
-				if !b.IsCheck(player) {
-					b.UndoNoUpdate(move)
-					m = append(m, move)
-				} else {
-					b.UndoNoUpdate(move)
-				}
-			}
-
-			// Handle pinned pawns
-			pinnedPawns := pawns & pinned & LINE[b.enPassant][playerKing]
-			if pinnedPawns != 0 {
-				sq := Square(BitScanForward(pinnedPawns))
-				m = append(m, Move{from: sq, to: b.enPassant, movetype: EN_PASSANT, captured: ternary(player == WHITE, B_P, W_P), colorMoved: player, piece: b.squares[sq]})
-			}
-		}
+	// reverse the attack colors so we can get pawn attacks FROM a square
+	if stm == WHITE {
+		allAttackers |= b.pieces[B_P] & WHITE_PAWN_ATTACKS_LOOKUP[sq]
+	} else {
+		allAttackers |= b.pieces[W_P] & BLACK_PAWN_ATTACKS_LOOKUP[sq]
 	}
 
-	return m
+	return allAttackers
 }
 
 func (b *Board) AllAttackersOf(sq Square, occ u64) u64 {

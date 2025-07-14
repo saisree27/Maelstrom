@@ -187,7 +187,7 @@ func (b *Board) movePiece(p Piece, mvfrom Square, mvto Square, c Color) {
 	// Update mailbox and zobrist in one pass
 	b.squares[mvto] = p
 	b.squares[mvfrom] = EMPTY
-	b.zobrist ^= ZOBRIST_TABLE[p][mvfrom] ^ ZOBRIST_TABLE[p][mvto] ^ ZOBRIST_TABLE[EMPTY][mvto] ^ ZOBRIST_TABLE[EMPTY][mvfrom]
+	b.zobrist ^= ZOBRIST_TABLE[p][mvfrom] ^ ZOBRIST_TABLE[p][mvto]
 }
 
 func (b *Board) capturePiece(p Piece, captured Piece, mvfrom Square, mvto Square, c Color) {
@@ -209,7 +209,7 @@ func (b *Board) capturePiece(p Piece, captured Piece, mvfrom Square, mvto Square
 	// Update mailbox and zobrist in one pass
 	b.squares[mvto] = p
 	b.squares[mvfrom] = EMPTY
-	b.zobrist ^= ZOBRIST_TABLE[p][mvfrom] ^ ZOBRIST_TABLE[p][mvto] ^ ZOBRIST_TABLE[captured][mvto] ^ ZOBRIST_TABLE[EMPTY][mvfrom]
+	b.zobrist ^= ZOBRIST_TABLE[p][mvfrom] ^ ZOBRIST_TABLE[p][mvto] ^ ZOBRIST_TABLE[captured][mvto]
 }
 
 func (b *Board) replacePiece(p Piece, q Piece, sq Square) {

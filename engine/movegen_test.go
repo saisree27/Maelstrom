@@ -372,6 +372,61 @@ func TestAllMovesMakeUnmake(t *testing.T) {
 	}
 }
 
+// In a given position, check that all moves can be made and unmade correctly (includes some perft calls) and that all stats are correct
+func TestAllMovesMakeUnmakeLegal(t *testing.T) {
+	fen := "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1"
+	b := Board{}
+	b.InitFEN(fen)
+
+	orig := b.GetStringFromBitBoards()
+
+	stats := fmt.Sprintf("Castling: %t %t %t %t, En passant: %q, Turn: %d, History: %d, Occupied: %d, Empty: %d, White: %d, Black: %d, Hash: %d\n", b.oo, b.ooo, b.OO, b.OOO, SQUARE_TO_STRING_MAP[b.enPassant], b.turn, len(b.history), b.occupied, b.empty, b.colors[WHITE], b.colors[BLACK], b.zobrist)
+
+	moves := b.GenerateLegalMoves()
+	for _, m := range moves {
+		fmt.Printf("Move: %s\n", m)
+		prevZobrist := b.zobrist
+		prevOcc := b.occupied
+		prevEmpty := b.empty
+		legal := b.IsLegal(m)
+		newZobrist := b.zobrist
+		newOcc := b.occupied
+		newEmpty := b.empty
+		fmt.Println()
+		if !legal {
+			t.Errorf("TestAllMovesMakeUnmakeLegal: legality checker claims move %s is not legal", m)
+		}
+
+		if prevOcc != newOcc {
+			t.Errorf("TestAllMovesMakeUnmakeLegal: occupancy changed during legality check")
+		}
+
+		if prevEmpty != newEmpty {
+			t.Errorf("TestAllMovesMakeUnmakeLegal: empty changed during legality check")
+		}
+
+		if prevZobrist != newZobrist {
+			t.Errorf("TestAllMovesMakeUnmakeLegal: zobrist hash changed during legality check")
+		}
+		b.MakeMove(m)
+
+		Perft(&b, 4)
+		b.Undo()
+
+		newStats := fmt.Sprintf("Castling: %t %t %t %t, En passant: %q, Turn: %d, History: %d, Occupied: %d, Empty: %d, White: %d, Black: %d, Hash: %d\n", b.oo, b.ooo, b.OO, b.OOO, SQUARE_TO_STRING_MAP[b.enPassant], b.turn, len(b.history), b.occupied, b.empty, b.colors[WHITE], b.colors[BLACK], b.zobrist)
+
+		new := b.GetStringFromBitBoards()
+
+		if orig != new {
+			t.Errorf("TestAllMovesMakeUnMake (%q): got %s, wanted %s", m.ToUCI(), new, orig)
+		}
+
+		if stats != newStats {
+			t.Errorf("TestAllMovesMakeUnMake (stats): got %s, wanted %s", newStats, stats)
+		}
+	}
+}
+
 func TestThreeFoldRep(t *testing.T) {
 	b := Board{}
 	b.InitStartPos()

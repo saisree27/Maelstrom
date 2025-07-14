@@ -16,10 +16,12 @@ type Stage uint8
 
 const (
 	TT_MOVE Stage = iota
+	GEN_CAPTURES
 	GOOD_CAPTURES
 	PROMOTIONS
 	KILLER1
 	KILLER2
+	GEN_QUIETS
 	HISTORY_QUIETS
 	BAD_CAPTURES
 )
@@ -30,25 +32,23 @@ type ScoredMove struct {
 }
 
 type MovePicker struct {
-	stage        Stage
-	promotions   []ScoredMove
-	captures     []ScoredMove
-	quiets       []ScoredMove
-	badCaptures  []ScoredMove
-	ttMove       Move
-	killer1      Move
-	killer2      Move
-	ttMoveLegal  bool
-	killer1Legal bool
-	killer2Legal bool
-	board        *Board
-	history      *[2][64][64]int
-	depth        int
-	currIdx      int
-	lastStage    Stage
+	stage       Stage
+	promotions  []ScoredMove
+	captures    []ScoredMove
+	quiets      []ScoredMove
+	badCaptures []ScoredMove
+	ttMove      Move
+	killer1     Move
+	killer2     Move
+	board       *Board
+	history     *[2][64][64]int
+	depth       int
+	currIdx     int
+	lastStage   Stage
+	QS          bool
 }
 
-func NewMovePicker(b *Board, moves []Move, ttMove Move, killer1 Move, killer2 Move, depth int, history *[2][64][64]int, fromQS bool) *MovePicker {
+func NewMovePicker(b *Board, ttMove Move, killer1 Move, killer2 Move, depth int, history *[2][64][64]int, fromQS bool) *MovePicker {
 	mp := &MovePicker{
 		board:     b,
 		ttMove:    ttMove,
@@ -59,31 +59,13 @@ func NewMovePicker(b *Board, moves []Move, ttMove Move, killer1 Move, killer2 Mo
 		history:   history,
 		currIdx:   0,
 		lastStage: ternary(fromQS, GOOD_CAPTURES, BAD_CAPTURES),
+		QS:        fromQS,
 	}
-
-	mp.processMoves(moves)
 	return mp
 }
 
 func (mp *MovePicker) processMoves(moves []Move) {
 	for _, mv := range moves {
-		if mp.lastStage > GOOD_CAPTURES {
-			if mv == mp.ttMove {
-				mp.ttMoveLegal = true
-				continue
-			}
-
-			if mv == mp.killer1 {
-				mp.killer1Legal = true
-				continue
-			}
-
-			if mv == mp.killer2 {
-				mp.killer2Legal = true
-				continue
-			}
-		}
-
 		if mv.movetype == CAPTURE || mv.movetype == EN_PASSANT || mv.movetype == CAPTURE_AND_PROMOTION {
 			score := MVV_LVA_TABLE[PieceToPieceType(mv.captured)][PieceToPieceType(mv.piece)]
 			if mv.movetype == CAPTURE_AND_PROMOTION {
@@ -132,8 +114,18 @@ func (mp *MovePicker) NextMove() Move {
 		switch mp.stage {
 		case TT_MOVE:
 			mp.stage++
-			if mp.ttMoveLegal {
+			legal := mp.board.IsLegal(mp.ttMove)
+			if legal {
 				return mp.ttMove
+			}
+		case GEN_CAPTURES:
+			mp.stage++
+			if mp.QS {
+				moves := mp.board.GenerateCaptures()
+				mp.processMoves(moves)
+			} else {
+				moves := mp.board.GenerateNoisies()
+				mp.processMoves(moves)
 			}
 
 		case GOOD_CAPTURES:
@@ -141,6 +133,10 @@ func (mp *MovePicker) NextMove() Move {
 				move := mp.captures[mp.currIdx].move
 				if SEE(move, mp.board) < 0 {
 					mp.badCaptures = append(mp.badCaptures, mp.captures[mp.currIdx])
+					mp.currIdx++
+					continue
+				}
+				if move == mp.ttMove {
 					mp.currIdx++
 					continue
 				}
@@ -161,19 +157,30 @@ func (mp *MovePicker) NextMove() Move {
 
 		case KILLER1:
 			mp.stage++
-			if mp.killer1Legal {
+			legal := mp.board.IsLegal(mp.killer1)
+			if legal {
 				return mp.killer1
 			}
 
 		case KILLER2:
 			mp.stage++
-			if mp.killer2Legal {
+			legal := mp.board.IsLegal(mp.killer2)
+			if legal {
 				return mp.killer2
 			}
+
+		case GEN_QUIETS:
+			mp.stage++
+			mp.processMoves(mp.board.GenerateQuiets())
 
 		case HISTORY_QUIETS:
 			if mp.getNextAndSwap(mp.quiets, mp.currIdx) {
 				move := mp.quiets[mp.currIdx].move
+				if move == mp.killer1 || move == mp.killer2 || move == mp.ttMove {
+					mp.currIdx++
+					continue
+				}
+
 				mp.currIdx++
 				return move
 			}
@@ -184,6 +191,10 @@ func (mp *MovePicker) NextMove() Move {
 		case BAD_CAPTURES:
 			if mp.getNextAndSwap(mp.badCaptures, mp.currIdx) {
 				move := mp.badCaptures[mp.currIdx].move
+				if move == mp.ttMove {
+					mp.currIdx++
+					continue
+				}
 				mp.currIdx++
 				return move
 			}
