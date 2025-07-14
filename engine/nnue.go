@@ -11,11 +11,11 @@ import (
 	"time"
 )
 
-//go:embed nn_weights/network.bin
+//go:embed nn_weights/512.bin
 var embeddedWeights []byte
 
 // NETWORK ARCHITECTURE:
-// (768 -> 256)x2 -> 1 (Perspective Network)
+// (768 -> 512)x2 -> 1 (Perspective Network)
 // This means there are two sets of inputs, x and x^ where x is from STM perspective, x^ is from NTM perspective
 // Input size: 768 flattened = 12 * 64. Indices 0 through 11 will represent friendly_pawn, friendly_bishop, ..., enemy_king
 // We will have two accumulators:
@@ -27,7 +27,7 @@ var embeddedWeights []byte
 // where O is the output layer weights and c is the output layer biases
 
 const INPUT_LAYER_SIZE = 768
-const HIDDEN_LAYER_SIZE = 256
+const HIDDEN_LAYER_SIZE = 512
 const OUTPUT_LAYER_SIZE = 1
 
 // Quantization constants
