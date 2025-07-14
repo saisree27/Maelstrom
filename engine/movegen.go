@@ -536,7 +536,7 @@ func (b *Board) IsLegal(move Move) bool {
 		return false
 	}
 
-	if ((move.movetype == CAPTURE || move.movetype == CAPTURE_AND_PROMOTION) && move.movetype != EN_PASSANT) && b.squares[move.to] == EMPTY {
+	if ((move.movetype == CAPTURE || move.movetype == CAPTURE_AND_PROMOTION) && move.movetype != EN_PASSANT) && (b.squares[move.to] == EMPTY || b.squares[move.to] != move.captured) {
 		return false
 	}
 
