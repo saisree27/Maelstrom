@@ -20,6 +20,7 @@ type Board struct {
 	OOO              bool                  // If queenside castling is available for White
 	oo               bool                  // If kingside castling is available for Black
 	ooo              bool                  // If queenside castling is available for Black
+	castlingRights   uint8                 // Combines all castling rights into index from 0 to 16 for castling hash
 	history          []prev                // Stores history for board
 	zobrist          u64                   // Zobrist hash (TODO)
 	plyCnt           int                   // Stores number of half moves played
@@ -37,6 +38,7 @@ type prev struct {
 	OOO                bool   // White Queenside castling history
 	oo                 bool   // Black Kingside castling history
 	ooo                bool   // Black Queenside castling history
+	castlingRights     uint8  // Combines all castling rights into index from 0 to 16 for castling hash
 	enPassant          Square // En passant square history
 	hash               u64    // Zobrist hash of prev position
 	whiteCastled       bool   // Stores whether white has previously castled
@@ -77,7 +79,9 @@ func (b *Board) InitStartPos() {
 	b.OOO = true
 	b.oo = true
 	b.ooo = true
-	b.zobrist ^= TURN_HASH
+	b.castlingRights = 15
+
+	b.zobrist ^= CASTLING_HASH[b.castlingRights]
 
 	b.accumulatorStack[b.accumulatorIdx] = GlobalNNUE.RecomputeAccumulators(b)
 }
@@ -122,22 +126,29 @@ func (b *Board) InitFEN(fen string) {
 	castling := attrs[2]
 	if strings.Contains(castling, "K") {
 		b.OO = true
+		b.castlingRights |= WHITE_K_CASTLE
 	}
 	if strings.Contains(castling, "Q") {
 		b.OOO = true
+		b.castlingRights |= WHITE_Q_CASTLE
 	}
 	if strings.Contains(castling, "k") {
 		b.oo = true
+		b.castlingRights |= BLACK_K_CASTLE
 	}
 	if strings.Contains(castling, "q") {
 		b.ooo = true
+		b.castlingRights |= BLACK_Q_CASTLE
 	}
+
+	b.zobrist ^= CASTLING_HASH[b.castlingRights]
 
 	enpassant := attrs[3]
 	if enpassant == "-" {
 		b.enPassant = EMPTY_SQ
 	} else {
 		b.enPassant = STRING_TO_SQUARE_MAP[enpassant]
+		b.zobrist ^= EP_FILE_HASH[SquareToFile(b.enPassant)]
 	}
 
 	halfMoveClock := attrs[4]
@@ -146,7 +157,10 @@ func (b *Board) InitFEN(fen string) {
 
 	moveCount := attrs[5]
 	b.moveCount, _ = strconv.Atoi(moveCount)
-	b.zobrist ^= TURN_HASH
+
+	if b.turn == BLACK {
+		b.zobrist ^= TURN_HASH
+	}
 
 	b.plyCnt = b.moveCount * 2
 
@@ -171,7 +185,6 @@ func (b *Board) putPiece(p Piece, s Square, c Color) {
 		var square u64 = SQUARE_TO_BITBOARD[s]
 		b.empty |= square
 		b.occupied &= ^square
-		b.zobrist ^= ZOBRIST_TABLE[p][s]
 	}
 }
 
@@ -277,7 +290,7 @@ func (b *Board) MakeMoveNoUpdate(mv Move) {
 
 func (b *Board) MakeMove(mv Move) {
 	var entry prev = prev{
-		move: mv, OO: b.OO, OOO: b.OOO, oo: b.oo, ooo: b.ooo,
+		move: mv, OO: b.OO, OOO: b.OOO, oo: b.oo, ooo: b.ooo, castlingRights: b.castlingRights,
 		enPassant:    b.enPassant,
 		hash:         b.zobrist,
 		whiteCastled: b.whiteCastled, blackCastled: b.blackCastled,
@@ -344,46 +357,79 @@ func (b *Board) MakeMove(mv Move) {
 		b.plyCnt50 = 0
 	}
 
-	b.turn = ReverseColor(b.turn)
+	prevRights := b.castlingRights
 
 	// update castling rights
 	if mv.piece == W_K {
 		b.OO = false
 		b.OOO = false
+		b.castlingRights &= ^WHITE_K_CASTLE
+		b.castlingRights &= ^WHITE_Q_CASTLE
 	}
 	if mv.piece == B_K {
 		b.oo = false
 		b.ooo = false
+		b.castlingRights &= ^BLACK_K_CASTLE
+		b.castlingRights &= ^BLACK_Q_CASTLE
 	}
-	if mv.piece == W_R {
-		if mv.from == A1 {
+	if mv.piece == W_R || mv.captured == W_R {
+		if mv.from == A1 || mv.to == A1 {
 			b.OOO = false
+			b.castlingRights &= ^WHITE_Q_CASTLE
 		}
-		if mv.from == H1 {
+		if mv.from == H1 || mv.to == H1 {
 			b.OO = false
+			b.castlingRights &= ^WHITE_K_CASTLE
 		}
 	}
-	if mv.piece == B_R {
-		if mv.from == A8 {
+	if mv.piece == B_R || mv.captured == B_R {
+		if mv.from == A8 || mv.to == A8 {
 			b.ooo = false
+			b.castlingRights &= ^BLACK_Q_CASTLE
 		}
-		if mv.from == H8 {
+		if mv.from == H8 || mv.to == H8 {
 			b.oo = false
+			b.castlingRights &= ^BLACK_K_CASTLE
 		}
 	}
+
+	prevEP := b.enPassant
 
 	// update en passant square
 	dist := Direction(int(mv.to - mv.from))
 	if dist == 2*NORTH && mv.piece == W_P {
 		b.enPassant = mv.from + Square(NORTH)
+		if WHITE_PAWN_ATTACKS_LOOKUP[b.enPassant]&b.pieces[B_P] == 0 {
+			b.enPassant = EMPTY_SQ
+		}
 	} else if dist == 2*SOUTH && mv.piece == B_P {
 		b.enPassant = mv.from + Square(SOUTH)
+		if BLACK_PAWN_ATTACKS_LOOKUP[b.enPassant]&b.pieces[W_P] == 0 {
+			b.enPassant = EMPTY_SQ
+		}
 	} else {
 		b.enPassant = EMPTY_SQ
 	}
 
-	b.plyCnt++
+	// Update zobrist with turn hash
 	b.zobrist ^= TURN_HASH
+	// Update zobrist with en passant/castling only if the info has changed
+	if prevEP != b.enPassant {
+		if prevEP != EMPTY_SQ {
+			b.zobrist ^= EP_FILE_HASH[SquareToFile(prevEP)]
+		}
+		if b.enPassant != EMPTY_SQ {
+			b.zobrist ^= EP_FILE_HASH[SquareToFile(b.enPassant)]
+		}
+	}
+
+	if prevRights != b.castlingRights {
+		b.zobrist ^= CASTLING_HASH[prevRights]
+		b.zobrist ^= CASTLING_HASH[b.castlingRights]
+	}
+
+	b.turn = ReverseColor(b.turn)
+	b.plyCnt++
 }
 
 func (b *Board) UndoNoUpdate(prevMove Move) {
@@ -474,6 +520,7 @@ func (b *Board) Undo() {
 	b.OOO = prevEntry.OOO
 	b.oo = prevEntry.oo
 	b.ooo = prevEntry.ooo
+	b.castlingRights = prevEntry.castlingRights
 	b.enPassant = prevEntry.enPassant
 	b.zobrist = prevEntry.hash
 	b.turn = ReverseColor(b.turn)

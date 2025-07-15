@@ -574,17 +574,33 @@ func InitLine() {
 	}
 }
 
-var ZOBRIST_TABLE [13][64]u64
+const (
+	WHITE_K_CASTLE = uint8(1 << 0)
+	WHITE_Q_CASTLE = uint8(1 << 1)
+	BLACK_K_CASTLE = uint8(1 << 2)
+	BLACK_Q_CASTLE = uint8(1 << 3)
+)
+
+var ZOBRIST_TABLE [12][64]u64
+var CASTLING_HASH [16]u64
+var EP_FILE_HASH [8]u64
 var TURN_HASH u64
 
 func InitZobrist() {
-	rand.Seed(42)
-	for i := 0; i < 13; i++ {
+	r := rand.New(rand.NewSource(42))
+	for i := 0; i < 12; i++ {
 		for j := 0; j < 64; j++ {
-			ZOBRIST_TABLE[i][j] = u64(rand.Uint64())
+			ZOBRIST_TABLE[i][j] = u64(r.Uint64())
 		}
 	}
-	TURN_HASH = u64(rand.Uint64())
+	for i := 0; i < 16; i++ {
+		CASTLING_HASH[i] = u64(r.Uint64())
+	}
+
+	for i := 0; i < 8; i++ {
+		EP_FILE_HASH[i] = u64(r.Uint64())
+	}
+	TURN_HASH = u64(r.Uint64())
 }
 
 // Some slice functions for unit testing and possibly other things in the engine

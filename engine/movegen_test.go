@@ -449,6 +449,32 @@ func TestThreeFoldRep(t *testing.T) {
 	}
 }
 
+func TestThreeFoldRep2(t *testing.T) {
+	b := Board{}
+	b.InitStartPos()
+
+	b.MakeMoveFromUCI("e2e4")
+	b.MakeMoveFromUCI("e7e5")
+	b.MakeMoveFromUCI("g1f3")
+	b.MakeMoveFromUCI("g8f6")
+	b.MakeMoveFromUCI("f3e5")
+	b.MakeMoveFromUCI("f6e4")
+	b.MakeMoveFromUCI("e5f3")
+	b.MakeMoveFromUCI("e4f6")
+	b.MakeMoveFromUCI("f3e5")
+	b.MakeMoveFromUCI("f6e4")
+	b.MakeMoveFromUCI("e5f3")
+	b.MakeMoveFromUCI("e4f6")
+	b.MakeMoveFromUCI("f3e5")
+	b.MakeMoveFromUCI("f6e4")
+
+	res := b.IsThreeFoldRep()
+
+	if !res {
+		t.Errorf("TestThreeFoldRep (true): got %t, wanted %t", res, true)
+	}
+}
+
 func TestGenerateCaptures(t *testing.T) {
 	fen := "r3r1k1/pp3pbp/1qp1b1p1/2B5/2BP4/Q1n2N2/P4PPP/3R1K1R w - - 4 18"
 	b := Board{}
