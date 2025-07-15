@@ -227,6 +227,7 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, line *[]Move
 
 	var quietsSearched []Move
 
+	skipQuiets := false
 	mvCnt := 0
 	for {
 		// BEST MOVE SELECTION (MOVE ORDERING)
@@ -236,12 +237,23 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, line *[]Move
 		if move.IsEmpty() {
 			break
 		}
+
 		mvCnt++
 
 		isQuiet := move.movetype == QUIET || move.movetype == K_CASTLE || move.movetype == Q_CASTLE
 		lmrDepth := Max(depth-LMR_TABLE[depth][mvCnt], 0)
 
+		if isQuiet && skipQuiets {
+			continue
+		}
+
 		if !isRoot && !isPv && bestScore > -WIN_VAL+100 {
+			// LATE MOVE PRUNING
+			if isQuiet && depth <= 7 && mvCnt > 5+2*depth*depth && !check {
+				skipQuiets = true
+				continue
+			}
+
 			// FUTILITY PRUNING
 			// Motivation: We want to discard moves which have no potential of raising alpha. We use a futilityMargin to estimate
 			//             the potential value of a move (based on depth).
@@ -251,6 +263,7 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, line *[]Move
 			// https://www.chessprogramming.org/Futility_Pruning
 			futilityMargin := Params.FUTILITY_MULT*lmrDepth + Params.FUTILITY_BASE
 			if isQuiet && !check && lmrDepth <= Params.FUTILITY_MAX_DEPTH && staticEval+futilityMargin <= alpha {
+				skipQuiets = true
 				continue
 			}
 
@@ -267,11 +280,11 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, line *[]Move
 			}
 		}
 
+		s.Position.MakeMove(move)
+
 		if isQuiet {
 			quietsSearched = append(quietsSearched, move)
 		}
-
-		s.Position.MakeMove(move)
 
 		score := 0
 		if mvCnt == 1 {
@@ -436,9 +449,6 @@ func (s *Searcher) SearchPosition() Move {
 
 	// Set prevBest to first legal move in case search is stopped immediately
 	prevBest := legalMoves[0]
-
-	// Half the history heuristic values after each search
-	s.HalfHistory()
 
 	for depth := 1; depth <= 100; depth++ {
 		s.Info.RootDepth = depth

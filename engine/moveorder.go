@@ -114,8 +114,7 @@ func (mp *MovePicker) NextMove() Move {
 		switch mp.stage {
 		case TT_MOVE:
 			mp.stage++
-			legal := mp.board.IsLegal(mp.ttMove)
-			if legal {
+			if mp.board.IsLegal(mp.ttMove) {
 				return mp.ttMove
 			}
 		case GEN_CAPTURES:
@@ -158,14 +157,14 @@ func (mp *MovePicker) NextMove() Move {
 		case KILLER1:
 			mp.stage++
 			legal := mp.board.IsLegal(mp.killer1)
-			if legal {
+			if legal && mp.killer1 != mp.ttMove {
 				return mp.killer1
 			}
 
 		case KILLER2:
 			mp.stage++
 			legal := mp.board.IsLegal(mp.killer2)
-			if legal {
+			if legal && mp.killer2 != mp.killer1 && mp.killer2 != mp.ttMove {
 				return mp.killer2
 			}
 
