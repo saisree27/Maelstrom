@@ -13,6 +13,9 @@ type TunableParameters struct {
 	IIR_DEPTH_REDUCTION         int
 	LMR_MIN_DEPTH               int
 	NMP_MIN_DEPTH               int
+	LMP_MAX_DEPTH               int
+	LMP_BASE                    int
+	LMP_MULT                    int
 	SEE_PAWN_VALUE              int
 	SEE_KNIGHT_VALUE            int
 	SEE_BISHOP_VALUE            int
@@ -39,6 +42,9 @@ var Params = TunableParameters{
 	IIR_DEPTH_REDUCTION:      1,
 	LMR_MIN_DEPTH:            2,
 	NMP_MIN_DEPTH:            2,
+	LMP_MAX_DEPTH:            7,
+	LMP_BASE:                 5,
+	LMP_MULT:                 2,
 	SEE_PAWN_VALUE:           100,
 	SEE_KNIGHT_VALUE:         300,
 	SEE_BISHOP_VALUE:         300,

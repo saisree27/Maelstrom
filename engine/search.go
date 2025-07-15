@@ -249,7 +249,7 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, line *[]Move
 
 		if !isRoot && !isPv && bestScore > -WIN_VAL+100 {
 			// LATE MOVE PRUNING
-			if isQuiet && depth <= 7 && mvCnt > 5+2*depth*depth && !check {
+			if isQuiet && depth <= Params.LMP_MAX_DEPTH && mvCnt > Params.LMP_BASE+Params.LMP_MULT*depth*depth && !check {
 				skipQuiets = true
 				continue
 			}
@@ -405,16 +405,6 @@ func (s *Searcher) ClearKillers() {
 
 func (s *Searcher) ClearHistory() {
 	s.History = [2][64][64]int{}
-}
-
-func (s *Searcher) HalfHistory() {
-	for c := 0; c < 2; c++ {
-		for from := 0; from < 64; from++ {
-			for to := 0; to < 64; to++ {
-				s.History[c][from][to] /= 2
-			}
-		}
-	}
 }
 
 func InitializeLMRTable() {
