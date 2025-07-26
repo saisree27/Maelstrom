@@ -21,6 +21,7 @@ const (
 	PROMOTIONS
 	KILLER1
 	KILLER2
+	COUNTER
 	GEN_QUIETS
 	HISTORY_QUIETS
 	BAD_CAPTURES
@@ -40,26 +41,30 @@ type MovePicker struct {
 	ttMove      Move
 	killer1     Move
 	killer2     Move
+	counter     Move
 	board       *Board
 	history     *[2][64][64]int
 	depth       int
 	currIdx     int
 	lastStage   Stage
 	QS          bool
+	skipQuiets  bool
 }
 
-func NewMovePicker(b *Board, ttMove Move, killer1 Move, killer2 Move, depth int, history *[2][64][64]int, fromQS bool) *MovePicker {
+func NewMovePicker(b *Board, ttMove Move, killer1 Move, killer2 Move, counter Move, depth int, history *[2][64][64]int, fromQS bool) *MovePicker {
 	mp := &MovePicker{
-		board:     b,
-		ttMove:    ttMove,
-		stage:     ternary(ttMove.IsEmpty(), TT_MOVE+1, TT_MOVE),
-		killer1:   killer1,
-		killer2:   killer2,
-		depth:     depth,
-		history:   history,
-		currIdx:   0,
-		lastStage: ternary(fromQS, GOOD_CAPTURES, BAD_CAPTURES),
-		QS:        fromQS,
+		board:      b,
+		ttMove:     ttMove,
+		stage:      ternary(ttMove.IsEmpty(), TT_MOVE+1, TT_MOVE),
+		killer1:    killer1,
+		killer2:    killer2,
+		counter:    counter,
+		depth:      depth,
+		history:    history,
+		currIdx:    0,
+		lastStage:  ternary(fromQS, GOOD_CAPTURES, BAD_CAPTURES),
+		QS:         fromQS,
+		skipQuiets: fromQS,
 	}
 	return mp
 }
@@ -109,6 +114,10 @@ func (mp *MovePicker) getNextAndSwap(moves []ScoredMove, idx int) bool {
 	return true
 }
 
+func (mp *MovePicker) SkipQuiets() {
+	mp.skipQuiets = true
+}
+
 func (mp *MovePicker) NextMove() Move {
 	for mp.stage <= mp.lastStage {
 		switch mp.stage {
@@ -156,23 +165,54 @@ func (mp *MovePicker) NextMove() Move {
 
 		case KILLER1:
 			mp.stage++
-			legal := mp.board.IsLegal(mp.killer1)
-			if legal && mp.killer1 != mp.ttMove {
-				return mp.killer1
+			if mp.skipQuiets {
+				continue
+			}
+
+			if mp.killer1 != mp.ttMove {
+				if mp.board.IsLegal(mp.killer1) {
+					return mp.killer1
+				}
 			}
 
 		case KILLER2:
 			mp.stage++
-			legal := mp.board.IsLegal(mp.killer2)
-			if legal && mp.killer2 != mp.killer1 && mp.killer2 != mp.ttMove {
-				return mp.killer2
+			if mp.skipQuiets {
+				continue
+			}
+
+			if mp.killer2 != mp.killer1 && mp.killer2 != mp.ttMove {
+				if mp.board.IsLegal(mp.killer2) {
+					return mp.killer2
+				}
+			}
+
+		case COUNTER:
+			mp.stage++
+			if mp.skipQuiets {
+				continue
+			}
+
+			if mp.counter != mp.killer1 && mp.counter != mp.killer2 && mp.counter != mp.ttMove {
+				if mp.board.IsLegal(mp.counter) {
+					return mp.counter
+				}
 			}
 
 		case GEN_QUIETS:
 			mp.stage++
+			if mp.skipQuiets {
+				continue
+			}
 			mp.processMoves(mp.board.GenerateQuiets())
 
 		case HISTORY_QUIETS:
+			if mp.skipQuiets {
+				mp.currIdx = 0
+				mp.stage++
+				continue
+			}
+
 			if mp.getNextAndSwap(mp.quiets, mp.currIdx) {
 				move := mp.quiets[mp.currIdx].move
 				if move == mp.killer1 || move == mp.killer2 || move == mp.ttMove {

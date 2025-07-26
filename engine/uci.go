@@ -69,6 +69,7 @@ func (uci *UCIManager) UCINewGame() {
 	uci.SearchThread.Position = NewBoard()
 	uci.SearchThread.ClearHistory()
 	uci.SearchThread.ClearKillers()
+	uci.SearchThread.ClearCounters()
 	ClearTT()
 }
 

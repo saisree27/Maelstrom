@@ -45,7 +45,7 @@ func RunSearch(position string, depth int) {
 
 		fmt.Printf("Depth %d: ", i)
 
-		score := s.Pvs(i, -WIN_VAL-1, WIN_VAL+1, true, &line)
+		score := s.Pvs(i, -WIN_VAL-1, WIN_VAL+1, true, Move{}, &line)
 		score *= COLOR_SIGN[s.Position.turn]
 
 		if Timer.Stop {

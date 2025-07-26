@@ -21,10 +21,11 @@ type SearchInfo struct {
 }
 
 type Searcher struct {
-	Position    *Board
-	KillerMoves [101][2]Move
-	History     [2][64][64]int
-	Info        SearchInfo
+	Position     *Board
+	KillerMoves  [101][2]Move
+	History      [2][64][64]int
+	CounterMoves [12][64]Move
+	Info         SearchInfo
 }
 
 func (s *Searcher) QuiescenceSearch(alpha int, beta int) int {
@@ -60,7 +61,7 @@ func (s *Searcher) QuiescenceSearch(alpha int, beta int) int {
 		alpha = eval
 	}
 
-	mp := NewMovePicker(s.Position, Move{}, Move{}, Move{}, 0, &s.History, true)
+	mp := NewMovePicker(s.Position, Move{}, Move{}, Move{}, Move{}, 0, &s.History, true)
 
 	for {
 		move := mp.NextMove()
@@ -87,7 +88,7 @@ func (s *Searcher) QuiescenceSearch(alpha int, beta int) int {
 	return alpha
 }
 
-func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, line *[]Move) int {
+func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, prevMove Move, line *[]Move) int {
 	s.Info.NodesSearched++
 
 	if s.Info.NodesSearched%2047 == 0 {
@@ -191,7 +192,7 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, line *[]Move
 		if depth >= Params.NMP_MIN_DEPTH && doNull && notJustPawnsAndKing != 0 && staticEval >= beta {
 			s.Position.MakeNullMove()
 			R := 4 + depth/3 + Min((staticEval-beta)/200, 3)
-			score := -s.Pvs(depth-1-R, -beta, -beta+1, false, &childPV)
+			score := -s.Pvs(depth-1-R, -beta, -beta+1, false, Move{}, &childPV)
 			s.Position.UndoNullMove()
 
 			childPV = []Move{}
@@ -223,11 +224,17 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, line *[]Move
 	bestMove = Move{}
 	ttFlag := UPPER
 
-	mp := NewMovePicker(s.Position, pvMove, s.KillerMoves[depth][0], s.KillerMoves[depth][1], depth, &s.History, false)
+	killer1 := s.KillerMoves[depth][0]
+	killer2 := s.KillerMoves[depth][1]
+	counter := s.CounterMoves[prevMove.piece][prevMove.to]
+	if prevMove.IsEmpty() {
+		counter = Move{}
+	}
+
+	mp := NewMovePicker(s.Position, pvMove, killer1, killer2, counter, depth, &s.History, false)
 
 	var quietsSearched []Move
 
-	skipQuiets := false
 	mvCnt := 0
 	for {
 		// BEST MOVE SELECTION (MOVE ORDERING)
@@ -243,14 +250,10 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, line *[]Move
 		isQuiet := move.movetype == QUIET || move.movetype == K_CASTLE || move.movetype == Q_CASTLE
 		lmrDepth := Max(depth-LMR_TABLE[depth][mvCnt], 0)
 
-		if isQuiet && skipQuiets {
-			continue
-		}
-
 		if !isRoot && !isPv && bestScore > -WIN_VAL+100 {
 			// LATE MOVE PRUNING
 			if isQuiet && depth <= Params.LMP_MAX_DEPTH && mvCnt > Params.LMP_BASE+Params.LMP_MULT*depth*depth && !check {
-				skipQuiets = true
+				mp.SkipQuiets()
 				continue
 			}
 
@@ -263,7 +266,7 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, line *[]Move
 			// https://www.chessprogramming.org/Futility_Pruning
 			futilityMargin := Params.FUTILITY_MULT*lmrDepth + Params.FUTILITY_BASE
 			if isQuiet && !check && lmrDepth <= Params.FUTILITY_MAX_DEPTH && staticEval+futilityMargin <= alpha {
-				skipQuiets = true
+				mp.SkipQuiets()
 				continue
 			}
 
@@ -288,7 +291,7 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, line *[]Move
 
 		score := 0
 		if mvCnt == 1 {
-			score = -s.Pvs(depth-1, -beta, -alpha, true, &childPV)
+			score = -s.Pvs(depth-1, -beta, -alpha, true, move, &childPV)
 		} else {
 			// LATE MOVE REDUCTION (LMR)
 			// Motivation: Because of move ordering, we can save time by reducing search depth of moves that are
@@ -305,15 +308,15 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, line *[]Move
 				R = Max(LMR_TABLE[depth][mvCnt], 0)
 			}
 
-			score = -s.Pvs(depth-1-R, -alpha-1, -alpha, true, &childPV)
+			score = -s.Pvs(depth-1-R, -alpha-1, -alpha, true, move, &childPV)
 
 			if score > alpha && R > 0 {
-				score = -s.Pvs(depth-1, -alpha-1, -alpha, true, &childPV)
+				score = -s.Pvs(depth-1, -alpha-1, -alpha, true, move, &childPV)
 				if score > alpha {
-					score = -s.Pvs(depth-1, -beta, -alpha, true, &childPV)
+					score = -s.Pvs(depth-1, -beta, -alpha, true, move, &childPV)
 				}
 			} else if score > alpha && score < beta {
-				score = -s.Pvs(depth-1, -beta, -alpha, true, &childPV)
+				score = -s.Pvs(depth-1, -beta, -alpha, true, move, &childPV)
 			}
 		}
 
@@ -332,6 +335,7 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, line *[]Move
 			ttFlag = LOWER
 			if isQuiet {
 				s.storeKillerMove(move, depth)
+				s.storeCounterMove(move, prevMove)
 
 				// History bonus using history gravity formula
 				bonus := 300*depth - 250
@@ -381,6 +385,12 @@ func (s *Searcher) storeKillerMove(move Move, depth int) {
 	}
 }
 
+func (s *Searcher) storeCounterMove(move Move, prevMove Move) {
+	if !prevMove.IsEmpty() {
+		s.CounterMoves[prevMove.piece][prevMove.to] = move
+	}
+}
+
 func (s *Searcher) updateHistory(move Move, color Color, bonus int) {
 	if bonus > HISTORY_MAX_BONUS {
 		bonus = HISTORY_MAX_BONUS
@@ -405,6 +415,10 @@ func (s *Searcher) ClearKillers() {
 
 func (s *Searcher) ClearHistory() {
 	s.History = [2][64][64]int{}
+}
+
+func (s *Searcher) ClearCounters() {
+	s.CounterMoves = [12][64]Move{}
 }
 
 func InitializeLMRTable() {
@@ -459,7 +473,7 @@ func (s *Searcher) SearchPosition() Move {
 
 		// Aspiration window search with exponentially-widening research on fail
 		for {
-			score = s.Pvs(depth, alpha, beta, true, &line)
+			score = s.Pvs(depth, alpha, beta, true, Move{}, &line)
 			if Timer.Stop {
 				return prevBest
 			}
