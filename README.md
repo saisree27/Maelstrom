@@ -30,7 +30,7 @@ Maelstrom often plays on Lichess [here](https://lichess.org/@/Maelstrom-Chess). 
  - Late move pruning
  - Quiescence search
  - Static Exchange Evaluation (SEE) pruning and move ordering
- - NNUE Evaluation using a (768->512)x2 -> 1 architecture using a SIMD SCReLU activation function, trained on Lc0/SF data
+ - NNUE Evaluation using a (768->512)x2->1 architecture using a SIMD SCReLU activation function, trained on Lc0/SF data
  - UCI protocol implementation, so you can run the engine using a UCI-supported GUI such as [CuteChess](https://github.com/cutechess/cutechess/releases)
  - Time management with soft/hard bounds
  - Pondering
@@ -45,11 +45,11 @@ Table summarizing Elo progression (with specific tests documented in release not
 
 |        Version      |  Estimated Elo  | CCRL Blitz |
 |:-------------------:|:------------:|:------------:|
-| v3.2.0    | ~3200 |              |
-| v3.1.1    | ~3070 |              |
-| v3.1.0    | ~3040 |              |
-| v3.0.0    |  ~2820 |              |
-| v2.1.0    | ~2300 |              |
+| v3.2.0    | ~3200 | [3213](https://computerchess.org.uk/ccrl/404/cgi/engine_details.cgi?print=Details&each_game=1&eng=Maelstrom%203.2.0%2064-bit#Maelstrom_3_2_0_64-bit) |
+| v3.1.1    | ~3070 |     -        |
+| v3.1.0    | ~3040 |     -        |
+| v3.0.0    |  ~2820 |    -         |
+| v2.1.0    | ~2300 |     -        |
 | v2.0.0    |  - |     [2111](https://computerchess.org.uk/ccrl/404/cgi/engine_details.cgi?print=Details&each_game=1&eng=Maelstrom%202.0.0%2064-bit#Maelstrom_2_0_0_64-bit)     |
 
 </div>
