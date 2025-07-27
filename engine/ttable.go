@@ -13,6 +13,14 @@ const (
 	EXACT
 )
 
+type ProbeResult uint8
+
+const (
+	CUTOFF ProbeResult = iota
+	FAIL
+	NULL
+)
+
 type TTEntry struct {
 	hash       u64
 	score      int32
@@ -77,7 +85,7 @@ func StoreEntry(b *Board, score int, bd bound, mv Move, depth uint8, staticEval 
 	}
 }
 
-func ProbeTT(b *Board, alpha int, beta int, depth uint8, m *Move, staticEval *int) (bool, int) {
+func ProbeTT(b *Board, alpha int, beta int, depth uint8, m *Move) (ProbeResult, int, *TTEntry) {
 	entryIndex := b.zobrist % TT.count
 	entry := &TT.entries[entryIndex]
 
@@ -87,23 +95,25 @@ func ProbeTT(b *Board, alpha int, beta int, depth uint8, m *Move, staticEval *in
 
 		// Get the PV-move
 		*m = entry.bestMove
-		*staticEval = int(entry.staticEval)
 		if entry.depth >= depth {
 			score := int(entry.score)
 			if entry.bd == LOWER && score >= beta {
-				return true, beta
+				return CUTOFF, beta, entry
 			}
 
 			if entry.bd == UPPER && score <= alpha {
-				return true, alpha
+				return CUTOFF, alpha, entry
 			}
 
 			if entry.bd == EXACT {
-				return true, score
+				return CUTOFF, score, entry
 			}
 		}
+
+		return FAIL, 0, entry
 	}
-	return false, 0
+
+	return NULL, 0, &TTEntry{}
 }
 
 // Increment age counter periodically

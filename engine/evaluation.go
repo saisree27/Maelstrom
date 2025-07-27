@@ -3,6 +3,10 @@ package engine
 // Values for material and checkmate
 const WIN_VAL int = 1000000
 
+var COLOR_SIGN = [2]int{
+	WHITE: 1, BLACK: -1,
+}
+
 var REVERSE_SQUARE = [64]int{
 	56, 57, 58, 59, 60, 61, 62, 63,
 	48, 49, 50, 51, 52, 53, 54, 55,
@@ -39,7 +43,7 @@ func EvaluateNNUE(b *Board) int {
 	}
 
 	eval = materialScaling(b, eval)
-	return eval
+	return eval * COLOR_SIGN[b.turn]
 }
 
 func materialScaling(b *Board, eval int) int {

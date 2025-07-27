@@ -116,3 +116,15 @@ func FromUCI(uci string, b *Board) Move {
 func (m Move) IsEmpty() bool {
 	return m.from == m.to || m.null
 }
+
+func (m Move) IsQuiet() bool {
+	return m.movetype == QUIET || m.movetype == K_CASTLE || m.movetype == Q_CASTLE
+}
+
+func (m Move) IsNoisy() bool {
+	return m.movetype == CAPTURE || m.movetype == CAPTURE_AND_PROMOTION || m.movetype == PROMOTION || m.movetype == EN_PASSANT
+}
+
+func (m Move) IsCapture() bool {
+	return m.movetype == CAPTURE || m.movetype == CAPTURE_AND_PROMOTION || m.movetype == EN_PASSANT
+}

@@ -6,10 +6,6 @@ import (
 	"strings"
 )
 
-var COLOR_SIGN = [2]int{
-	WHITE: 1, BLACK: -1,
-}
-
 var LMR_TABLE = [101][101]int{}
 
 type SearchInfo struct {
@@ -39,17 +35,24 @@ func (s *Searcher) QuiescenceSearch(alpha int, beta int) int {
 		return 0
 	}
 
-	eval := -2 * WIN_VAL
+	ttMove := Move{}
 
 	// Probe TT in QS, see if we can get a TT cutoff or just get static eval
-	res, score := ProbeTT(s.Position, alpha, beta, uint8(0), &Move{}, &eval)
-	if res {
+	probeResult, score, entry := ProbeTT(s.Position, alpha, beta, uint8(0), &ttMove)
+	if probeResult == CUTOFF {
 		return score
 	}
 
-	// If we didn't get static eval from TT
-	if eval < -WIN_VAL {
-		eval = EvaluateNNUE(s.Position) * COLOR_SIGN[s.Position.turn]
+	// If TT move is not a capture, we should not use it in move ordering
+	if !ttMove.IsCapture() {
+		ttMove = Move{}
+	}
+
+	eval := -2 * WIN_VAL
+	if probeResult == NULL {
+		eval = EvaluateNNUE(s.Position)
+	} else {
+		eval = int(entry.staticEval)
 	}
 
 	// Beta cutoff
@@ -61,7 +64,7 @@ func (s *Searcher) QuiescenceSearch(alpha int, beta int) int {
 		alpha = eval
 	}
 
-	mp := NewMovePicker(s.Position, Move{}, Move{}, Move{}, Move{}, 0, &s.History, true)
+	mp := NewMovePicker(s.Position, ttMove, Move{}, Move{}, Move{}, 0, &s.History, true)
 
 	for {
 		move := mp.NextMove()
@@ -123,19 +126,26 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, prevMove Mov
 
 	bestMove := Move{}
 
-	staticEval := -2 * WIN_VAL
-
 	// Probe TT:
 	// - Try to get PV move, static eval
 	// - If conditions are met, we can return ttScore from TT
-	res, ttScore := ProbeTT(s.Position, alpha, beta, uint8(depth), &bestMove, &staticEval)
-	if res && !isRoot && !isPv {
+	probeResult, ttScore, entry := ProbeTT(s.Position, alpha, beta, uint8(depth), &bestMove)
+	if probeResult == CUTOFF && !isRoot && !isPv {
 		return ttScore
 	}
 
-	// Compute static eval to be used for pruning checks
-	if staticEval < -WIN_VAL {
-		staticEval = EvaluateNNUE(s.Position) * COLOR_SIGN[stm]
+	// Compute static eval to be used for pruning
+	staticEval := -2 * WIN_VAL
+	if check || probeResult == NULL {
+		staticEval = EvaluateNNUE(s.Position)
+	} else {
+		staticEval = int(entry.staticEval)
+		if int(entry.score) > staticEval && (entry.bd == EXACT || entry.bd == LOWER) {
+			staticEval = int(entry.score)
+		}
+		if int(entry.score) < staticEval && (entry.bd == EXACT || entry.bd == UPPER) {
+			staticEval = int(entry.score)
+		}
 	}
 
 	// Pre-allocate PV line for child nodes
@@ -247,7 +257,7 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, prevMove Mov
 
 		mvCnt++
 
-		isQuiet := move.movetype == QUIET || move.movetype == K_CASTLE || move.movetype == Q_CASTLE
+		isQuiet := move.IsQuiet()
 		lmrDepth := Max(depth-LMR_TABLE[depth][mvCnt], 0)
 
 		if !isRoot && !isPv && bestScore > -WIN_VAL+100 {
@@ -441,9 +451,10 @@ func (s *Searcher) SearchPosition() Move {
 	line := []Move{}
 	legalMoves := s.Position.GenerateLegalMoves()
 	prevScore := 0
+	maxDepth := 100
 
 	if len(legalMoves) == 1 {
-		return legalMoves[0]
+		Timer.hardLimit /= 10
 	}
 
 	// If no legal moves, return empty move
@@ -454,7 +465,7 @@ func (s *Searcher) SearchPosition() Move {
 	// Set prevBest to first legal move in case search is stopped immediately
 	prevBest := legalMoves[0]
 
-	for depth := 1; depth <= 100; depth++ {
+	for depth := 1; depth <= maxDepth; depth++ {
 		s.Info.RootDepth = depth
 
 		// Aspiration windows
@@ -528,12 +539,6 @@ func (s *Searcher) SearchPosition() Move {
 				s.Info.PonderMove = line[1]
 			} else {
 				s.Info.PonderMove = Move{}
-
-				// Attempt to get ponder move from TT
-				staticEval := 0
-				s.Position.MakeMove(prevBest)
-				ProbeTT(s.Position, -WIN_VAL-1, WIN_VAL+1, 1, &s.Info.PonderMove, &staticEval)
-				s.Position.Undo()
 			}
 		}
 
