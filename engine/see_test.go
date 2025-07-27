@@ -37,16 +37,21 @@ func TestSee(t *testing.T) {
 		s.Position.InitFEN(fen + " 0 1")
 		move := FromUCI(uci, s.Position)
 
-		if move.promote != EMPTY {
-			fmt.Println("skip promotion")
-			continue
-		}
-
-		res := SEE(move, s.Position)
+		res := SEE(move, s.Position, score)
 
 		fmt.Printf("\n\n")
-		if res != score {
-			t.Fatalf("Expected %d, got %d", score, res)
+		if !res {
+			t.Fatalf("Expected %d, got %t", score, res)
+		}
+
+		res = SEE(move, s.Position, score+1)
+		if res {
+			t.Fatalf("Expected %d, got %t", score, res)
+		}
+
+		res = SEE(move, s.Position, score-1)
+		if !res {
+			t.Fatalf("Expected %d, got %t", score, res)
 		}
 	}
 }

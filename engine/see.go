@@ -16,49 +16,81 @@ var SEE_PIECE_VALUES = [6]int{
 //	capture the square the move went to. Once we do this until there are no more captures left to that square,
 //	we'll have a decent idea how much this capture gains/loses material.
 //
-// Pseudocode implementation from https://www.chessprogramming.org/SEE_-_The_Swap_Algorithm
-func SEE(move Move, b *Board) int {
-	gain := [32]int{}
-	d := 0
-	mayXRay := b.occupied & ^(b.pieces[W_K] | b.pieces[W_N] | b.pieces[B_K] | b.pieces[B_N]) // pawns, bishops, rooks. queens
-	fromSet := SQUARE_TO_BITBOARD[move.from]
-	occ := b.occupied ^ SQUARE_TO_BITBOARD[move.from] ^ SQUARE_TO_BITBOARD[move.to]
-	attadef := b.AllAttackersOf(move.to, occ)
+// Implementation inspired from Ethereal/Weiss/Stormphrax's implementation of SEE thresholding
+func SEE(move Move, b *Board, threshold int) bool {
+	stm := b.turn
+	gain := 0
 
-	stm := ReverseColor(b.turn)
-	initial_gain := 0
-	if move.captured != EMPTY {
-		initial_gain += SEE_PIECE_VALUES[PieceToPieceType(move.captured)]
+	// Determine gain of the first move
+	if move.movetype == EN_PASSANT {
+		gain += SEE_PIECE_VALUES[PAWN]
+	} else if move.movetype == CAPTURE || move.movetype == CAPTURE_AND_PROMOTION {
+		gain += SEE_PIECE_VALUES[PieceToPieceType(move.captured)]
+	}
+	if move.movetype == PROMOTION || move.movetype == CAPTURE_AND_PROMOTION {
+		gain += SEE_PIECE_VALUES[PieceToPieceType(move.promote)] - SEE_PIECE_VALUES[PAWN]
 	}
 
-	attacker := PieceToPieceType(move.piece)
-	seen := u64(0)
+	// Subtract threshold to keep our logic in terms of greater and less than 0
+	gain -= threshold
 
-	gain[d] = initial_gain
+	// If our gain is already negative after making the move, it will not be able to increase
+	if gain < 0 {
+		return false
+	}
 
-	for fromSet != 0 {
-		d++
-		gain[d] = SEE_PIECE_VALUES[attacker] - gain[d-1]
-		attadef &= ^fromSet
-		occ &= ^fromSet
-		seen |= fromSet
+	// If we were to lose the moving piece (or promoted piece), are we still above threshold?
+	// If so, no need to continue with SEE, just return true
+	nextLoss := SEE_PIECE_VALUES[PieceToPieceType(move.piece)]
+	if move.movetype == PROMOTION || move.movetype == CAPTURE_AND_PROMOTION {
+		nextLoss = SEE_PIECE_VALUES[PieceToPieceType(move.promote)]
+	}
+	gain -= nextLoss
+	if gain >= 0 {
+		return true
+	}
 
-		if fromSet&mayXRay != 0 {
-			attadef |= b.XRayAttacks(move.to, occ) & ^seen
+	sq := move.to
+	occ := b.occupied ^ SQUARE_TO_BITBOARD[move.from] ^ SQUARE_TO_BITBOARD[move.to]
+	queens := b.pieces[B_Q] | b.pieces[W_Q]
+	bishops := b.pieces[B_B] | b.pieces[W_B] | queens
+	rooks := b.pieces[B_R] | b.pieces[W_R] | queens
+
+	var attackerPiece PieceType
+
+	attackers := b.AllAttackersOf(sq, occ)
+	nextTm := ReverseColor(stm)
+
+	for {
+		ourAttackers := attackers & b.colors[nextTm]
+
+		if ourAttackers == 0 {
+			break
 		}
 
-		fromSet = getLeastValuablePiece(b, attadef, stm, &attacker)
+		next := getLeastValuablePiece(b, ourAttackers, nextTm, &attackerPiece)
+		occ ^= next
 
-		stm = ReverseColor(stm)
+		if attackerPiece == PAWN || attackerPiece == BISHOP || attackerPiece == QUEEN {
+			attackers |= BishopAttacks(sq, occ) & bishops
+		}
+
+		if attackerPiece == ROOK || attackerPiece == QUEEN {
+			attackers |= RookAttacks(sq, occ) & rooks
+		}
+
+		attackers &= occ
+		gain = -gain - 1 - SEE_PIECE_VALUES[attackerPiece]
+		nextTm = ReverseColor(nextTm)
+
+		if gain >= 0 {
+			if attackerPiece == KING && attackers&b.colors[nextTm] != 0 {
+				nextTm = ReverseColor(nextTm)
+			}
+			break
+		}
 	}
-
-	// Negamax-ing gains
-	for d > 1 {
-		d--
-		gain[d-1] = -Max(-gain[d-1], gain[d])
-	}
-
-	return gain[0]
+	return stm != nextTm
 }
 
 func getLeastValuablePiece(b *Board, attadef u64, stm Color, piece *PieceType) u64 {

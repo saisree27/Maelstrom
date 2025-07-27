@@ -140,11 +140,11 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, prevMove Mov
 		staticEval = EvaluateNNUE(s.Position)
 	} else {
 		staticEval = int(entry.staticEval)
-		if int(entry.score) > staticEval && (entry.bd == EXACT || entry.bd == LOWER) {
-			staticEval = int(entry.score)
+		if ttScore > staticEval && (entry.bd == EXACT || entry.bd == LOWER) {
+			staticEval = ttScore
 		}
-		if int(entry.score) < staticEval && (entry.bd == EXACT || entry.bd == UPPER) {
-			staticEval = int(entry.score)
+		if ttScore < staticEval && (entry.bd == EXACT || entry.bd == UPPER) {
+			staticEval = ttScore
 		}
 	}
 
@@ -282,13 +282,13 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, prevMove Mov
 
 			// SEE QUIET PRUNING
 			seeMargin := -Params.SEE_QUIET_PRUNING_MULT * lmrDepth * lmrDepth
-			if isQuiet && SEE(move, s.Position) < seeMargin {
+			if isQuiet && !SEE(move, s.Position, seeMargin) {
 				continue
 			}
 
 			// SEE CAPTURE PRUNING
 			seeMargin = -Params.SEE_CAPTURE_PRUNING_MULT * depth
-			if (move.movetype == CAPTURE || move.movetype == EN_PASSANT) && SEE(move, s.Position) < seeMargin {
+			if move.IsCapture() && !SEE(move, s.Position, seeMargin) {
 				continue
 			}
 		}

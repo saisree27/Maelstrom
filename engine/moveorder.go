@@ -139,7 +139,7 @@ func (mp *MovePicker) NextMove() Move {
 		case GOOD_CAPTURES:
 			if mp.getNextAndSwap(mp.captures, mp.currIdx) {
 				move := mp.captures[mp.currIdx].move
-				if SEE(move, mp.board) < 0 {
+				if !SEE(move, mp.board, 0) {
 					mp.badCaptures = append(mp.badCaptures, mp.captures[mp.currIdx])
 					mp.currIdx++
 					continue

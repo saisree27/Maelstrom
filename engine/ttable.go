@@ -110,7 +110,7 @@ func ProbeTT(b *Board, alpha int, beta int, depth uint8, m *Move) (ProbeResult, 
 			}
 		}
 
-		return FAIL, 0, entry
+		return FAIL, int(entry.score), entry
 	}
 
 	return NULL, 0, &TTEntry{}
