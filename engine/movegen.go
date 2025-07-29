@@ -387,7 +387,7 @@ func (b *Board) PinnedPieces(kingSquare Square, c Color) (u64, u64) {
 
 func (b *Board) GenerateMoves(allowed u64, includePromotions bool, skipQuiets bool) []Move {
 	// Setup move list with pre-allocated capacity
-	m := make([]Move, 0, 48)
+	m := make([]Move, 0, 30)
 
 	player := b.turn
 	opponent := ReverseColor(player)

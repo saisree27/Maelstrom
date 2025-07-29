@@ -6,8 +6,8 @@ import (
 	"strings"
 )
 
-var LMR_TABLE = [101][101]int{}
-
+// SearchInfo stores global search statistics which will be used
+// to report search information via UCI.
 type SearchInfo struct {
 	NodesSearched    int
 	PonderMove       Move
@@ -16,6 +16,8 @@ type SearchInfo struct {
 	PonderingEnabled bool
 }
 
+// Searcher is the primary search thread. All information stored in
+// this struct is specific to each individual search.
 type Searcher struct {
 	Position     *Board
 	KillerMoves  [101][2]Move
@@ -24,6 +26,13 @@ type Searcher struct {
 	Info         SearchInfo
 }
 
+// This tables stores the pre-computed depth reductions based on
+// depth and number of explored moves.
+var LMR_TABLE = [101][101]int{}
+
+// Quiescence search - utilized at leaf nodes to mitigate the horizon effect
+// by calculating all possible captures and only computing a static evaluation
+// when the position is quiet.
 func (s *Searcher) QuiescenceSearch(alpha int, beta int) int {
 	s.Info.NodesSearched++
 
@@ -91,6 +100,13 @@ func (s *Searcher) QuiescenceSearch(alpha int, beta int) int {
 	return alpha
 }
 
+// Principal Variation Search (variation of Negamax) - primary search function.
+// The main difference between this and negamax is we explore the first move in
+// the move ordering (the principal move) and search it in a large window in an
+// attempt to be able to prune future moves. The doNull parameter refers to whether
+// we can perform Null Move Pruning at this node, prevMove refers to the move played
+// in the parent node (used for updating counter moves), and line refers to the tracked
+// principal variation.
 func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, prevMove Move, line *[]Move) int {
 	s.Info.NodesSearched++
 
@@ -107,7 +123,11 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, prevMove Mov
 	stm := s.Position.turn
 	check := s.Position.IsCheck(stm)
 
+	///////////////////////////////////////////////////////////////////////////////
 	// CHECK EXTENSION
+	// When we encounter a check, we should ensure that we resolve the check. This
+	// can be implemented simply by searching for one more ply.
+	///////////////////////////////////////////////////////////////////////////////
 	if check && depth < 100 {
 		depth++
 	}
@@ -126,15 +146,23 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, prevMove Mov
 
 	bestMove := Move{}
 
-	// Probe TT:
-	// - Try to get PV move, static eval
-	// - If conditions are met, we can return ttScore from TT
+	///////////////////////////////////////////////////////////////////////////////
+	// TRANSPOSITION TABLE PROBE
+	// The goal is to prune the node entirely using the saved score in TT.
+	// Even if this doesn't happen though, we can still utilize saved static eval.
+	///////////////////////////////////////////////////////////////////////////////
 	probeResult, ttScore, entry := ProbeTT(s.Position, alpha, beta, uint8(depth), &bestMove)
 	if probeResult == CUTOFF && !isRoot && !isPv {
 		return ttScore
 	}
 
-	// Compute static eval to be used for pruning
+	///////////////////////////////////////////////////////////////////////////////
+	// STATIC EVAL CALCULATION/CORRECTION
+	// Need the static evaluation of the board position for certain pruning
+	// techniques. When the TT probe returns an entry, we can potentially utilize
+	// the saved static eval. In many cases we can also use the saved TT score as
+	// the static eval, which would be a more accurate assessment of the position.
+	///////////////////////////////////////////////////////////////////////////////
 	staticEval := -2 * WIN_VAL
 	if check || probeResult == NULL {
 		staticEval = EvaluateNNUE(s.Position)
@@ -151,17 +179,20 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, prevMove Mov
 	// Pre-allocate PV line for child nodes
 	childPV := []Move{}
 
-	// Conditions for RFP, Razoring, NMP
+	///////////////////////////////////////////////////////////////////////////////
+	// NODE PRUNING CONDITIONS
+	// In order to prune the entire node via RFP/NMP/etc we need to ensure that we
+	// are not in a root node, aren't in a PV node, and that the position is not in
+	// check.
+	///////////////////////////////////////////////////////////////////////////////
 	if !isRoot && !isPv && !check {
-		// REVERSE FUTILITY PRUNING / STATIC NULL MOVE PRUNING
-		// Motivation: If the material balance minus a safety margin does not improve beta,
-		// 			   then we can fail-high because the child node would not improve alpha.
-		// 			   Currently the margin is a constant multiple of depth, this can be improved.
-		// Conditions:
-		//    1. Not in check
-		//    2. Not in PV node
-		//    3. TT move exists and is not a capture
+		///////////////////////////////////////////////////////////////////////////////
+		// REVERSE FUTILITY PRUNING
+		// If the material balance minus a safety margin does not improve beta,
+		// then we can fail-high because the child node would not improve alpha.
+		// Currently the margin is a constant multiple of depth, this can be improved.
 		// More info: https://www.chessprogramming.org/Reverse_Futility_Pruning
+		///////////////////////////////////////////////////////////////////////////////
 		if depth <= Params.RFP_MAX_DEPTH && !bestMove.IsEmpty() && bestMove.movetype != CAPTURE && beta > -WIN_VAL-100 {
 			margin := Params.RFP_MULT * depth
 			if staticEval-margin >= beta {
@@ -169,14 +200,13 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, prevMove Mov
 			}
 		}
 
+		///////////////////////////////////////////////////////////////////////////////
 		// RAZORING
-		// Motivation: we can prune branches at shallow depths if the static evaluation
-		//             with a safety margin is less than alpha and quiescence confirms that
-		//             we can fail low.
-		// Conditions:
-		//    1. Not a PV node
-		// 	  2. Not searching for mate
+		// We can prune branches at shallow depths if the static evaluation with a
+		// safety margin is less than alpha and quiescence confirms that we can fail
+		// low. However, we need to ensure that we are not searching for mate.
 		// More info: https://www.chessprogramming.org/Razoring
+		///////////////////////////////////////////////////////////////////////////////
 		if depth <= Params.RAZORING_MAX_DEPTH && alpha < WIN_VAL/10 && beta > -WIN_VAL/10 {
 			razorMargin := Params.RAZORING_MULT * depth
 			if staticEval+razorMargin <= alpha {
@@ -188,16 +218,15 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, prevMove Mov
 			}
 		}
 
+		///////////////////////////////////////////////////////////////////////////////
 		// NULL MOVE PRUNING
-		// Motivation: The null move would be worse than any possible legal move, so
-		// 			   if we can have a reduced search by performing a null move that still fails high
-		// 			   we can be relatively sure that the best legal move would also fail high over beta,
-		//             so we can avoid having to check this node. Reduced depth here is 3 + d/6, formula from Blunder
-		// Conditions:
-		//    1. Not in check
-		//    2. Side to move does not have just king and pawns
-		// 	  3. Not in PV node
+		// The null move would be worse than any possible legal move, so if we can have
+		// a reduced search by performing a null move that still fails high we can be
+		// relatively sure that the best legal move would also fail high over beta, so
+		// we can avoid having to check this node. However, we need to ensure that the
+		// side to move doesn't have just a king and pawns.
 		// More info: https://www.chessprogramming.org/Null_Move_Pruning
+		///////////////////////////////////////////////////////////////////////////////
 		notJustPawnsAndKing := s.Position.colors[stm] ^ (s.Position.GetColorPieces(PAWN, stm) | s.Position.GetColorPieces(KING, stm))
 		if depth >= Params.NMP_MIN_DEPTH && doNull && notJustPawnsAndKing != 0 && staticEval >= beta {
 			s.Position.MakeNullMove()
@@ -217,14 +246,12 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, prevMove Mov
 		}
 	}
 
-	// INTERNAL ITERATIVE REDUCTION (IIR)
-	// Motivation: If there is no TT move, we hope we can safely reduce the depth of node since we
-	//             did not look at this position in prior searches. We can do IIR on PV nodes and
-	//             expected cut nodes.
-	// Conditions:
-	//    1. TT move not found
-	//    2. Depth is greater than some limit
-	//    3. Is in a PV node
+	///////////////////////////////////////////////////////////////////////////////
+	// INTERNAL ITERATIVE REDUCTION
+	// If there is no TT move, we hope we can safely reduce the depth of node since
+	// we did not look at this position in prior searches. We can do IIR on PV
+	// nodes and expected cut nodes.
+	///////////////////////////////////////////////////////////////////////////////
 	if bestMove.IsEmpty() && depth >= Params.IIR_MIN_DEPTH && isPv {
 		depth -= Params.IIR_DEPTH_REDUCTION
 	}
@@ -247,9 +274,10 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, prevMove Mov
 
 	mvCnt := 0
 	for {
-		// BEST MOVE SELECTION (MOVE ORDERING)
-		// Motivation: If we select good moves to search first, we can prune later moves.
-		// move := s.SelectMove(mvCnt, moves, pvMove, depth)
+		///////////////////////////////////////////////////////////////////////////////
+		// MOVE ORDERING
+		// If we select good moves to search first, we can prune later moves.
+		///////////////////////////////////////////////////////////////////////////////
 		move := mp.NextMove()
 		if move.IsEmpty() {
 			break
@@ -261,32 +289,44 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, prevMove Mov
 		lmrDepth := Max(depth-LMR_TABLE[depth][mvCnt], 0)
 
 		if !isRoot && !isPv && bestScore > -WIN_VAL+100 {
+			///////////////////////////////////////////////////////////////////////////////
 			// LATE MOVE PRUNING
+			// With good move ordering, we can skip quiet moves that are late in the move
+			// tree. However, at higher depths we should avoid doing as much skipping based
+			// on move number, so we apply a quadratic depth-based formula to determine at
+			// what point to start pruning moves.
+			///////////////////////////////////////////////////////////////////////////////
 			if isQuiet && depth <= Params.LMP_MAX_DEPTH && mvCnt > Params.LMP_BASE+Params.LMP_MULT*depth*depth && !check {
 				mp.SkipQuiets()
 				continue
 			}
 
+			///////////////////////////////////////////////////////////////////////////////
 			// FUTILITY PRUNING
-			// Motivation: We want to discard moves which have no potential of raising alpha. We use a futilityMargin to estimate
-			//             the potential value of a move (based on depth).
-			// Conditions:
-			//    1. Quiet, seemingly unimportant move (means not a PV node)
-			//    2. Ensure we are not searching for mate
-			// https://www.chessprogramming.org/Futility_Pruning
+			// We want to discard moves which have no potential of raising alpha. We use a
+			// futilityMargin to estimate the potential value of a move (based on depth).
+			// We need to ensure that we futility prune only in quiet positions.
+			// More info: https://www.chessprogramming.org/Futility_Pruning
+			///////////////////////////////////////////////////////////////////////////////
 			futilityMargin := Params.FUTILITY_MULT*lmrDepth + Params.FUTILITY_BASE
 			if isQuiet && !check && lmrDepth <= Params.FUTILITY_MAX_DEPTH && staticEval+futilityMargin <= alpha {
 				mp.SkipQuiets()
 				continue
 			}
 
-			// SEE QUIET PRUNING
+			///////////////////////////////////////////////////////////////////////////////
+			// SEE PRUNING (CAPTURES AND QUIETS)
+			// Using Static Exchange Evaluation (SEE), we can determine whether a move is
+			// worth exploring by whether it loses a large amount of material. At higher
+			// depths we should increase the SEE margin threshold to avoid pruning moves
+			// that seem to lose material but are good. As a result we can maintain depth-
+			// based formulas for both quiet moves and capture moves.
+			///////////////////////////////////////////////////////////////////////////////
 			seeMargin := -Params.SEE_QUIET_PRUNING_MULT * lmrDepth * lmrDepth
 			if isQuiet && !SEE(move, s.Position, seeMargin) {
 				continue
 			}
 
-			// SEE CAPTURE PRUNING
 			seeMargin = -Params.SEE_CAPTURE_PRUNING_MULT * depth
 			if move.IsCapture() && !SEE(move, s.Position, seeMargin) {
 				continue
@@ -303,19 +343,34 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, prevMove Mov
 		if mvCnt == 1 {
 			score = -s.Pvs(depth-1, -beta, -alpha, true, move, &childPV)
 		} else {
-			// LATE MOVE REDUCTION (LMR)
-			// Motivation: Because of move ordering, we can save time by reducing search depth of moves that are
-			//             late in order. If these moves fail high, we need to re-search them since we probably
-			//             missed something. The reduction depth is currently based on a formula used by Ethereal
-			// Conditions:
-			//    1. Quiet, seemingly unimportant move (means not a PV node)
-			//    2. Position not in check before move
-			//    3. Not a shallow depth
-			// https://www.chessprogramming.org/Late_Move_Reductions
+			///////////////////////////////////////////////////////////////////////////////
+			// LATE MOVE REDUCTION
+			// Because of move ordering, we can save time by reducing search depth of moves
+			// that are late in order. If these moves fail high, we need to re-search them
+			// since we probably missed something. The reduction depth is currently based
+			// on a formula used by Ethereal. However, we reduce less when the position is
+			// either in check prior or after the move, and reduce more if we are not in a
+			// PV node. We also do not reduce at all when the move is a capture.
+			// More info: https://www.chessprogramming.org/Late_Move_Reductions
+			///////////////////////////////////////////////////////////////////////////////
 			R := 0
 
-			if depth >= Params.LMR_MIN_DEPTH && isQuiet && !isPv && !check {
-				R = Max(LMR_TABLE[depth][mvCnt], 0)
+			if depth >= Params.LMR_MIN_DEPTH && isQuiet {
+				R = LMR_TABLE[depth][mvCnt]
+
+				if check {
+					R--
+				}
+
+				if s.Position.IsCheck(s.Position.turn) {
+					R--
+				}
+
+				if !isPv {
+					R++
+				}
+
+				R = Max(R, 0)
 			}
 
 			score = -s.Pvs(depth-1-R, -alpha-1, -alpha, true, move, &childPV)
@@ -344,6 +399,10 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, prevMove Mov
 		if score >= beta {
 			ttFlag = LOWER
 			if isQuiet {
+				///////////////////////////////////////////////////////////////////////////////
+				// FAIL HIGH QUIET MOVES
+				// Quiet moves that fail high can be used later on to enhance move ordering.
+				///////////////////////////////////////////////////////////////////////////////
 				s.storeKillerMove(move, depth)
 				s.storeCounterMove(move, prevMove)
 
