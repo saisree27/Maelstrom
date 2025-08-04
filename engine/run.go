@@ -39,6 +39,7 @@ func RunSearch(position string, depth int) {
 	}
 
 	s.Position.PrintFromBitBoards()
+	s.ResetInfo()
 
 	for i := 1; i <= depth; i++ {
 		line := []Move{}
