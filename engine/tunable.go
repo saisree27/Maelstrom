@@ -27,6 +27,8 @@ type TunableParameters struct {
 	TIME_DIVISOR                int64
 	INC_FRACTION                int64
 	HARD_LIMIT_MULT             int64
+	TM_STABILITY_WINDOW         int
+	TM_NODE_COUNT_CONSTANT      int
 }
 
 var Params = TunableParameters{
@@ -55,4 +57,6 @@ var Params = TunableParameters{
 	TIME_DIVISOR:             25,
 	INC_FRACTION:             2,
 	HARD_LIMIT_MULT:          2,
+	TM_STABILITY_WINDOW:      10,
+	TM_NODE_COUNT_CONSTANT:   15,
 }

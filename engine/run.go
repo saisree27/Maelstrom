@@ -45,7 +45,8 @@ func RunSearch(position string, depth int) {
 
 		fmt.Printf("Depth %d: ", i)
 
-		score := s.Pvs(i, -WIN_VAL-1, WIN_VAL+1, true, Move{}, &line)
+		searchStack := [MAX_PLY]SearchStack{}
+		score := s.Pvs(i, 1, -WIN_VAL-1, WIN_VAL+1, true, searchStack[:], &line)
 
 		if Timer.Stop {
 			break

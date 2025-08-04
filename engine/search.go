@@ -14,6 +14,15 @@ type SearchInfo struct {
 	RootDepth        int
 	IsPondering      bool
 	PonderingEnabled bool
+	NodesPerMove     map[Move]int
+}
+
+// SearchStack stores additional information that we will keep on
+// the stack and index using ply.
+type SearchStack struct {
+	staticEval    int
+	staticEvalSet bool
+	move          Move
 }
 
 // Searcher is the primary search thread. All information stored in
@@ -29,6 +38,10 @@ type Searcher struct {
 // This tables stores the pre-computed depth reductions based on
 // depth and number of explored moves.
 var LMR_TABLE = [101][101]int{}
+
+// Max depth and ply we will search
+const MAX_DEPTH = 100
+const MAX_PLY = 256
 
 // Quiescence search - utilized at leaf nodes to mitigate the horizon effect
 // by calculating all possible captures and only computing a static evaluation
@@ -73,7 +86,7 @@ func (s *Searcher) QuiescenceSearch(alpha int, beta int) int {
 		alpha = eval
 	}
 
-	mp := NewMovePicker(s.Position, ttMove, Move{}, Move{}, Move{}, 0, &s.History, true)
+	mp := NewMovePicker(s.Position, ttMove, Move{}, Move{}, Move{}, &s.History, true)
 
 	for {
 		move := mp.NextMove()
@@ -107,7 +120,7 @@ func (s *Searcher) QuiescenceSearch(alpha int, beta int) int {
 // we can perform Null Move Pruning at this node, prevMove refers to the move played
 // in the parent node (used for updating counter moves), and line refers to the tracked
 // principal variation.
-func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, prevMove Move, line *[]Move) int {
+func (s *Searcher) Pvs(depth int, ply int, alpha int, beta int, doNull bool, ss []SearchStack, line *[]Move) int {
 	s.Info.NodesSearched++
 
 	if s.Info.NodesSearched%2047 == 0 {
@@ -122,6 +135,7 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, prevMove Mov
 	isRoot := depth == s.Info.RootDepth
 	stm := s.Position.turn
 	check := s.Position.IsCheck(stm)
+	ss[ply].staticEvalSet = false
 
 	///////////////////////////////////////////////////////////////////////////////
 	// CHECK EXTENSION
@@ -132,7 +146,7 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, prevMove Mov
 		depth++
 	}
 
-	if depth <= 0 {
+	if depth <= 0 || ply >= MAX_PLY {
 		return s.QuiescenceSearch(alpha, beta)
 	}
 
@@ -175,6 +189,16 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, prevMove Mov
 			staticEval = ttScore
 		}
 	}
+	ss[ply].staticEval = staticEval
+	ss[ply].staticEvalSet = true
+
+	///////////////////////////////////////////////////////////////////////////////
+	// IMPROVING HEURISTIC
+	// We can use the static evaluation difference between plies to determine
+	// whether this is a node worth reducing more or less. This will be useful in
+	// RFP, LMP, NMP, and LMR techniques.
+	///////////////////////////////////////////////////////////////////////////////
+	// improving := !check && ply >= 2 && ss[ply-2].staticEvalSet && ss[ply-2].staticEval < ss[ply].staticEval
 
 	// Pre-allocate PV line for child nodes
 	childPV := []Move{}
@@ -231,7 +255,7 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, prevMove Mov
 		if depth >= Params.NMP_MIN_DEPTH && doNull && notJustPawnsAndKing != 0 && staticEval >= beta {
 			s.Position.MakeNullMove()
 			R := 4 + depth/3 + Min((staticEval-beta)/200, 3)
-			score := -s.Pvs(depth-1-R, -beta, -beta+1, false, Move{}, &childPV)
+			score := -s.Pvs(depth-1-R, ply+2, -beta, -beta+1, false, ss, &childPV)
 			s.Position.UndoNullMove()
 
 			childPV = []Move{}
@@ -263,12 +287,12 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, prevMove Mov
 
 	killer1 := s.KillerMoves[depth][0]
 	killer2 := s.KillerMoves[depth][1]
-	counter := s.CounterMoves[prevMove.piece][prevMove.to]
-	if prevMove.IsEmpty() {
-		counter = Move{}
+	counter := Move{}
+	if ply > 0 && !ss[ply-1].move.IsEmpty() {
+		counter = s.CounterMoves[ss[ply-1].move.piece][ss[ply-1].move.to]
 	}
 
-	mp := NewMovePicker(s.Position, pvMove, killer1, killer2, counter, depth, &s.History, false)
+	mp := NewMovePicker(s.Position, pvMove, killer1, killer2, counter, &s.History, false)
 
 	var quietsSearched []Move
 
@@ -334,6 +358,8 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, prevMove Mov
 		}
 
 		s.Position.MakeMove(move)
+		ss[ply].move = move
+		prevNodes := s.Info.NodesSearched
 
 		if isQuiet {
 			quietsSearched = append(quietsSearched, move)
@@ -341,7 +367,7 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, prevMove Mov
 
 		score := 0
 		if mvCnt == 1 {
-			score = -s.Pvs(depth-1, -beta, -alpha, true, move, &childPV)
+			score = -s.Pvs(depth-1, ply+1, -beta, -alpha, true, ss, &childPV)
 		} else {
 			///////////////////////////////////////////////////////////////////////////////
 			// LATE MOVE REDUCTION
@@ -373,19 +399,24 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, prevMove Mov
 				R = Max(R, 0)
 			}
 
-			score = -s.Pvs(depth-1-R, -alpha-1, -alpha, true, move, &childPV)
+			score = -s.Pvs(depth-1-R, ply+1, -alpha-1, -alpha, true, ss, &childPV)
 
 			if score > alpha && R > 0 {
-				score = -s.Pvs(depth-1, -alpha-1, -alpha, true, move, &childPV)
+				score = -s.Pvs(depth-1, ply+1, -alpha-1, -alpha, true, ss, &childPV)
 				if score > alpha {
-					score = -s.Pvs(depth-1, -beta, -alpha, true, move, &childPV)
+					score = -s.Pvs(depth-1, ply+1, -beta, -alpha, true, ss, &childPV)
 				}
 			} else if score > alpha && score < beta {
-				score = -s.Pvs(depth-1, -beta, -alpha, true, move, &childPV)
+				score = -s.Pvs(depth-1, ply+1, -beta, -alpha, true, ss, &childPV)
 			}
 		}
 
 		s.Position.Undo()
+		ss[ply].move = Move{}
+
+		if isRoot {
+			s.Info.NodesPerMove[move] = s.Info.NodesSearched - prevNodes
+		}
 
 		if Timer.Stop {
 			return 0
@@ -404,7 +435,9 @@ func (s *Searcher) Pvs(depth int, alpha int, beta int, doNull bool, prevMove Mov
 				// Quiet moves that fail high can be used later on to enhance move ordering.
 				///////////////////////////////////////////////////////////////////////////////
 				s.storeKillerMove(move, depth)
-				s.storeCounterMove(move, prevMove)
+				if ply > 0 {
+					s.storeCounterMove(move, ss[ply-1].move)
+				}
 
 				// History bonus using history gravity formula
 				bonus := 300*depth - 250
@@ -501,6 +534,7 @@ func InitializeLMRTable() {
 
 func (s *Searcher) ResetInfo() {
 	s.Info.NodesSearched = 0
+	s.Info.NodesPerMove = map[Move]int{}
 }
 
 func (s *Searcher) SearchPosition() Move {
@@ -510,7 +544,6 @@ func (s *Searcher) SearchPosition() Move {
 	line := []Move{}
 	legalMoves := s.Position.GenerateLegalMoves()
 	prevScore := 0
-	maxDepth := 100
 
 	if len(legalMoves) == 1 {
 		Timer.hardLimit /= 10
@@ -524,7 +557,7 @@ func (s *Searcher) SearchPosition() Move {
 	// Set prevBest to first legal move in case search is stopped immediately
 	prevBest := legalMoves[0]
 
-	for depth := 1; depth <= maxDepth; depth++ {
+	for depth := 1; depth <= MAX_DEPTH; depth++ {
 		s.Info.RootDepth = depth
 
 		// Aspiration windows
@@ -543,7 +576,8 @@ func (s *Searcher) SearchPosition() Move {
 
 		// Aspiration window search with exponentially-widening research on fail
 		for {
-			score = s.Pvs(depth, alpha, beta, true, Move{}, &line)
+			searchStack := [MAX_PLY]SearchStack{}
+			score = s.Pvs(depth, 0, alpha, beta, true, searchStack[:], &line)
 			if Timer.Stop {
 				return prevBest
 			}
@@ -560,8 +594,6 @@ func (s *Searcher) SearchPosition() Move {
 			}
 			break
 		}
-
-		prevScore = score
 
 		delta := Max(int(Timer.Delta()), 1)
 		nps := s.Info.NodesSearched * 1000 / delta
@@ -591,7 +623,15 @@ func (s *Searcher) SearchPosition() Move {
 			}
 		}
 
+		Timer.CheckID(&s.Info, depth)
+
+		if depth > 1 {
+			Timer.UpdateSoftLimit(&s.Info, line[0], prevBest, score, prevScore)
+		}
+
 		prevBest = line[0]
+		prevScore = score
+		s.Info.NodesPerMove = map[Move]int{}
 
 		if s.Info.PonderingEnabled {
 			if len(line) > 1 {
@@ -601,7 +641,6 @@ func (s *Searcher) SearchPosition() Move {
 			}
 		}
 
-		Timer.CheckID(&s.Info, depth)
 		if Timer.Stop {
 			return prevBest
 		}

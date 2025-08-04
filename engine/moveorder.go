@@ -44,14 +44,13 @@ type MovePicker struct {
 	counter     Move
 	board       *Board
 	history     *[2][64][64]int
-	depth       int
 	currIdx     int
 	lastStage   Stage
 	QS          bool
 	skipQuiets  bool
 }
 
-func NewMovePicker(b *Board, ttMove Move, killer1 Move, killer2 Move, counter Move, depth int, history *[2][64][64]int, fromQS bool) *MovePicker {
+func NewMovePicker(b *Board, ttMove Move, killer1 Move, killer2 Move, counter Move, history *[2][64][64]int, fromQS bool) *MovePicker {
 	mp := &MovePicker{
 		board:      b,
 		ttMove:     ttMove,
@@ -59,7 +58,6 @@ func NewMovePicker(b *Board, ttMove Move, killer1 Move, killer2 Move, counter Mo
 		killer1:    killer1,
 		killer2:    killer2,
 		counter:    counter,
-		depth:      depth,
 		history:    history,
 		currIdx:    0,
 		lastStage:  ternary(fromQS, GOOD_CAPTURES, BAD_CAPTURES),

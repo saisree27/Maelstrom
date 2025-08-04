@@ -45,7 +45,7 @@ Table summarizing Elo progression (with specific tests documented in release not
 
 |        Version      |  Estimated Elo  | CCRL Blitz |
 |:-------------------:|:------------:|:------------:|
-| v3.2.0    | ~3200 | [3213](https://computerchess.org.uk/ccrl/404/cgi/engine_details.cgi?print=Details&each_game=1&eng=Maelstrom%203.2.0%2064-bit#Maelstrom_3_2_0_64-bit) |
+| v3.2.0    | ~3200 | [3224](https://computerchess.org.uk/ccrl/404/cgi/engine_details.cgi?print=Details&each_game=1&eng=Maelstrom%203.2.0%2064-bit#Maelstrom_3_2_0_64-bit) |
 | v3.1.1    | ~3070 |     -        |
 | v3.1.0    | ~3040 |     -        |
 | v3.0.0    |  ~2820 |    -         |
