@@ -44,21 +44,27 @@ type MovePicker struct {
 	counter     Move
 	board       *Board
 	history     *[2][64][64]int
+	searcher    *Searcher
+	stack       []SearchStack
+	ply         int
 	currIdx     int
 	lastStage   Stage
 	QS          bool
 	skipQuiets  bool
 }
 
-func NewMovePicker(b *Board, ttMove Move, killer1 Move, killer2 Move, counter Move, history *[2][64][64]int, fromQS bool) *MovePicker {
+func NewMovePicker(s *Searcher, ss []SearchStack, ttMove Move, killer1 Move, killer2 Move, counter Move, ply int, fromQS bool) *MovePicker {
 	mp := &MovePicker{
-		board:      b,
+		board:      s.Position,
 		ttMove:     ttMove,
 		stage:      ternary(ttMove.IsEmpty(), TT_MOVE+1, TT_MOVE),
 		killer1:    killer1,
 		killer2:    killer2,
 		counter:    counter,
-		history:    history,
+		history:    &s.History,
+		searcher:   s,
+		stack:      ss,
+		ply:        ply,
 		currIdx:    0,
 		lastStage:  ternary(fromQS, GOOD_CAPTURES, BAD_CAPTURES),
 		QS:         fromQS,
@@ -85,6 +91,7 @@ func (mp *MovePicker) processMoves(moves []Move) {
 			})
 		} else {
 			score := mp.history[mp.board.turn][mv.from][mv.to]
+			score += mp.searcher.getContHist(mp.stack, mv, mp.ply, 1)
 			mp.quiets = append(mp.quiets, ScoredMove{
 				move:  mv,
 				score: score,

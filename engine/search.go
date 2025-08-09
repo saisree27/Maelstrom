@@ -32,6 +32,7 @@ type Searcher struct {
 	KillerMoves  [101][2]Move
 	History      [2][64][64]int
 	CounterMoves [12][64]Move
+	ContHist     [12][64][12][64]int
 	Info         SearchInfo
 }
 
@@ -86,7 +87,7 @@ func (s *Searcher) QuiescenceSearch(alpha int, beta int) int {
 		alpha = eval
 	}
 
-	mp := NewMovePicker(s.Position, ttMove, Move{}, Move{}, Move{}, &s.History, true)
+	mp := NewMovePicker(s, []SearchStack{}, ttMove, Move{}, Move{}, Move{}, 0, true)
 
 	for {
 		move := mp.NextMove()
@@ -292,7 +293,7 @@ func (s *Searcher) Pvs(depth int, ply int, alpha int, beta int, doNull bool, ss 
 		counter = s.CounterMoves[ss[ply-1].move.piece][ss[ply-1].move.to]
 	}
 
-	mp := NewMovePicker(s.Position, pvMove, killer1, killer2, counter, &s.History, false)
+	mp := NewMovePicker(s, ss, pvMove, killer1, killer2, counter, ply, false)
 
 	var quietsSearched []Move
 
@@ -442,11 +443,13 @@ func (s *Searcher) Pvs(depth int, ply int, alpha int, beta int, doNull bool, ss 
 				// History bonus using history gravity formula
 				bonus := 300*depth - 250
 				s.updateHistory(move, s.Position.turn, bonus)
+				s.updateContHist(ss, move, bonus, ply, 1)
 
 				// Malus for all quiet moves we searched prior
 				for idx := 0; idx < len(quietsSearched)-1; idx++ {
 					move = quietsSearched[idx]
 					s.updateHistory(move, s.Position.turn, -bonus)
+					s.updateContHist(ss, move, -bonus, ply, 1)
 				}
 			}
 			break
@@ -494,18 +497,30 @@ func (s *Searcher) storeCounterMove(move Move, prevMove Move) {
 }
 
 func (s *Searcher) updateHistory(move Move, color Color, bonus int) {
-	if bonus > HISTORY_MAX_BONUS {
-		bonus = HISTORY_MAX_BONUS
-	} else if bonus < -HISTORY_MAX_BONUS {
-		bonus = -HISTORY_MAX_BONUS
-	}
-
-	absBonus := bonus
-	if absBonus < 0 {
-		absBonus *= -1
-	}
-
+	bonus = Clamp(bonus, -HISTORY_MAX_BONUS, HISTORY_MAX_BONUS)
+	absBonus := Abs(bonus)
 	s.History[color][move.from][move.to] += bonus - s.History[color][move.from][move.to]*absBonus/HISTORY_MAX_BONUS
+}
+
+func (s *Searcher) updateContHist(ss []SearchStack, move Move, bonus int, curPly int, traverse int) {
+	bonus = Clamp(bonus, -HISTORY_MAX_BONUS, HISTORY_MAX_BONUS)
+	absBonus := Abs(bonus)
+	if curPly >= traverse {
+		prevMove := ss[curPly-traverse].move
+		if !prevMove.IsEmpty() {
+			s.ContHist[move.piece][move.to][prevMove.piece][prevMove.to] += bonus - s.ContHist[move.piece][move.to][prevMove.piece][prevMove.to]*absBonus/HISTORY_MAX_BONUS
+		}
+	}
+}
+
+func (s *Searcher) getContHist(ss []SearchStack, move Move, curPly int, traverse int) int {
+	if curPly >= traverse {
+		prevMove := ss[curPly-traverse].move
+		if !prevMove.IsEmpty() {
+			return s.ContHist[move.piece][move.to][prevMove.piece][prevMove.to]
+		}
+	}
+	return 0
 }
 
 func (s *Searcher) ClearKillers() {
@@ -517,6 +532,10 @@ func (s *Searcher) ClearKillers() {
 
 func (s *Searcher) ClearHistory() {
 	s.History = [2][64][64]int{}
+}
+
+func (s *Searcher) ClearContHist() {
+	s.ContHist = [12][64][12][64]int{}
 }
 
 func (s *Searcher) ClearCounters() {

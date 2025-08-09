@@ -630,11 +630,6 @@ func CheckSameElements(a, b []string) bool {
 	return reflect.DeepEqual(a_copy, b_copy)
 }
 
-// get rid of variable unused error while developing, don't really like that lol
-func UNUSED(x interface{}) {
-	_ = x
-}
-
 func Max(a, b int) int {
 	if a > b {
 		return a
@@ -647,4 +642,15 @@ func Min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func Abs(a int) int {
+	if a < 0 {
+		return -a
+	}
+	return a
+}
+
+func Clamp(x int, lower int, upper int) int {
+	return Min(Max(x, lower), upper)
 }
