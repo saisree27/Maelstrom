@@ -1,5 +1,7 @@
 <div align="center">
   <img src="maelstrom-logo.png" width="250" height="250" style="border-radius:5%">
+  <h1 style="border-bottom:none; margin-bottom:0;">MAELSTROM</h1>
+  <p>a UCI-compliant chess engine made in Go</p>
 </div>
 
 <div align="center">
@@ -9,10 +11,6 @@
   ![](https://img.shields.io/github/commits-since/saisree27/Maelstrom/v3.2.0)
 
 </div>
-
-# Maelstrom
-
-UCI-compliant Golang chess engine in development from scratch.
 
 ## Play/watch games
 Maelstrom often plays on Lichess [here](https://lichess.org/@/Maelstrom-Chess). Please feel free to challenge the engine on lichess whenever it is online.
