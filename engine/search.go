@@ -159,14 +159,14 @@ func (s *Searcher) Pvs(depth int, ply int, alpha int, beta int, doNull bool, ss 
 		return 0
 	}
 
-	bestMove := Move{}
+	ttMove := Move{}
 
 	///////////////////////////////////////////////////////////////////////////////
 	// TRANSPOSITION TABLE PROBE
 	// The goal is to prune the node entirely using the saved score in TT.
 	// Even if this doesn't happen though, we can still utilize saved static eval.
 	///////////////////////////////////////////////////////////////////////////////
-	probeResult, ttScore, entry := ProbeTT(s.Position, alpha, beta, uint8(depth), &bestMove)
+	probeResult, ttScore, entry := ProbeTT(s.Position, alpha, beta, uint8(depth), &ttMove)
 	if probeResult == CUTOFF && !isRoot && !isPv {
 		return ttScore
 	}
@@ -218,7 +218,7 @@ func (s *Searcher) Pvs(depth int, ply int, alpha int, beta int, doNull bool, ss 
 		// Currently the margin is a constant multiple of depth, this can be improved.
 		// More info: https://www.chessprogramming.org/Reverse_Futility_Pruning
 		///////////////////////////////////////////////////////////////////////////////
-		if depth <= Params.RFP_MAX_DEPTH && !bestMove.IsEmpty() && bestMove.movetype != CAPTURE && beta > -WIN_VAL-100 {
+		if depth <= Params.RFP_MAX_DEPTH && !ttMove.IsEmpty() && ttMove.movetype != CAPTURE && beta > -WIN_VAL-100 {
 			margin := Params.RFP_MULT * depth
 			if staticEval-margin >= beta {
 				return beta + (staticEval-beta)/2
@@ -277,13 +277,13 @@ func (s *Searcher) Pvs(depth int, ply int, alpha int, beta int, doNull bool, ss 
 	// we did not look at this position in prior searches. We can do IIR on PV
 	// nodes and expected cut nodes.
 	///////////////////////////////////////////////////////////////////////////////
-	if bestMove.IsEmpty() && depth >= Params.IIR_MIN_DEPTH && isPv {
+	if ttMove.IsEmpty() && depth >= Params.IIR_MIN_DEPTH && isPv {
 		depth -= Params.IIR_DEPTH_REDUCTION
 	}
 
-	pvMove := bestMove
+	pvMove := ttMove
 	bestScore := -WIN_VAL - 1
-	bestMove = Move{}
+	bestMove := Move{}
 	ttFlag := UPPER
 
 	killer1 := s.KillerMoves[depth][0]
@@ -383,21 +383,24 @@ func (s *Searcher) Pvs(depth int, ply int, alpha int, beta int, doNull bool, ss 
 			R := 0
 
 			if depth >= Params.LMR_MIN_DEPTH && isQuiet {
-				R = LMR_TABLE[depth][mvCnt]
-
-				if check {
-					R--
-				}
+				R = LMR_TABLE[depth][mvCnt] * 1024
 
 				if s.Position.IsCheck(s.Position.turn) {
-					R--
+					R -= Params.LMR_CHECK
 				}
 
 				if !isPv {
-					R++
+					R += Params.LMR_NOT_PV
 				}
 
-				R = Max(R, 0)
+				if ttMove.IsCapture() {
+					R += Params.LMR_TT_CAPTURE
+				}
+
+				hist := mp.history[stm][move.from][move.to] + s.getContHist(ss, move, ply, 1)
+				R -= hist * 1024 / (HISTORY_MAX_BONUS)
+
+				R = Max(R/1024, 0)
 			}
 
 			score = -s.Pvs(depth-1-R, ply+1, -alpha-1, -alpha, true, ss, &childPV)
