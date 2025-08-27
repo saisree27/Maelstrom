@@ -8,7 +8,7 @@
 
   ![](https://github.com/saisree27/Maelstrom/actions/workflows/go.yml/badge.svg)
   ![](https://img.shields.io/github/v/release/saisree27/Maelstrom)
-  ![](https://img.shields.io/github/commits-since/saisree27/Maelstrom/v3.2.0)
+  ![](https://img.shields.io/github/commits-since/saisree27/Maelstrom/v3.3.0)
 
 </div>
 
