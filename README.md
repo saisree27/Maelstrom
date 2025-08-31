@@ -1,7 +1,7 @@
 <div align="center">
   <img src="maelstrom-logo.png" width="250" height="250" style="border-radius:5%">
   <h1 style="border-bottom:none; margin-bottom:0;">MAELSTROM</h1>
-  <p>a UCI-compliant chess engine made in Go</p>
+  <p>a strong UCI-compliant chess engine made in Go <br> latest version strength estimated to be <strong>~3300 Elo</strong></p>
 </div>
 
 <div align="center">
@@ -18,7 +18,7 @@ Maelstrom often plays on Lichess [here](https://lichess.org/@/Maelstrom-Chess). 
 ## Features
  - Fast bitboard move generation (magic bitboards for sliding pieces)
  - Iterative deepening principal variation search with aspiration windows
- - Move ordering with MVV-LVA, history, and killer heuristic
+ - Stage-based move picker with MVV-LVA, history, killer, counter-move, and 1-ply continuation history 
  - Transposition table
  - Null move pruning
  - Static null move pruning
@@ -30,7 +30,7 @@ Maelstrom often plays on Lichess [here](https://lichess.org/@/Maelstrom-Chess). 
  - Static Exchange Evaluation (SEE) pruning and move ordering
  - NNUE Evaluation using a (768->512)x2->1 architecture using a SIMD SCReLU activation function, trained on Lc0/SF data
  - UCI protocol implementation, so you can run the engine using a UCI-supported GUI such as [CuteChess](https://github.com/cutechess/cutechess/releases)
- - Time management with soft/hard bounds
+ - Time management with soft/hard bounds and soft scaling
  - Pondering
 
 ## Releases

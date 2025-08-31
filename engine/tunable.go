@@ -60,7 +60,7 @@ var Params = TunableParameters{
 	SEE_QUEEN_VALUE:          900,
 	SEE_QUIET_PRUNING_MULT:   20,
 	SEE_CAPTURE_PRUNING_MULT: 100,
-	TIME_DIVISOR:             25,
+	TIME_DIVISOR:             20,
 	INC_FRACTION:             2,
 	HARD_LIMIT_MULT:          2,
 	TM_STABILITY_WINDOW:      10,
