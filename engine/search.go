@@ -83,6 +83,11 @@ func (s *Searcher) QuiescenceSearch(alpha int, beta int) int {
 		return beta
 	}
 
+	// Delta pruning
+	if eval < alpha-1000 {
+		return alpha
+	}
+
 	if alpha < eval {
 		alpha = eval
 	}
