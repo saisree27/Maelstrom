@@ -126,7 +126,7 @@ func (s *Searcher) QuiescenceSearch(alpha int, beta int) int {
 // we can perform Null Move Pruning at this node, prevMove refers to the move played
 // in the parent node (used for updating counter moves), and line refers to the tracked
 // principal variation.
-func (s *Searcher) Pvs(depth int, ply int, alpha int, beta int, doNull bool, ss []SearchStack, line *[]Move) int {
+func (s *Searcher) Pvs(depth int, ply int, alpha int, beta int, doNull bool, ss []SearchStack, line *[]Move, cutNode bool) int {
 	s.Info.NodesSearched++
 
 	if s.Info.NodesSearched%2047 == 0 {
@@ -261,7 +261,7 @@ func (s *Searcher) Pvs(depth int, ply int, alpha int, beta int, doNull bool, ss 
 		if depth >= Params.NMP_MIN_DEPTH && doNull && notJustPawnsAndKing != 0 && staticEval >= beta {
 			s.Position.MakeNullMove()
 			R := 4 + depth/3 + Min((staticEval-beta)/200, 3)
-			score := -s.Pvs(depth-1-R, ply+2, -beta, -beta+1, false, ss, &childPV)
+			score := -s.Pvs(depth-1-R, ply+2, -beta, -beta+1, false, ss, &childPV, false)
 			s.Position.UndoNullMove()
 
 			childPV = []Move{}
@@ -280,9 +280,9 @@ func (s *Searcher) Pvs(depth int, ply int, alpha int, beta int, doNull bool, ss 
 	// INTERNAL ITERATIVE REDUCTION
 	// If there is no TT move, we hope we can safely reduce the depth of node since
 	// we did not look at this position in prior searches. We can do IIR on PV
-	// nodes and expected cut nodes.
+	// nodes and cut nodes.
 	///////////////////////////////////////////////////////////////////////////////
-	if ttMove.IsEmpty() && depth >= Params.IIR_MIN_DEPTH && isPv {
+	if ttMove.IsEmpty() && depth >= Params.IIR_MIN_DEPTH && (isPv || cutNode) {
 		depth -= Params.IIR_DEPTH_REDUCTION
 	}
 
@@ -373,7 +373,7 @@ func (s *Searcher) Pvs(depth int, ply int, alpha int, beta int, doNull bool, ss 
 
 		score := 0
 		if mvCnt == 1 {
-			score = -s.Pvs(depth-1, ply+1, -beta, -alpha, true, ss, &childPV)
+			score = -s.Pvs(depth-1, ply+1, -beta, -alpha, true, ss, &childPV, !isPv && !cutNode)
 		} else {
 			///////////////////////////////////////////////////////////////////////////////
 			// LATE MOVE REDUCTION
@@ -402,21 +402,25 @@ func (s *Searcher) Pvs(depth int, ply int, alpha int, beta int, doNull bool, ss 
 					R += Params.LMR_TT_CAPTURE
 				}
 
+				if cutNode {
+					R += Params.LMR_CUTNODE
+				}
+
 				hist := mp.history[stm][move.from][move.to] + s.getContHist(ss, move, ply, 1)
 				R -= hist * 1024 / (HISTORY_MAX_BONUS)
 
 				R = Max(R/1024, 0)
 			}
 
-			score = -s.Pvs(depth-1-R, ply+1, -alpha-1, -alpha, true, ss, &childPV)
+			score = -s.Pvs(depth-1-R, ply+1, -alpha-1, -alpha, true, ss, &childPV, true)
 
 			if score > alpha && R > 0 {
-				score = -s.Pvs(depth-1, ply+1, -alpha-1, -alpha, true, ss, &childPV)
+				score = -s.Pvs(depth-1, ply+1, -alpha-1, -alpha, true, ss, &childPV, !cutNode)
 				if score > alpha {
-					score = -s.Pvs(depth-1, ply+1, -beta, -alpha, true, ss, &childPV)
+					score = -s.Pvs(depth-1, ply+1, -beta, -alpha, true, ss, &childPV, false)
 				}
 			} else if score > alpha && score < beta {
-				score = -s.Pvs(depth-1, ply+1, -beta, -alpha, true, ss, &childPV)
+				score = -s.Pvs(depth-1, ply+1, -beta, -alpha, true, ss, &childPV, false)
 			}
 		}
 
@@ -604,7 +608,7 @@ func (s *Searcher) SearchPosition() Move {
 		// Aspiration window search with exponentially-widening research on fail
 		for {
 			searchStack := [MAX_PLY]SearchStack{}
-			score = s.Pvs(depth, 0, alpha, beta, true, searchStack[:], &line)
+			score = s.Pvs(depth, 0, alpha, beta, true, searchStack[:], &line, false)
 			if Timer.Stop {
 				return prevBest
 			}

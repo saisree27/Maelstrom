@@ -15,6 +15,7 @@ type TunableParameters struct {
 	LMR_CHECK                   int
 	LMR_TT_CAPTURE              int
 	LMR_NOT_PV                  int
+	LMR_CUTNODE                 int
 	NMP_MIN_DEPTH               int
 	LMP_MAX_DEPTH               int
 	LMP_BASE                    int
@@ -49,6 +50,7 @@ var Params = TunableParameters{
 	LMR_CHECK:                1170,
 	LMR_TT_CAPTURE:           1130,
 	LMR_NOT_PV:               1050,
+	LMR_CUTNODE:              1400,
 	NMP_MIN_DEPTH:            2,
 	LMP_MAX_DEPTH:            7,
 	LMP_BASE:                 5,
