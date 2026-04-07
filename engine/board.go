@@ -353,8 +353,6 @@ func (b *Board) MakeMove(mv Move) {
 			}
 			b.plyCnt50 = 0
 		}
-	} else {
-		b.plyCnt50 = 0
 	}
 
 	prevRights := b.castlingRights

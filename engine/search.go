@@ -23,6 +23,7 @@ type SearchStack struct {
 	staticEval    int
 	staticEvalSet bool
 	move          Move
+	excluded      Move
 }
 
 // Searcher is the primary search thread. All information stored in
@@ -141,6 +142,7 @@ func (s *Searcher) Pvs(depth int, ply int, alpha int, beta int, doNull bool, ss 
 	isRoot := depth == s.Info.RootDepth
 	stm := s.Position.turn
 	check := s.Position.IsCheck(stm)
+	excluded := ss[ply].excluded
 	ss[ply].staticEvalSet = false
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -171,9 +173,14 @@ func (s *Searcher) Pvs(depth int, ply int, alpha int, beta int, doNull bool, ss 
 	// The goal is to prune the node entirely using the saved score in TT.
 	// Even if this doesn't happen though, we can still utilize saved static eval.
 	///////////////////////////////////////////////////////////////////////////////
-	probeResult, ttScore, entry := ProbeTT(s.Position, alpha, beta, uint8(depth), &ttMove)
-	if probeResult == CUTOFF && !isRoot && !isPv {
-		return ttScore
+	probeResult := NULL
+	ttScore := 0
+	entry := &TTEntry{}
+	if excluded.IsEmpty() {
+		probeResult, ttScore, entry = ProbeTT(s.Position, alpha, beta, uint8(depth), &ttMove)
+		if probeResult == CUTOFF && !isRoot && !isPv {
+			return ttScore
+		}
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -215,7 +222,7 @@ func (s *Searcher) Pvs(depth int, ply int, alpha int, beta int, doNull bool, ss 
 	// are not in a root node, aren't in a PV node, and that the position is not in
 	// check.
 	///////////////////////////////////////////////////////////////////////////////
-	if !isRoot && !isPv && !check {
+	if !isRoot && !isPv && !check && excluded.IsEmpty() {
 		///////////////////////////////////////////////////////////////////////////////
 		// REVERSE FUTILITY PRUNING
 		// If the material balance minus a safety margin does not improve beta,
@@ -282,7 +289,7 @@ func (s *Searcher) Pvs(depth int, ply int, alpha int, beta int, doNull bool, ss 
 	// we did not look at this position in prior searches. We can do IIR on PV
 	// nodes and cut nodes.
 	///////////////////////////////////////////////////////////////////////////////
-	if ttMove.IsEmpty() && depth >= Params.IIR_MIN_DEPTH && (isPv || cutNode) {
+	if excluded.IsEmpty() && ttMove.IsEmpty() && depth >= Params.IIR_MIN_DEPTH && (isPv || cutNode) {
 		depth -= Params.IIR_DEPTH_REDUCTION
 	}
 
@@ -312,11 +319,42 @@ func (s *Searcher) Pvs(depth int, ply int, alpha int, beta int, doNull bool, ss 
 		if move.IsEmpty() {
 			break
 		}
+		if move == excluded {
+			continue
+		}
 
 		mvCnt++
+		extension := 0
 
 		isQuiet := move.IsQuiet()
 		lmrDepth := Max(depth-LMR_TABLE[depth][mvCnt], 0)
+
+		if move == ttMove &&
+			excluded.IsEmpty() &&
+			!isRoot &&
+			!check &&
+			depth >= Params.SE_MIN_DEPTH &&
+			probeResult != NULL &&
+			(entry.bd == EXACT || entry.bd == LOWER) &&
+			int(entry.depth)+Params.SE_TT_DEPTH_MARGIN >= depth &&
+			Abs(ttScore) < WIN_VAL-100 {
+			singularBeta := ttScore - Params.SE_MARGIN_MULT*depth
+			singularDepth := Max((depth-1)/2, 1)
+			ss[ply].excluded = move
+			singularLine := []Move{}
+			singularScore := s.Pvs(singularDepth, ply, singularBeta-1, singularBeta, false, ss, &singularLine, cutNode)
+			ss[ply].excluded = Move{}
+
+			if Timer.Stop {
+				return 0
+			}
+
+			if singularScore < singularBeta {
+				extension = 1
+			}
+		}
+
+		searchDepth := depth + extension
 
 		if !isRoot && !isPv && bestScore > -WIN_VAL+100 {
 			///////////////////////////////////////////////////////////////////////////////
@@ -373,7 +411,7 @@ func (s *Searcher) Pvs(depth int, ply int, alpha int, beta int, doNull bool, ss 
 
 		score := 0
 		if mvCnt == 1 {
-			score = -s.Pvs(depth-1, ply+1, -beta, -alpha, true, ss, &childPV, !isPv && !cutNode)
+			score = -s.Pvs(searchDepth-1, ply+1, -beta, -alpha, true, ss, &childPV, !isPv && !cutNode)
 		} else {
 			///////////////////////////////////////////////////////////////////////////////
 			// LATE MOVE REDUCTION
@@ -412,15 +450,15 @@ func (s *Searcher) Pvs(depth int, ply int, alpha int, beta int, doNull bool, ss 
 				R = Max(R/1024, 0)
 			}
 
-			score = -s.Pvs(depth-1-R, ply+1, -alpha-1, -alpha, true, ss, &childPV, true)
+			score = -s.Pvs(searchDepth-1-R, ply+1, -alpha-1, -alpha, true, ss, &childPV, true)
 
 			if score > alpha && R > 0 {
-				score = -s.Pvs(depth-1, ply+1, -alpha-1, -alpha, true, ss, &childPV, !cutNode)
+				score = -s.Pvs(searchDepth-1, ply+1, -alpha-1, -alpha, true, ss, &childPV, !cutNode)
 				if score > alpha {
-					score = -s.Pvs(depth-1, ply+1, -beta, -alpha, true, ss, &childPV, false)
+					score = -s.Pvs(searchDepth-1, ply+1, -beta, -alpha, true, ss, &childPV, false)
 				}
 			} else if score > alpha && score < beta {
-				score = -s.Pvs(depth-1, ply+1, -beta, -alpha, true, ss, &childPV, false)
+				score = -s.Pvs(searchDepth-1, ply+1, -beta, -alpha, true, ss, &childPV, false)
 			}
 		}
 
@@ -488,7 +526,7 @@ func (s *Searcher) Pvs(depth int, ply int, alpha int, beta int, doNull bool, ss 
 		}
 	}
 
-	if !Timer.Stop {
+	if !Timer.Stop && excluded.IsEmpty() {
 		StoreEntry(s.Position, bestScore, ttFlag, bestMove, uint8(depth), staticEval)
 	}
 

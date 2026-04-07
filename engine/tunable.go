@@ -11,6 +11,9 @@ type TunableParameters struct {
 	FUTILITY_MAX_DEPTH          int
 	IIR_MIN_DEPTH               int
 	IIR_DEPTH_REDUCTION         int
+	SE_MIN_DEPTH                int
+	SE_TT_DEPTH_MARGIN          int
+	SE_MARGIN_MULT              int
 	LMR_MIN_DEPTH               int
 	LMR_CHECK                   int
 	LMR_TT_CAPTURE              int
@@ -46,6 +49,9 @@ var Params = TunableParameters{
 	FUTILITY_MAX_DEPTH:       10,
 	IIR_MIN_DEPTH:            4,
 	IIR_DEPTH_REDUCTION:      1,
+	SE_MIN_DEPTH:             8,
+	SE_TT_DEPTH_MARGIN:       3,
+	SE_MARGIN_MULT:           2,
 	LMR_MIN_DEPTH:            2,
 	LMR_CHECK:                1170,
 	LMR_TT_CAPTURE:           1130,
