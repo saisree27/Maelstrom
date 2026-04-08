@@ -49,7 +49,7 @@ var Params = TunableParameters{
 	FUTILITY_MAX_DEPTH:       10,
 	IIR_MIN_DEPTH:            4,
 	IIR_DEPTH_REDUCTION:      1,
-	SE_MIN_DEPTH:             8,
+	SE_MIN_DEPTH:             6,
 	SE_TT_DEPTH_MARGIN:       3,
 	SE_MARGIN_MULT:           2,
 	LMR_MIN_DEPTH:            2,
